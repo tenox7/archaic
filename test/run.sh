@@ -88,19 +88,25 @@ fi
 
 # 5. WRP's form: Archaic hides W, H, M, T, C (and their labels) and sends
 #    its own values: the window's size, ISMAP, GIF, 2 colors. With -a,
-#    M, T and C are shown and sent as set.
+#    M, T and C are shown and sent as set. WRP's buttons get pictures.
 cat >"$tmp/wrp.html" <<'EOF'
 <HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
 <FORM ACTION="/wrp" METHOD="GET">
 <INPUT TYPE="TEXT" NAME="url" VALUE="" SIZE="20">
 <INPUT TYPE="SUBMIT" VALUE="Go">
 <INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Bk">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="St">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Re">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Up">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Dn">
 W <INPUT TYPE="TEXT" NAME="w" VALUE="1152" SIZE="4">
 H <INPUT TYPE="TEXT" NAME="h" VALUE="600" SIZE="4">
 Z <SELECT NAME="z"><OPTION DISABLED>Zoom</OPTION><OPTION VALUE="1.0" SELECTED>1.0 x</OPTION></SELECT>
 M <SELECT NAME="m"><OPTION VALUE="ismap" SELECTED>ISMAP</OPTION><OPTION VALUE="html">HTML</OPTION></SELECT>
 T <SELECT NAME="t"><OPTION VALUE="gip" SELECTED>GIP</OPTION><OPTION VALUE="gif">GIF</OPTION></SELECT>
 K <INPUT TYPE="TEXT" NAME="k" VALUE="" SIZE="4">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Bs">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Rt">
 </FORM>
 </BODY></HTML>
 EOF
@@ -113,6 +119,14 @@ if [ -z "$shown" ] && grep -q 'select.* z sel' "$tmp/f.out" &&
 else
 	bad "wrp form: shows the wrong things:"
 	echo "$shown"
+fi
+# WRP's 7 buttons (NAME=Fn) are pictures; Go and other forms' buttons are text.
+if [ "$(grep -c '^ *[0-9]* button .* Fn "[A-Za-z]*" icon$' "$tmp/f.out")" = 7 ] &&
+	! grep -q '"Go" icon' "$tmp/f.out" && ! grep -q 'icon' "$tmp/t.out"; then
+	ok "wrp form: Bk St Re Up Dn Bs Rt are pictures, Go is text"
+else
+	bad "wrp form: the wrong buttons are pictures:"
+	grep 'button' "$tmp/f.out"
 fi
 x=$(awk '$2 == "field" && $8 == "url" { print $3 + 5; exit }' "$tmp/f.out")
 y=$(awk '$2 == "field" && $8 == "url" { print $4 + 5; exit }' "$tmp/f.out")

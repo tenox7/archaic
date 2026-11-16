@@ -19,7 +19,8 @@
  *
  * WRP's form: Archaic sets WRP's settings itself and does not show them.
  * W and H: the picture fills the window. M, T, C: ISMAP, GIF, 2 colors
- * (with -a, the menus for these are shown and used).
+ * (with -a, the menus for these are shown and used). WRP's buttons
+ * (Bk, St, Re, Up, Dn, Bs, Rt) are drawn as pictures: see icons[].
  */
 #include "archaic.h"
 
@@ -173,18 +174,153 @@ int i;
 		fill(x + 1 + PAD + tw(s + n - k, k), y + 1 + PAD, 1, fh, 1);
 }
 
+/* WRP's buttons get pictures, like the buttons of a real browser. (WRP
+ * names them with 2 letters because old browsers can only show text on
+ * a button.) Bk back, St stop, Re reload, Up and Dn scroll the page;
+ * Bs and Rt are Backspace and Return for the K field. # is black. */
+#define IW 13
+#define IH 11
+static char *icons[] = {
+	"Bk",
+	".....#.......",
+	"....##.......",
+	"...###.......",
+	"..####.......",
+	".############",
+	"#############",
+	".############",
+	"..####.......",
+	"...###.......",
+	"....##.......",
+	".....#.......",
+	"St",
+	"....#####....",
+	"...#.....#...",
+	"..#.#####.#..",
+	".#.#######.#.",
+	".#.#######.#.",
+	".#.#######.#.",
+	".#.#######.#.",
+	".#.#######.#.",
+	"..#.#####.#..",
+	"...#.....#...",
+	"....#####....",
+	"Re",
+	"....#####..#.",
+	"..#######.##.",
+	"..###...####.",
+	".##.....####.",
+	".##....#####.",
+	".##..........",
+	".##..........",
+	".##.......##.",
+	"..###...###..",
+	"..#########..",
+	"....#####....",
+	"Up",
+	"......#......",
+	".....###.....",
+	"....#####....",
+	"...#######...",
+	"..#########..",
+	".###########.",
+	".....###.....",
+	".....###.....",
+	".....###.....",
+	".....###.....",
+	".....###.....",
+	"Dn",
+	".....###.....",
+	".....###.....",
+	".....###.....",
+	".....###.....",
+	".....###.....",
+	".###########.",
+	"..#########..",
+	"...#######...",
+	"....#####....",
+	".....###.....",
+	"......#......",
+	"Bs",
+	".....########",
+	"....#########",
+	"...##########",
+	"..####.###.##",
+	".######.#.###",
+	"########.####",
+	".######.#.###",
+	"..####.###.##",
+	"...##########",
+	"....#########",
+	".....########",
+	"Rt",
+	"...........##",
+	"...........##",
+	"...#.......##",
+	"..##.......##",
+	".###.......##",
+	"#############",
+	"#############",
+	".###.........",
+	"..##.........",
+	"...#.........",
+	".............",
+	0
+};
+
+/* the picture of button it, or 0: only WRP's buttons (NAME=Fn) have one */
+static char **icon(it)
+Item *it;
+{
+	int i;
+
+	if (it->type != I_BUTTON || it->form < 0 || it->form >= MAXFORM ||
+		!wrpf[it->form] || !it->name || !strieq(it->name, "Fn") ||
+		!it->text)
+		return (char **)0;
+	for (i = 0; icons[i]; i += IH + 1)
+		if (strieq(icons[i], it->text))
+			return &icons[i + 1];
+	return (char **)0;
+}
+
+/* picture p at x, y: drawn only when all of it is on the page part */
+static void drawicon(x, y, p)
+int x, y;
+char **p;
+{
+	static unsigned char b[IH * ((IW + 7) / 8)];
+	int bpl = (IW + 7) / 8, r, c;
+
+	if (y < 0 || y + IH > viewh)
+		return;
+	for (r = 0; r < IH * bpl; ++r)
+		b[r] = 0;
+	for (r = 0; r < IH; ++r)
+		for (c = 0; c < IW && p[r][c]; ++c)
+			if (p[r][c] == '#')
+				b[r * bpl + c / 8] |= 0x80 >> (c & 7);
+	g_bits(x, y, IW, IH, b, bpl);
+}
+
 static void drawbutton(i)
 int i;
 {
 	Item *it = &items[i];
 	int x = it->x, y = it->y - top, w = it->w, h = it->h, n;
+	char **p = icon(it);
 
 	fill(x, y, w, h, 0);
 	box(x, y, w - 1, h - 1);
 	fill(x + 1, y + h - 1, w - 1, 1, 1);	/* shadow */
 	fill(x + w - 1, y + 1, 1, h - 1, 1);
-	n = len(it->text);
-	text(x + (w - 1 - tw(it->text, n)) / 2, y + 1 + PAD, it->text, n);
+	if (p)
+		drawicon(x + (w - 1 - IW) / 2, y + 1 + (h - 3 - IH) / 2, p);
+	else {
+		n = len(it->text);
+		text(x + (w - 1 - tw(it->text, n)) / 2, y + 1 + PAD, it->text,
+			n);
+	}
 	if (i == pressed)
 		inv(x + 1, y + 1, w - 3, h - 3);
 }
@@ -372,7 +508,8 @@ Item *it;
 		it->h = fh + 2 * PAD + 2;
 		break;
 	case I_BUTTON:
-		it->w = tw(it->text, len(it->text)) + 2 * BPAD + 3;
+		it->w = (icon(it) ? IW : tw(it->text, len(it->text))) +
+			2 * BPAD + 3;
 		it->h = fh + 2 * PAD + 2;
 		break;
 	case I_SELECT:
@@ -1014,6 +1151,8 @@ static void dump()
 			printf(" =\"%s\"", it->val);
 		if (it->type == I_TEXT || it->type == I_BUTTON || it->type == I_IMAGE)
 			printf(" \"%s\"", it->text);
+		if (icon(it))
+			printf(" icon");
 		if (it->type == I_SELECT) {
 			printf(" sel %d:", it->sel);
 			for (j = 0; j < it->nopt; ++j) {

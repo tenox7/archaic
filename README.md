@@ -52,7 +52,7 @@ So Archaic on Idris looks for WRP at `http://10.0.2.2:8080/`.
 Somewhere else: `archaic HOST:PORT`, or `setenv WRP HOST:PORT`.
 
 The ST's own screen, 640 x 400, black and white
-(Archaic under the xterm, after two clicks on **Dn**):
+(Archaic under the xterm, after three clicks on the ↓ button):
 
 ![Archaic on the Atari ST screen: Wikipedia's Idris article](screenshots/idris.png)
 
@@ -83,7 +83,22 @@ archaic [=WxH+X+Y] [-a] [-t] [-v] [-o file.pbm] [-s script] [url]
 | T (picture type) | GIF |
 | C (colors) | 2 |
 
-So WRP's form is one line: the address, Go, Bk, St, Re, Up, Dn, Z (zoom), K (keys), Bs, Rt.
+So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom) and **K** (keys).
+
+**WRP's buttons are pictures**, like in a modern browser.
+(WRP names them with 2 letters, because old browsers can only put text on a button.)
+
+| Picture | WRP's name | Does |
+|---|---|---|
+| ← arrow | Bk | back |
+| stop sign | St | stop loading |
+| ↻ circle arrow | Re | reload |
+| ↑ and ↓ arrows | Up, Dn | scroll the web page one screen up or down |
+| ⌫ | Bs | Backspace, for the web page |
+| ↵ | Rt | Return (Enter), for the web page |
+
+To type into a box on the web page: click the box in the picture, type in **K**,
+press Return (WRP types it into the page), then click ↵ if the page needs Enter.
 
 **Mouse**
 
@@ -145,7 +160,7 @@ make test         # sh test/run.sh
 2. Gray and color GIFs decode at the right size.
 3. HTML: title, entities, fields, menus, hidden fields, buttons, links, comments.
 4. A button click sends the form with the right query.
-5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus).
+5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons are pictures, Go stays text.
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 
 Run WRP for the tests: `wrp -l 127.0.0.1:8089`.
@@ -359,9 +374,9 @@ On DOS or Win16, use the large memory model, or make these smaller in `archaic.h
 
 ## Known limits
 
-- One page at a time. No history of its own: use WRP's **Bk** button.
+- One page at a time. No history of its own: use WRP's back button (← arrow).
 - A page over 30 KB of HTML is cut (WRP's pages are about 3 KB).
-- WRP before commit 3126bc0 (November 2026) could hang for good on **Bk**,
+- WRP before commit 3126bc0 (November 2026) could hang for good on back (← arrow),
   when Chrome took the page from its back-forward cache. Use a newer WRP.
 
 ---
