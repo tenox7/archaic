@@ -33,14 +33,17 @@ You need:
   `atarist-idris314-hatari` (on osarchive, in `os/idris/virt/`).
   Newer kits have Archaic in `/usr/X/bin`.
 - Or **this repo's [release](https://github.com/tenox7/archaic/releases)**:
-  the `archaic` binary for Idris. Copy it into Idris (kermit works),
-  then `chmod 755 archaic`.
+  the `archaic` binary for Idris. Copy it into Idris's `/usr/X/bin`
+  (kermit works), then `chmod /usr/X/bin/archaic`.
+  With no mode, Idris's chmod makes a file executable.
 
 Then:
 
 1. On your computer, start WRP: `wrp`. It listens on port 8080.
 2. In Idris, log in as `root` and start X: `/usr/X/bin/xstart`.
 3. In an xterm, type `archaic`. It opens on the whole screen.
+   (xstart puts `/usr/X/bin` on the search path. From a telnet login,
+   type `/usr/X/bin/archaic`.)
 4. Click the address box, type an address, press Return.
 5. **Ctrl-Q** quits.
 
@@ -281,7 +284,11 @@ Test on a copy of your Idris disk.
 - `#` is **not** a comment. `:` with plain words is.
   Even then, no quotes, `;` or brackets in it.
 - `cp /dev/null file` copies the device. Use `cat /dev/null > file`.
-- `rm` has no `-f`. There is no `tail` and no `which`.
+- `rm` has no `-f`. There is no `tail`, no `which` and no `rmdir`:
+  `rm -d DIR` removes an empty directory.
+- `chmod 755 file` does not work: chmod takes flags, not numbers.
+  `chmod file` (no mode) makes a file executable.
+- `$PATH` is `$P` followed by `ATH`. The command search path is `$X`.
 
 ### X10 on this ST
 
