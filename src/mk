@@ -1,0 +1,10 @@
+: mk - build Archaic on Idris. First sh mkinc once, then sh mk.
+: Each c also tries to link and prints undefined names. That is fine,
+: the link at the end, sh lka, is the real one.
+c main.c
+c html.c
+c http.c
+c gif.c
+c x10.c
+c nidris.c
+sh lka

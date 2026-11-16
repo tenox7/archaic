@@ -1,0 +1,182 @@
+/* archaic.h - Archaic, a very small web browser for old systems.
+ *
+ * It is a client of WRP, the Web Rendering Proxy
+ * (github.com/tenox7/wrp): WRP runs a modern browser on a modern
+ * machine and sends the page as a GIF picture with a click map. Archaic
+ * shows WRP's form (text fields, buttons, menus), the GIF, and sends the
+ * clicks back.
+ *
+ * The code is meant to build with very old C compilers too:
+ * - K&R style function definitions; prototypes only through P(), so
+ *   -DNOPROTO turns them off for a pre-ANSI compiler
+ * - no const, enum, void *, struct assignment or structs passed by value
+ * - parameters only int, long or pointers (no char, short or float)
+ * - no arrays in local (auto) variables: Whitesmiths C on Idris gets
+ *   a[n - 1] wrong for them. Make them static.
+ * - plain char may be signed or unsigned: use unsigned char for bytes
+ * - int may be 16 bits: use long for byte counts and pixel offsets
+ * - only a few library calls: malloc, free, sprintf, printf, fprintf,
+ *   getenv, time (and fopen, fwrite, fclose, fflush for the -t and -o
+ *   test options). No string.h: the core has its own small helpers.
+ *
+ * One port = one display file (g_ functions) and one network file
+ * (n_ functions) next to the portable core (main.c, html.c, http.c,
+ * gif.c). See README.md.
+ */
+#ifndef ARCHAIC_H
+#define ARCHAIC_H
+
+#include <stdio.h>
+
+#ifdef NOPROTO
+#define P(a) ()
+#else
+#define P(a) a
+#endif
+
+#define VERSION "0.1"
+
+/* WRP's address when none is given: WRP's default port. Whitesmiths C
+ * (_WSLAS) means Idris, in the emulator kit, where the host is 10.0.2.2. */
+#ifndef DEFURL
+#ifdef _WSLAS
+#define DEFURL "http://10.0.2.2:8080/"
+#else
+#define DEFURL "http://127.0.0.1:8080/"
+#endif
+#endif
+
+/* limits: all memory is static or comes from malloc once per image */
+#define MAXITEM 600		/* words, fields, buttons, images on a page */
+#define MAXOPT 120		/* <OPTION>s on a page */
+#define MAXFORM 4		/* <FORM>s on a page */
+#define MAXIMG 8		/* <IMG>s on a page */
+#define POOLSZ 12000		/* text of a page */
+#define MAXVAL 300		/* longest text field value */
+#define MAXURL 1600		/* longest URL or form data */
+#define MAXPAGE 30000		/* longest HTML page (bytes) */
+#define MAXTITLE 80
+#define MAXW 2048		/* widest image */
+
+/* page items */
+#define I_TEXT 1		/* a word */
+#define I_BR 2			/* line break */
+#define I_PARA 3		/* paragraph break */
+#define I_FIELD 4		/* <INPUT TYPE=TEXT> or PASSWORD */
+#define I_BUTTON 5		/* <INPUT TYPE=SUBMIT> */
+#define I_HIDDEN 6		/* <INPUT TYPE=HIDDEN> */
+#define I_SELECT 7		/* <SELECT> */
+#define I_IMAGE 8		/* <IMG> */
+
+typedef struct item {
+	int type;
+	int x, y, w, h;		/* where the layout put it */
+	int sp;			/* white space before it */
+	int form;		/* its <FORM>, or -1 */
+	char *href;		/* the link it is in, or 0 */
+	char *name;		/* field, button, select: NAME */
+	char *text;		/* word, button label, image SRC */
+	char *val;		/* field: value (MAXVAL bytes) */
+	int size;		/* field: SIZE in characters */
+	int pass;		/* field: TYPE=PASSWORD */
+	int opt, nopt, sel;	/* select: first option, count, selected */
+	int img;		/* image: index in imgs[], or -1 */
+	int iw, ih;		/* image: WIDTH, HEIGHT */
+	int ismap;		/* image: ISMAP */
+} Item;
+
+typedef struct opt {
+	char *val;
+	char *text;
+	int dis;		/* DISABLED */
+} Opt;
+
+typedef struct form {
+	char *action;
+	int post;		/* METHOD=POST */
+} Form;
+
+typedef struct image {
+	int w, h;		/* 0 until the GIF header has come */
+	int bpl;		/* bytes in a row */
+	unsigned char *bits;	/* rows of pixels, 1 = black, high bit left */
+} Image;
+
+/* html.c: the page */
+extern Item items[];
+extern int nitems;
+extern Opt opts[];
+extern int nopts;
+extern Form forms[];
+extern int nforms;
+extern char title[];
+int html_parse P((char *buf, int len));
+
+/* http.c: URLs and HTTP/1.0 */
+extern char http_url[];		/* where the answer came from, after redirects */
+extern char http_type[];	/* Content-Type */
+extern char http_err[];		/* why http_open failed */
+extern long http_len;		/* Content-Length, -1 if none */
+extern long http_got;		/* body bytes read so far */
+extern int http_status;
+int http_open P((char *url, char *post));
+int http_getc P((void));
+void http_close P((void));
+void http_pump P((void));	/* take what the network has, without waiting */
+long now P((void));		/* seconds */
+void url_join P((char *base, char *ref, char *out));
+void url_enc P((char *out, char *s));
+int lc P((int c));
+int strieq P((char *a, char *b));
+int strnieq P((char *a, char *b, int n));
+void scopy P((char *d, char *s, int max));
+
+/* gif.c */
+int gif_load P((Image *im));
+
+/* main.c: called from the other files */
+extern int stop;		/* set to end the load that is running */
+int ui_poll P((void));		/* handle events while the network waits */
+void img_rows P((Image *im, int y, int n));	/* rows y.. y+n-1 are new */
+void say P((char *s));		/* status line */
+
+/* events from the display */
+#define E_NONE 0
+#define E_KEY 1			/* key: character in key */
+#define E_DOWN 2		/* mouse button key (1 left 2 middle 3 right) at x, y */
+#define E_EXPOSE 3		/* draw x, y, w, h again */
+#define E_SIZE 4		/* the window is now w x h */
+#define E_QUIT 5		/* the window was closed */
+
+typedef struct event {
+	int type;
+	int x, y, w, h;
+	int key;
+} Event;
+
+/* the display: one of x10.c, x11.c, ... Colors: 0 white, 1 black.
+ * x, y are the top left corner, also for text. */
+int g_open P((char *geom, int *w, int *h));
+void g_close P((void));
+void g_title P((char *s));
+void g_fill P((int x, int y, int w, int h, int c));
+void g_invert P((int x, int y, int w, int h));
+void g_text P((int x, int y, char *s, int n, int inv));
+int g_textw P((char *s, int n));
+void g_font P((int *height, int *base));
+void g_bits P((int x, int y, int w, int h, unsigned char *bits, int bpl));
+void g_flush P((void));
+int g_event P((Event *e, int wait));
+int g_fd P((void));
+
+/* the network: one of nidris.c (Idris netd), nsock.c (BSD sockets), ...
+ * n_read: up to n bytes. wait 1: wait at most about a second, and less
+ * when the display has input; wait 0: don't wait. Returns the number of
+ * bytes, -2 = nothing yet, 0 = the end, -1 = error. n_open may call
+ * ui_poll() while it waits, and gives up when that returns 1. */
+int n_open P((char *host, int port, char *err));
+int n_read P((int h, char *buf, int n, int wait));
+int n_write P((int h, char *buf, int n));
+void n_close P((int h));
+
+#endif

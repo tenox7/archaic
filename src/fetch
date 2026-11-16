@@ -1,0 +1,14 @@
+: fetch - bring the Archaic sources in from the Mac with hget.
+: On the Mac, in the archaic folder: python3 tools/idris.py 0 serve . 8077
+: Here, in an empty folder: hget 10.0.2.2 8077 /src/fetch fetch
+: then sh fetch, sh mkinc, sh mk
+hget 10.0.2.2 8077 /src/archaic.h archaic.h
+hget 10.0.2.2 8077 /src/main.c main.c
+hget 10.0.2.2 8077 /src/html.c html.c
+hget 10.0.2.2 8077 /src/http.c http.c
+hget 10.0.2.2 8077 /src/gif.c gif.c
+hget 10.0.2.2 8077 /src/x10.c x10.c
+hget 10.0.2.2 8077 /src/nidris.c nidris.c
+hget 10.0.2.2 8077 /src/mkinc mkinc
+hget 10.0.2.2 8077 /src/mk mk
+hget 10.0.2.2 8077 /src/lka lka

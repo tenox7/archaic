@@ -1,0 +1,10 @@
+: mkinc - run once before sh mk. The C compiler looks for headers in
+: this folder first. Put the X10 headers here as X/..., and an empty
+: sys/param.h, which Xlib.h wants and Idris does not have.
+mkdir X
+mkdir sys
+cp /usr/X/include/X.h X/X.h
+cp /usr/X/include/Xlib.h X/Xlib.h
+cp /usr/X/include/mit-copyright. X/mit-copyright.
+cat /dev/null > sys/param.h
+ls -l X sys

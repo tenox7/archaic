@@ -1,0 +1,8 @@
+# builds
+archaic
+archaic-asan
+*.dSYM/
+*.o
+*.pbm
+._*
+.DS_Store
