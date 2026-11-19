@@ -21,7 +21,8 @@
  *
  * One port = one display file (g_ functions) and one network file
  * (n_ functions) next to the portable core (main.c, html.c, http.c,
- * gif.c). See README.md.
+ * gif.c). See README.md. The displays for modern systems (SDL, Cocoa)
+ * may use newer C.
  */
 #ifndef ARCHAIC_H
 #define ARCHAIC_H
@@ -159,8 +160,10 @@ typedef struct event {
 	int key;
 } Event;
 
-/* the display: one of x10.c, x11.c, ... Colors: 0 white, 1 black.
- * x, y are the top left corner, also for text. */
+/* the display: one of x10.c, x11.c, unixpc.c, sdl.c, cocoa.m ...
+ * Colors: 0 white, 1 black. x, y are the top left corner, also for
+ * text. sdl.c and cocoa.m draw with fb.c (a screen in memory). g_fd:
+ * the display's file, for the network's select(); -1 if it has none. */
 int g_open P((char *geom, int *w, int *h));
 void g_close P((void));
 void g_title P((char *s));

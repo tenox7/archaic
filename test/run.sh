@@ -1,10 +1,12 @@
 #!/bin/sh
-# Tests for Archaic on the Mac (or any Unix), without a window (-t).
-#   sh test/run.sh [archaic binary] [WRP address]
+# Tests for Archaic on the Mac (or any Unix), without a window (-t, and
+# the headless display).
+#   sh test/run.sh [archaic binary] [WRP address] [archaic-headless binary]
 # Needs: python3 (a small web server), ImageMagick (magick) to check the
 # GIF decoder. The WRP part runs only when WRP answers at the address.
 bin=${1:-./archaic-asan}
 wrp=${2:-127.0.0.1:8089}
+hl=${3:-./archaic-headless}
 port=8079
 tmp=$(mktemp -d)
 fail=0
@@ -167,6 +169,41 @@ if curl -s -m 3 -o /dev/null "http://$wrp/"; then
 	fi
 else
 	echo "skip  wrp: nothing at $wrp"
+fi
+
+# 7. The display with no window (archaic-headless): commands on standard
+#    input, PNG and PBM screenshots, typing into a field, a new size.
+if [ -x "$hl" ]; then
+	cp "$tmp/t.html" "$here/data/t.html"
+	x=$(awk '$2 == "field" { print $3 + 2; exit }' "$tmp/t.out")
+	y=$(awk '$2 == "field" { print $4 + 2; exit }' "$tmp/t.out")
+	printf '%s\n' "shot $tmp/h1.png" "shot $tmp/h1.pbm" "click $x $y" \
+		"key ctrl-u" "type hi" "key return" "size 500 300" \
+		"shot $tmp/h2.png" quit |
+		"$hl" -g 640x400 "http://127.0.0.1:$port/t.html" >"$tmp/h.out" 2>&1
+	rm -f "$here/data/t.html"
+	if grep -qx 'title T&T AB' "$tmp/h.out" &&
+		grep -qx "shot $tmp/h2.png 500x300" "$tmp/h.out"; then
+		ok "headless: title, shots, size 500 300"
+	else
+		bad "headless: wrong output:"
+		cat "$tmp/h.out"
+	fi
+	if [ "$(magick identify -format '%wx%h' "$tmp/h1.png" 2>/dev/null)" = 640x400 ] &&
+		magick compare -metric AE "$tmp/h1.png" "$tmp/h1.pbm" null: 2>/dev/null &&
+		magick "$tmp/h1.pbm" -format '%[fx:mean < 0.999]' info: | grep -qx 1; then
+		ok "headless: the PNG shot reads back, has the page, and equals the PBM shot"
+	else
+		bad "headless: the PNG shot is wrong or blank"
+	fi
+	if grep -q 'GET /go?q=hi&s=2&h=x' "$tmp/http.log"; then
+		ok "headless: click, Ctrl-U, typing and Return send the form"
+	else
+		bad "headless: the typed form was not sent:"
+		grep 'GET /go' "$tmp/http.log"
+	fi
+else
+	echo "skip  headless: no $hl"
 fi
 
 [ $fail = 0 ] && echo "all tests passed"

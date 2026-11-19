@@ -1,6 +1,9 @@
 # builds
 archaic
 archaic-asan
+archaic-sdl
+archaic-cocoa
+archaic-headless
 *.dSYM/
 *.o
 *.pbm

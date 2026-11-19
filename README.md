@@ -16,7 +16,8 @@ First port: **Whitesmiths Idris** (a 1988 Unix clone) on the **Atari ST**,
 with **X10** (X Version 10 Release 4) and TCP/IP over **SLIP**.
 Second port: the **AT&T UNIX PC** (3B1, PC 7300, 1985), with its own
 window system and **WIN/TCP** (The Wollongong Group's TCP/IP) on its Ethernet board.
-Also: any Unix with X11, for development and tests.
+Also, for development and tests: **macOS** (Cocoa), anything with **SDL 2**,
+any Unix with **X11**, and **no window at all** (commands in, screenshots out).
 The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 
 | What Archaic shows | What it skips |
@@ -162,6 +163,10 @@ press Return (WRP types it into the page), then click ↵ if the page needs Ente
 | Rfrsh, Clear | draw the window again |
 | the resize box | a new window size. Then click ↻ for a picture that fits |
 
+**On macOS (Cocoa) and with SDL:** Page Up, Page Down, the up and down arrows
+and the mouse wheel or trackpad scroll too. Ctrl+click is the right button.
+Cmd-Q and the window's close button quit.
+
 The help line at the bottom of the screen lists the main keys.
 
 ---
@@ -178,6 +183,11 @@ The help line at the bottom of the screen lists the main keys.
 | `src/x10.c` | display for X10 (Idris) |
 | `src/nidris.c` | network for Idris: TCP through netd |
 | `src/x11.c` | display for X11 (Unix, macOS with XQuartz) |
+| `src/cocoa.m` | display for macOS: a Cocoa window |
+| `src/sdl.c` | display for SDL 2 (macOS, Linux, Windows ...) |
+| `src/headless.c` | display with no window, for tests and automation: commands on standard input, screenshots |
+| `src/fb.c`, `fb.h` | a screen in memory, for `cocoa.m`, `sdl.c` and `headless.c`; writes PNG screenshots |
+| `src/font6x13.h` | the X11 6x13 font (public domain), for `fb.c` |
 | `src/nsock.c` | network for BSD sockets (Unix, macOS) |
 | `src/fetch`, `mkinc`, `mk`, `lka` | Idris scripts: get the sources, headers, compile, link |
 | `src/unixpc.c` | display for the AT&T UNIX PC (3B1) window system |
@@ -185,7 +195,8 @@ The help line at the bottom of the screen lists the main keys.
 | `src/mkunixpc` | 3B1 script: compile and link with gcc |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
-| `test/run.sh` | tests: GIF decoder, HTML, forms, WRP |
+| `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
+| `test/run.sh` | tests: GIF decoder, HTML, forms, WRP, the headless display |
 | `test/xshot.sh` | test: run the X11 build and take a screenshot |
 | `test/data/` | GIFs saved from WRP, for the tests |
 | `test/cfacts.c`, `cfacts2.c` | probe for a new port: what its C compiler and linker do (name length, case, struct copies) |
@@ -195,13 +206,50 @@ The help line at the bottom of the screen lists the main keys.
 
 ## Building and testing on Unix or macOS
 
-Needs X11 (on macOS: XQuartz in `/opt/X11`). The tests need ImageMagick.
-
 ```
 make              # ./archaic, X11 + BSD sockets
-make archaic-asan # the same with address and undefined-behaviour checks
+make cocoa        # ./archaic-cocoa, a macOS window
+make sdl          # ./archaic-sdl, SDL 2
+make headless     # ./archaic-headless, no window: for tests and automation
+make archaic-asan # X11 with address and undefined-behaviour checks
 make knr          # syntax check as a pre-ANSI compiler sees it (-DNOPROTO)
 make test         # sh test/run.sh
+```
+
+- `make` needs X11 (on macOS: XQuartz in `/opt/X11`).
+- `make cocoa` needs only the Xcode command line tools.
+- `make sdl` needs SDL 2: `sdl2-config` on the PATH (`brew install sdl2`).
+- `make headless` needs only a C compiler.
+- The tests need ImageMagick.
+
+Cocoa, SDL and headless draw the same pixels, with the X11 6x13 font.
+On a Retina screen, Cocoa and SDL show each pixel as 2x2.
+
+### No window: archaic-headless
+
+`archaic-headless` reads commands from standard input, one per line.
+It reads the next command only when Archaic has nothing else to do,
+so a command that loads a page ends before the next one starts.
+At the end of the input, Archaic quits.
+
+| Command | Does |
+|---|---|
+| `click X Y [B]` | mouse button B (1 left, 2 middle, 3 right) at X, Y |
+| `key K` | a character, or `return`, `tab`, `esc`, `backspace`, `delete`, `space`, `pgup`, `pgdn`, `up`, `down`, `ctrl-X` |
+| `type TEXT` | the rest of the line, as keys |
+| `scroll up`, `scroll down` | as Page Up and Page Down |
+| `size W H` | the window is now W x H |
+| `shot FILE` | write the screen to FILE: PNG, or PBM if the name ends in `.pbm` |
+| `sleep MS` | wait MS milliseconds |
+| `quit` | quit |
+
+Empty lines and lines that start with `#` do nothing. Standard output gets
+`title TEXT` for each page, and `shot FILE WxH` for each screenshot.
+
+```
+printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' \
+    'key return' 'shot page.png' 'scroll down' 'shot down.png' |
+    ./archaic-headless -v -g 800x600 127.0.0.1:8080
 ```
 
 `test/run.sh` checks:
@@ -212,6 +260,7 @@ make test         # sh test/run.sh
 4. A button click sends the form with the right query.
 5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons are pictures, Go stays text.
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
+7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
 
 Run WRP for the tests: `wrp -l 127.0.0.1:8089`.
 
