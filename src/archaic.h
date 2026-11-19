@@ -34,14 +34,19 @@
 #define P(a) a
 #endif
 
-#define VERSION "0.2"
+#define VERSION "0.3"
 
-/* WRP's address when none is given: WRP's default port. Whitesmiths C
- * (_WSLAS) means Idris, in the emulator kit, where the host is 10.0.2.2. */
+/* WRP's address when none is given: WRP's default port. In the emulator
+ * kits the host is 10.0.2.2: Whitesmiths C (_WSLAS) means Idris, and
+ * gcc's unixpc the AT&T UNIX PC (3B1). */
 #ifndef DEFURL
 #ifdef _WSLAS
 #define DEFURL "http://10.0.2.2:8080/"
-#else
+#endif
+#ifdef unixpc
+#define DEFURL "http://10.0.2.2:8080/"
+#endif
+#ifndef DEFURL
 #define DEFURL "http://127.0.0.1:8080/"
 #endif
 #endif

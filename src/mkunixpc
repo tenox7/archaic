@@ -1,0 +1,11 @@
+# mkunixpc - build Archaic on the AT&T UNIX PC (3B1): sh mkunixpc
+# It needs gcc (2.5.8 in /usr/local/bin) and WIN/TCP of The Wollongong
+# Group (TWG), the 3B1's TCP/IP: its headers are in /usr/ethernet/include
+# and its library is /usr/lib/libnet.a. TWG's READ_ME says to compile
+# with -DSYSTEM5 -DSHORT_IDENT. -shlib links the shared library, which
+# has libc and tam, the window library.
+CC=/usr/local/bin/gcc
+$CC -O -c main.c html.c http.c gif.c unixpc.c &&
+$CC -O -DSYSTEM5 -DSHORT_IDENT -I/usr/ethernet/include -c ntwg.c &&
+$CC -o archaic main.o html.o http.o gif.o unixpc.o ntwg.o -lnet -shlib &&
+ls -l archaic

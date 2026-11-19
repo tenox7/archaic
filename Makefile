@@ -1,5 +1,6 @@
 # Archaic for Unix with X11 and BSD sockets (on macOS: XQuartz in /opt/X11).
 # The Idris (Atari ST) build is src/mk, run inside Idris.
+# The AT&T UNIX PC (3B1) build is src/mkunixpc, run on the 3B1.
 
 CC = cc
 X11 = /opt/X11

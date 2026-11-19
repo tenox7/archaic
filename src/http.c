@@ -7,6 +7,9 @@
  * be redrawn and a load can be stopped.
  */
 #include "archaic.h"
+#ifdef unixpc
+#include <sys/types.h>		/* time_t: the 3B1's time.h does not have it */
+#endif
 #include <time.h>
 
 char http_url[MAXURL];

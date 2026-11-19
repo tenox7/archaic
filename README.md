@@ -12,6 +12,8 @@ WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
 
 First port: **Whitesmiths Idris** (a 1988 Unix clone) on the **Atari ST**,
 with **X10** (X Version 10 Release 4) and TCP/IP over **SLIP**.
+Second port: the **AT&T UNIX PC** (3B1, PC 7300, 1985), with its own
+window system and **WIN/TCP** (The Wollongong Group's TCP/IP) on its Ethernet board.
 Also: any Unix with X11, for development and tests.
 The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 
@@ -58,6 +60,37 @@ The ST's own screen, 640 x 400, black and white
 
 ---
 
+## Quick start: the AT&T UNIX PC (3B1)
+
+You need:
+
+- **WRP** on your computer, as above.
+- A **3B1** with the Ethernet board and **WIN/TCP** (TWG's TCP/IP, in `/usr/ethernet`),
+  or the **FreeBee** emulator: the kit `att3b1-unix351-freebee` (on osarchive, in `os/att/3b1/virt/`).
+- The `archaic-unixpc` binary from this repo's **[release](https://github.com/tenox7/archaic/releases)**,
+  or build it (see below). Copy it to the 3B1 as `/usr/local/bin/archaic`,
+  then `chmod 755 /usr/local/bin/archaic`.
+
+Then:
+
+1. On your computer, start WRP: `wrp`. It listens on port 8080.
+2. On the 3B1, open a shell window (Office > UNIX System) and type `archaic`.
+   It opens a window of its own, as large as the screen allows.
+   (A telnet or rsh login works too: the window opens on the 3B1's screen.)
+3. Click the address box, type an address with `https://`, press Return.
+4. **Exit** (or the close box in the window's frame) quits.
+
+In the FreeBee kit, your computer is `10.0.2.2` for the 3B1, as for Idris.
+So Archaic on the 3B1 looks for WRP at `http://10.0.2.2:8080/`.
+The 3B1 has no DNS: give WRP's address as numbers, or put the name in `/etc/hosts`.
+
+The 3B1's screen in FreeBee (green on black), 720 x 348.
+Wikipedia's AT&T UNIX PC article, after one click on the ↓ button:
+
+![Archaic on the AT&T UNIX PC: Wikipedia's AT&T UNIX PC article](screenshots/unixpc.png)
+
+---
+
 ## Using it
 
 ```
@@ -66,8 +99,8 @@ archaic [=WxH+X+Y] [-a] [-t] [-v] [-o file.pbm] [-s script] [url]
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris: `10.0.2.2`, Unix: `127.0.0.1`) |
-| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default: the whole screen |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris and the 3B1: `10.0.2.2`, Unix: `127.0.0.1`) |
+| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default: the whole screen. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
 | `-a` | also show WRP's M, T and C menus (for future color ports; Idris does not need it) |
 | `-t` | test mode: no window. Prints the page items and a checksum of each picture |
 | `-v` | status messages also go to stderr |
@@ -117,6 +150,18 @@ press Return (WRP types it into the page), then click ↵ if the page needs Ente
 | Space / b | scroll down / up (when no field has the keyboard) |
 | Ctrl-Q | quit |
 
+**On the 3B1**, its own keys and the window's frame work too:
+
+| Key or frame part | Does |
+|---|---|
+| Exit, Cancl, the close box | quit |
+| Page, Next, ↓ / Shift+Page, Prev, ↑ | scroll down / up |
+| the scroll arrows (also FreeBee's mouse wheel) | scroll |
+| Rfrsh, Clear | draw the window again |
+| the resize box | a new window size. Then click ↻ for a picture that fits |
+
+The help line at the bottom of the screen lists the main keys.
+
 ---
 
 ## Files
@@ -133,6 +178,9 @@ press Return (WRP types it into the page), then click ↵ if the page needs Ente
 | `src/x11.c` | display for X11 (Unix, macOS with XQuartz) |
 | `src/nsock.c` | network for BSD sockets (Unix, macOS) |
 | `src/fetch`, `mkinc`, `mk`, `lka` | Idris scripts: get the sources, headers, compile, link |
+| `src/unixpc.c` | display for the AT&T UNIX PC (3B1) window system |
+| `src/ntwg.c` | network for the 3B1: the BSD sockets of WIN/TCP (TWG) |
+| `src/mkunixpc` | 3B1 script: compile and link with gcc |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `test/run.sh` | tests: GIF decoder, HTML, forms, WRP |
@@ -330,6 +378,95 @@ Test on a copy of your Idris disk.
 
 ---
 
+## Building on the AT&T UNIX PC (3B1)
+
+Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
+
+1. Copy these 8 files (74 KB) into a folder on the 3B1, with ftp, rcp or a floppy:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `unixpc.c`, `ntwg.c` and `mkunixpc`.
+   The FreeBee kit forwards the 3B1's ftp to port 35121 on your computer, and rsh to 35514.
+2. Build:
+
+   ```
+   sh mkunixpc     # compile and link: archaic, about 43 KB
+   ```
+
+   It takes about 40 s in FreeBee at turbo 10.
+3. Test. **Test mode, no window needed** (serve this folder from your computer:
+   `python3 -m http.server 8077`):
+
+   ```
+   ./archaic -t http://10.0.2.2:8077/test/data/hn2.gif
+   ```
+
+   The last line ends with `sum ae2b58f3`: the same as on Unix and on Idris.
+
+   **With the window:** `./archaic` in a shell window.
+
+**Measured in FreeBee** (from Return until the picture is complete):
+
+| What | 10 MHz, as a real 3B1 | turbo 10, as in the kit |
+|---|---|---|
+| WRP start page (`-t`) | 1 s | 0.1 s |
+| decode check (`-t`, an 11 KB GIF) | 10 s | 1 s |
+| Wikipedia page with its picture | 12 s | 2 s |
+| ↓ on it (a dithered photo) | 18 s | 7 s |
+
+---
+
+## The AT&T UNIX PC (3B1): what to know
+
+Test on a copy of your 3B1 disk.
+
+### The system
+
+| Thing | 3B1 |
+|---|---|
+| CPU, memory | 68010 at 10 MHz, up to 4 MB, paged MMU |
+| Screen | 720 x 348, black and white (FreeBee can show it green) |
+| Window system | in the kernel: `/dev/window`, and **tam**, the window library (in the shared library) |
+| Network | Ethernet board, **WIN/TCP** of The Wollongong Group: BSD sockets in `/usr/lib/libnet.a` |
+| Addresses (FreeBee kit) | the 3B1 10.0.2.15. **Your computer = 10.0.2.2** (its 127.0.0.1) |
+| File names | 14 characters at most |
+
+### The C compiler
+
+- gcc 2.5.8 (`/usr/local/bin/gcc`, not on a stock 3B1). It defines `unixpc`:
+  Archaic uses that for the default address.
+- `-shlib` links the shared library: libc and tam.
+- `<time.h>` has no `time_t`: it is in `<sys/types.h>`.
+- `/bin/cc`, the 1985 compiler, stops at the `#sccs` line of each header on the kit's disk. Archaic does not use it.
+- SysV cannot replace a program that runs: quit Archaic before you link it again.
+
+### The window system
+
+- A window of its own: close 0, 1 and 2, open `/dev/window`, then `winit()` and `wcreate()`.
+  `WIOCSETD` then sets the size in pixels.
+- Windows live between y 12 and y 300. The frame adds 6 pixels at the left,
+  28 at the right (with the scroll arrows), and 20 at the top and at the bottom.
+  So the largest inside is 686 x 248, or 720 x 288 without a frame.
+- `wrastop()` draws. **1 is a lit pixel**, and the **low** bit of each 16-bit word is the **left** pixel.
+  Archaic makes white lit, so pictures are not negatives.
+- Text: the font file `/usr/lib/wfont/system.8.ft` (9 x 12, ASCII only), drawn with `wrastop()`.
+- `keypad(wn, 1)`: the 3B1's keys come as one code each (`kcodes.h`): Exit 0350, Cancl 0370, Page 0371.
+  The window is a tty: with VMIN 0 and VTIME 1, a read waits at most 0.1 s.
+- Mouse: `wsetmouse()` with MSDOWN. A click comes as the Mouse key (0375),
+  then `wreadmouse()` gives x, y in the window and the buttons: 4 left, 2 middle, 1 right.
+- The frame's scroll arrows send Roll Up and Roll Down (Shift+↑, Shift+↓). FreeBee's wheel does too.
+- **SIGWIND** (the window has a new size) goes only to the window's process group.
+  Archaic calls `setpgrp()` before it opens the window, then `ioctl(wn, WIOCPGRP, 0)`.
+- `wprompt()` text shows on the screen's prompt line: 72 characters fit.
+
+### WIN/TCP
+
+- Headers in `/usr/ethernet/include`, the library `/usr/lib/libnet.a`.
+  Compile with `-DSYSTEM5 -DSHORT_IDENT` (TWG's READ_ME).
+- `select()` takes bit masks (a `long`), not `fd_set`, and waits as long as asked: 0.1 s works.
+  Archaic waits on the network in 0.1 s steps and reads the window's keys between them.
+- No DNS: `gethostbyname()` reads only `/etc/hosts`. Archaic tries `inet_addr()` first.
+
+---
+
 ## Porting to DOS, OS/2, Win16 and others
 
 The core (`main.c`, `html.c`, `http.c`, `gif.c`) does not change.
@@ -376,6 +513,7 @@ On DOS or Win16, use the large memory model, or make these smaller in `archaic.h
 
 - One page at a time. No history of its own: use WRP's back button (← arrow).
 - A page over 30 KB of HTML is cut (WRP's pages are about 3 KB).
+- On the 3B1, the font has only ASCII: other letters in WRP's form show as `?`.
 - WRP before commit 3126bc0 (November 2026) could hang for good on back (← arrow),
   when Chrome took the page from its back-forward cache. Use a newer WRP.
 
