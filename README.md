@@ -10,6 +10,8 @@ WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
 
 ![Archaic in Hatari: Idris on an Atari Mega ST, showing Wikipedia](screenshots/hatari.png)
 
+![Archaic in FreeBee: the AT&T UNIX PC (3B1), showing Wikipedia](screenshots/freebee.png)
+
 First port: **Whitesmiths Idris** (a 1988 Unix clone) on the **Atari ST**,
 with **X10** (X Version 10 Release 4) and TCP/IP over **SLIP**.
 Second port: the **AT&T UNIX PC** (3B1, PC 7300, 1985), with its own
