@@ -153,6 +153,10 @@ void say P((char *s));		/* status line */
 #define E_EXPOSE 3		/* draw x, y, w, h again */
 #define E_SIZE 4		/* the window is now w x h */
 #define E_QUIT 5		/* the window was closed */
+#define E_SCROLL 6		/* scroll y units of key, down if y > 0: */
+#define S_PIXEL 0		/*  pixels (a trackpad) */
+#define S_STEP 1		/*  a quarter of the window (the wheel, the arrows) */
+#define S_PAGE 2		/*  a window less 2 lines (Page Up, Page Down) */
 
 typedef struct event {
 	int type;

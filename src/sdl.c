@@ -3,11 +3,11 @@
  * pixel is 2x2, with no smoothing.
  *
  * Keys: SDL's text events give the characters; Return, Backspace, Tab,
- * Esc, Delete and Ctrl+letter come as key events. Page Up, Page Down,
- * the up and down arrows and the mouse wheel scroll: they come as a
- * right click at the top or the bottom of the page, as in x11.c and
- * unixpc.c. Ctrl+click is the right button. Cmd-Q and the close button
- * quit. SDL has no file to wait on: g_fd() is -1.
+ * Esc, Delete and Ctrl+letter come as key events. Page Up and Page Down
+ * scroll a window, the up and down arrows and the wheel's steps a
+ * quarter of it (E_SCROLL); a trackpad scrolls by pixels. Ctrl+click is
+ * the right button. Cmd-Q and the close button quit. SDL has no file to
+ * wait on: g_fd() is -1.
  */
 #include "fb.h"
 #include <SDL.h>
@@ -15,7 +15,7 @@
 static SDL_Window *win;
 static SDL_Renderer *ren;
 static SDL_Texture *tex;
-static float wheel;		/* wheel steps not used yet */
+static float wheel;		/* trackpad pixels not used yet */
 static unsigned char text[64];	/* typed characters not given yet */
 static int ntext, itext;
 
@@ -128,15 +128,15 @@ int g_fd()
 	return -1;
 }
 
-/* scroll: a right click at the top (up) or the bottom (down) */
-static int roll(e, down)
+/* scroll y units (S_PIXEL, S_STEP, S_PAGE), down if y > 0 */
+static int scrl(e, y, unit)
 Event *e;
-int down;
+int y, unit;
 {
-	e->type = E_DOWN;
-	e->key = 3;
+	e->type = E_SCROLL;
 	e->x = 0;
-	e->y = down ? fbh - 30 : 0;
+	e->y = y;
+	e->key = unit;
 	return 1;
 }
 
@@ -231,11 +231,13 @@ int wait;
 			case SDLK_ESCAPE:
 				return key(e, 033);
 			case SDLK_PAGEUP:
-			case SDLK_UP:
-				return roll(e, 0);
+				return scrl(e, -1, S_PAGE);
 			case SDLK_PAGEDOWN:
+				return scrl(e, 1, S_PAGE);
+			case SDLK_UP:
+				return scrl(e, -1, S_STEP);
 			case SDLK_DOWN:
-				return roll(e, 1);
+				return scrl(e, 1, S_STEP);
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
@@ -248,13 +250,18 @@ int wait;
 				ev.button.button == SDL_BUTTON_MIDDLE ? 2 : 3;
 			return 1;
 		case SDL_MOUSEWHEEL:
-			/* 3 steps of the wheel scroll a page */
-			wheel += ev.wheel.preciseY;
-			if (wheel >= 3 || wheel <= -3) {
-				k = wheel < 0;
-				wheel = 0;
-				return roll(e, k);
+			/* A wheel gives whole steps: a quarter of the window
+			 * each. A trackpad gives parts of steps: 10 pixels a step. */
+			if (ev.wheel.preciseY == (float)ev.wheel.y) {
+				if (ev.wheel.y)
+					return scrl(e, -ev.wheel.y, S_STEP);
+				break;
 			}
+			wheel += ev.wheel.preciseY * 10;
+			k = (int)wheel;
+			wheel -= k;
+			if (k)
+				return scrl(e, -k, S_PIXEL);
 			break;
 		}
 	}

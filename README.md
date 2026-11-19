@@ -118,6 +118,7 @@ archaic [=WxH+X+Y] [-a] [-t] [-v] [-o file.pbm] [-s script] [url]
 | M (mode) | ISMAP |
 | T (picture type) | GIF |
 | C (colors) | 2 |
+| SL (slices) | 1: the whole page, in slices (see Scrolling). An older WRP ignores it |
 
 So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom) and **K** (keys).
 
@@ -129,7 +130,7 @@ So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom) 
 | ← arrow | Bk | back |
 | stop sign | St | stop loading |
 | ↻ circle arrow | Re | reload |
-| ↑ and ↓ arrows | Up, Dn | scroll the web page one screen up or down |
+| ↑ and ↓ arrows | Up, Dn | scroll the web page one screen up or down. Only an older WRP shows them: see Scrolling |
 | ⌫ | Bs | Backspace, for the web page |
 | ↵ | Rt | Return (Enter), for the web page |
 
@@ -139,7 +140,7 @@ press Return (WRP types it into the page), then click ↵ if the page needs Ente
 **Mouse**
 
 - Left button: click links, buttons, fields, menus, and the picture.
-- Right button: scroll. Top half of the window = up, bottom half = down.
+- Right button: scroll a window. Top half of the window = up, bottom half = down.
 
 **Keys**
 
@@ -150,7 +151,7 @@ press Return (WRP types it into the page), then click ↵ if the page needs Ente
 | Backspace / Delete | delete the last character |
 | Ctrl-U | clear the field |
 | Esc | stop loading (or leave the field) |
-| Space / b | scroll down / up (when no field has the keyboard) |
+| Space / b | scroll a window down / up (when no field has the keyboard) |
 | Ctrl-Q | quit |
 
 **On the 3B1**, its own keys and the window's frame work too:
@@ -158,16 +159,38 @@ press Return (WRP types it into the page), then click ↵ if the page needs Ente
 | Key or frame part | Does |
 |---|---|
 | Exit, Cancl, the close box | quit |
-| Page, Next, ↓ / Shift+Page, Prev, ↑ | scroll down / up |
-| the scroll arrows (also FreeBee's mouse wheel) | scroll |
+| Page, Next / Shift+Page, Prev | scroll a window down / up |
+| ↓ / ↑, the scroll arrows (also FreeBee's mouse wheel) | scroll a quarter of the window down / up |
 | Rfrsh, Clear | draw the window again |
 | the resize box | a new window size. Then click ↻ for a picture that fits |
 
-**On macOS (Cocoa) and with SDL:** Page Up, Page Down, the up and down arrows
-and the mouse wheel or trackpad scroll too. Ctrl+click is the right button.
+**On macOS (Cocoa) and with SDL:** Page Up and Page Down scroll a window.
+The up and down arrows and each step of the mouse wheel scroll a quarter of it.
+A trackpad scrolls smoothly, by pixels. Ctrl+click is the right button.
 Cmd-Q and the window's close button quit.
 
 The help line at the bottom of the screen lists the main keys.
+
+**Scrolling: the whole page in slices**
+
+With a WRP that knows slices (`sl=1`), WRP makes a picture of the whole page once, and keeps it.
+
+- Archaic shows the picture in a frame under WRP's form. Only the frame scrolls: the form stays at the top.
+- The picture comes in **slices** as high as the frame. Archaic keeps 4 of them:
+  the ones on the screen, and the next one above and below.
+  It gets the next ones while you read, so most scrolls do not wait for the network.
+- A click on the picture goes to WRP as a place on the whole page.
+- After a click or keys on the same page, the frame stays where it was. A new page starts at its top.
+- WRP leaves out its Up and Dn buttons.
+- A slice is a 2-color GIF: about 5 to 9 KB for 632 x 351 pixels.
+
+| Input | Scrolls the frame |
+|---|---|
+| a step of the wheel, ↑ ↓, the 3B1's scroll arrows and Roll keys | a quarter of the frame |
+| Page Up, Page Down, Space, b, the right button, the 3B1's Page, Next, Prev | the frame, less 2 text lines |
+| a trackpad (Cocoa, SDL) | by pixels |
+
+An older WRP ignores `sl=1`: then the picture fills the window, and WRP's Up and Dn buttons scroll the page.
 
 ---
 
@@ -237,7 +260,9 @@ At the end of the input, Archaic quits.
 | `click X Y [B]` | mouse button B (1 left, 2 middle, 3 right) at X, Y |
 | `key K` | a character, or `return`, `tab`, `esc`, `backspace`, `delete`, `space`, `pgup`, `pgdn`, `up`, `down`, `ctrl-X` |
 | `type TEXT` | the rest of the line, as keys |
-| `scroll up`, `scroll down` | as Page Up and Page Down |
+| `scroll up`, `scroll down` | a window, as Page Up and Page Down |
+| `wheel N` | N steps of the mouse wheel (a quarter of the window each); down if N > 0, up if N < 0 |
+| `pixels N` | N pixels, as a trackpad; down if N > 0, up if N < 0 |
 | `size W H` | the window is now W x H |
 | `shot FILE` | write the screen to FILE: PNG, or PBM if the name ends in `.pbm` |
 | `sleep MS` | wait MS milliseconds |
@@ -261,6 +286,9 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons are pictures, Go stays text.
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
+8. The tall picture, with no WRP: the test server cuts a random 632 x 1500 GIF into slices.
+   After a wheel step, a window and a scroll to the end, the frame must show exactly the right rows.
+   Also: the next slice comes before it is needed, and a click sends the place on the whole page.
 
 Run WRP for the tests: `wrp -l 127.0.0.1:8089`.
 
@@ -534,7 +562,7 @@ A port is **one display file** and **one network file**.
 | `g_text(x, y, s, n, inv)` | n characters, x, y = top left |
 | `g_textw(s, n)`, `g_font(&height, &base)` | font size |
 | `g_bits(x, y, w, h, bits, bpl)` | 1-bit rows, 1 = black, high bit left |
-| `g_event(&e, wait)` | next key, click, expose, resize, quit |
+| `g_event(&e, wait)` | next key, click, expose, resize, quit, scroll (`E_SCROLL`: pixels, quarter windows or windows) |
 | `g_fd()` | the display's file descriptor, or -1 |
 
 **Network (`n_` functions)**
@@ -567,6 +595,7 @@ On DOS or Win16, use the large memory model, or make these smaller in `archaic.h
 - On the 3B1, the font has only ASCII: other letters in WRP's form show as `?`.
 - WRP before commit 3126bc0 (November 2026) could hang for good on back (← arrow),
   when Chrome took the page from its back-forward cache. Use a newer WRP.
+- With slices, a link to a place on the same page (`#name`) does not scroll the frame there.
 
 ---
 

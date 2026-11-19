@@ -182,9 +182,10 @@ int wait;
 			e->x = ev.xbutton.x;
 			e->y = ev.xbutton.y;
 			e->key = ev.xbutton.button;
-			if (e->key == 4 || e->key == 5) {	/* wheel: scroll */
-				e->y = e->key == 4 ? 0 : wh - 30;
-				e->key = 3;
+			if (e->key == 4 || e->key == 5) {	/* the wheel */
+				e->type = E_SCROLL;
+				e->y = e->key == 4 ? -1 : 1;
+				e->key = S_STEP;
 			}
 			return 1;
 		case ConfigureNotify:

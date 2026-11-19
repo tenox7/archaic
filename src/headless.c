@@ -9,7 +9,10 @@
  *	key K		a character, or return, tab, esc, backspace,
  *			delete, space, pgup, pgdn, up, down, ctrl-X
  *	type TEXT	the rest of the line, as keys
- *	scroll up|down	as Page Up and Page Down
+ *	scroll up|down	a window, as Page Up and Page Down
+ *	wheel N		N steps of the wheel (a quarter window each),
+ *			down if N > 0
+ *	pixels N	N pixels, as a trackpad, down if N > 0
  *	size W H	the window is now W x H
  *	shot FILE	write the screen to FILE: PNG, or PBM for *.pbm
  *	sleep MS	wait MS milliseconds
@@ -30,14 +33,15 @@
 static char line[1024];
 static char *text;		/* type: characters not given yet */
 
-static int roll(e, down)
+/* scroll y units (S_PIXEL, S_STEP, S_PAGE), down if y > 0 */
+static int scrl(e, y, unit)
 Event *e;
-int down;
+int y, unit;
 {
-	e->type = E_DOWN;
-	e->key = 3;
+	e->type = E_SCROLL;
 	e->x = 0;
-	e->y = down ? fbh - 30 : 0;
+	e->y = y;
+	e->key = unit;
 	return 1;
 }
 
@@ -104,10 +108,14 @@ char *s;
 		return key(e, s[0]);
 	if (strncmp(s, "ctrl-", 5) == 0 && s[5] && !s[6])
 		return key(e, s[5] & 037);
-	if (!strcmp(s, "pgup") || !strcmp(s, "up"))
-		return roll(e, 0);
-	if (!strcmp(s, "pgdn") || !strcmp(s, "down"))
-		return roll(e, 1);
+	if (!strcmp(s, "pgup"))
+		return scrl(e, -1, S_PAGE);
+	if (!strcmp(s, "pgdn"))
+		return scrl(e, 1, S_PAGE);
+	if (!strcmp(s, "up"))
+		return scrl(e, -1, S_STEP);
+	if (!strcmp(s, "down"))
+		return scrl(e, 1, S_STEP);
 	for (i = 0; names[i]; i += 2)
 		if (!strcmp(s, names[i]))
 			return key(e, names[i + 1][0]);
@@ -152,7 +160,11 @@ char *s;
 		return 0;
 	}
 	if (n == 6 && !strncmp(s, "scroll", 6))
-		return roll(e, !strcmp(a, "down"));
+		return scrl(e, strcmp(a, "down") ? -1 : 1, S_PAGE);
+	if (n == 5 && !strncmp(s, "wheel", 5))
+		return scrl(e, atoi(a), S_STEP);
+	if (n == 6 && !strncmp(s, "pixels", 6))
+		return scrl(e, atoi(a), S_PIXEL);
 	if (n == 4 && !strncmp(s, "size", 4)) {
 		if (sscanf(a, "%d %d", &w, &h) != 2 || w < 200 || h < 100 ||
 			fb_size(w, h) < 0) {

@@ -12,8 +12,29 @@ tmp=$(mktemp -d)
 fail=0
 here=$(cd "$(dirname "$0")" && pwd)
 
-python3 -I -m http.server "$port" --bind 127.0.0.1 --directory "$here/data" \
-	>"$tmp/http.log" 2>&1 &
+# The web server for the tests: python's, and GIFs cut into slices for
+# ?y=Y&h=H, as WRP does for the tall picture (with ImageMagick).
+cat >"$tmp/srv.py" <<'EOF'
+import functools, http.server, subprocess, sys, urllib.parse
+class H(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        u = urllib.parse.urlsplit(self.path)
+        q = urllib.parse.parse_qs(u.query)
+        if u.path.endswith('.gif') and 'y' in q and 'h' in q:
+            crop = 'x%d+0+%d' % (int(q['h'][0]), int(q['y'][0]))
+            b = subprocess.run(['magick', self.translate_path(u.path), '-crop',
+                crop, '+repage', 'gif:-'], capture_output=True).stdout
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/gif')
+            self.send_header('Content-Length', str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+            return
+        super().do_GET()
+http.server.ThreadingHTTPServer(('127.0.0.1', int(sys.argv[1])),
+    functools.partial(H, directory=sys.argv[2])).serve_forever()
+EOF
+python3 -I "$tmp/srv.py" "$port" "$here/data" >"$tmp/http.log" 2>&1 &
 srv=$!
 trap 'kill $srv 2>/dev/null; wait $srv 2>/dev/null; rm -rf "$tmp"' EXIT
 sleep 1
@@ -135,13 +156,13 @@ y=$(awk '$2 == "field" && $8 == "url" { print $4 + 5; exit }' "$tmp/f.out")
 "$bin" -t -s "@$x,$y;x~" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
 "$bin" -t -a -s "@$x,$y;y~" "http://127.0.0.1:$port/wrp.html" >"$tmp/fa.out" 2>&1
 rm -f "$here/data/wrp.html"
-if grep -Eq 'GET /wrp\?url=x&z=1\.0&k=&w=632&h=[0-9]+&m=ismap&t=gif&c=2 ' "$tmp/http.log"; then
-	ok "wrp form: sends $(grep -Eo 'w=632&h=[0-9]+&m=ismap&t=gif&c=2' "$tmp/http.log")"
+if grep -Eq 'GET /wrp\?url=x&z=1\.0&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log"; then
+	ok "wrp form: sends $(grep -Eo 'w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2' "$tmp/http.log")"
 else
 	bad "wrp form: the query is wrong:"
 	grep 'GET /wrp?url=x' "$tmp/http.log"
 fi
-if grep -Eq 'GET /wrp\?url=y&z=1\.0&m=ismap&t=gip&k=&w=632&h=[0-9]+ ' "$tmp/http.log"; then
+if grep -Eq 'GET /wrp\?url=y&z=1\.0&m=ismap&t=gip&k=&w=632&h=[0-9]+&sl=1 ' "$tmp/http.log"; then
 	ok "wrp form -a: shows M and T, sends them as set"
 else
 	bad "wrp form -a: the query is wrong:"
@@ -204,6 +225,66 @@ if [ -x "$hl" ]; then
 	fi
 else
 	echo "skip  headless: no $hl"
+fi
+
+# 8. The tall picture: WRP's picture of a whole page (sl=1), in a frame
+#    under the form, in slices. A random 632x1500 picture; each shot's
+#    frame must be exactly the picture's rows at the scroll position.
+if [ -x "$hl" ]; then
+	magick -size 632x1500 xc: +noise Random -colorspace gray -threshold 50% \
+		-type bilevel "$here/data/tall.gif"
+	cat >"$here/data/tall.html" <<'EOF'
+<HTML><HEAD><TITLE>Tall</TITLE></HEAD><BODY>
+<FORM ACTION="/wrp" METHOD="GET">
+<INPUT TYPE="TEXT" NAME="url" VALUE="tall" SIZE="20">
+<INPUT TYPE="SUBMIT" VALUE="Go">
+W <INPUT TYPE="TEXT" NAME="w" VALUE="632" SIZE="4">
+</FORM>
+<BR>
+<A HREF="/map"><IMG SRC="/tall.gif" WIDTH="632" HEIGHT="1500" ISMAP></A>
+</BODY></HTML>
+EOF
+	"$bin" -t "http://127.0.0.1:$port/tall.html" >"$tmp/tall.out" 2>&1
+	fx=$(awk '$2 == "image" { print $3; exit }' "$tmp/tall.out")
+	fy=$(awk '$2 == "image" { print $4; exit }' "$tmp/tall.out")
+	fh=$(awk '$2 == "image" { print $6; exit }' "$tmp/tall.out")
+	if grep -q "image .* ismap got 632x$fh sum [0-9a-f]* tall 632x1500 at 0" "$tmp/tall.out" &&
+		grep -q "GET /tall.gif?y=0&h=$fh " "$tmp/http.log"; then
+		ok "tall: a frame ${fh} high, its first slice"
+	else
+		bad "tall: no frame or no slice:"
+		grep image "$tmp/tall.out"
+	fi
+	q=$((fh / 4))
+	p=$((fh - 26))
+	last=$((1500 - fh))
+	printf '%s\n' "shot $tmp/t0.png" 'wheel 1' "shot $tmp/t1.png" 'scroll down' \
+		"shot $tmp/t2.png" 'pixels 5000' "shot $tmp/t3.png" \
+		"click $((fx + 10)) $((fy + 20))" quit |
+		"$hl" -g 640x400 "http://127.0.0.1:$port/tall.html" >"$tmp/th.out" 2>&1
+	rm -f "$here/data/tall.html"
+	n=0
+	for s in "t0 0" "t1 $q" "t2 $((q + p))" "t3 $last"; do
+		set -- $s
+		magick "$tmp/$1.png" -crop "632x$fh+$fx+$fy" +repage "$tmp/$1f.png"
+		magick "$here/data/tall.gif" -crop "632x$fh+0+$2" +repage "$tmp/$1r.png"
+		if magick compare -metric AE "$tmp/$1f.png" "$tmp/$1r.png" null: 2>/dev/null; then
+			n=$((n + 1))
+		else
+			bad "tall: shot $1 is not rows $2 to $(($2 + fh - 1))"
+		fi
+	done
+	[ $n = 4 ] && ok "tall: the frame shows the right rows at 0, a wheel step, a window, the end"
+	if grep -q "GET /tall.gif?y=$fh&h=$fh " "$tmp/http.log" &&
+		grep -q "GET /map?10,$((last + 20)) " "$tmp/http.log"; then
+		ok "tall: the next slice comes before it is needed; a click sends page rows"
+	else
+		bad "tall: slices or the click are wrong:"
+		grep -E 'GET /(tall|map)' "$tmp/http.log"
+	fi
+	rm -f "$here/data/tall.gif"
+else
+	echo "skip  tall: no $hl"
 fi
 
 [ $fail = 0 ] && echo "all tests passed"

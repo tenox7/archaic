@@ -4,11 +4,10 @@
  *
  * Built without ARC: retain and release by hand, as in old Cocoa.
  * Keys: the characters as typed; Return, Backspace, Tab, Esc and
- * Ctrl+letter. Page Up, Page Down, the up and down arrows and the scroll
- * wheel or trackpad scroll: they come as a right click at the top or the
- * bottom of the page, as in x11.c and unixpc.c. Ctrl+click is the right
- * button. Cmd-Q, Cmd-W and the close button quit. Cocoa has no file to
- * wait on: g_fd() is -1.
+ * Ctrl+letter. Page Up and Page Down scroll a window, the up and down
+ * arrows and the wheel's steps a quarter of it (E_SCROLL); a trackpad
+ * scrolls by pixels. Ctrl+click is the right button. Cmd-Q, Cmd-W and
+ * the close button quit. Cocoa has no file to wait on: g_fd() is -1.
  */
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
@@ -33,7 +32,7 @@ static NSView *view;
 static id del;
 static CGContextRef bm;		/* fb as a Quartz bitmap */
 static CGColorSpaceRef rgb;
-static double wheel;		/* wheel steps not used yet */
+static double wheel;		/* wheel steps or trackpad pixels not used yet */
 
 static void put(type, x, y, k)
 int type, x, y, k;
@@ -52,11 +51,21 @@ int type, x, y, k;
 	qin = (qin + 1) % NQ;
 }
 
-/* scroll: a right click at the top (up) or the bottom (down) */
-static void roll(down)
-int down;
+/* scroll y units (S_PIXEL, S_STEP, S_PAGE), down if y > 0: added to
+ * the last event if that is a scroll of the same units not taken yet */
+static void scrl(y, unit)
+int y, unit;
 {
-	put(E_DOWN, 0, down ? fbh - 30 : 0, 3);
+	Event *e;
+
+	if (qin != qout) {
+		e = &evq[(qin + NQ - 1) % NQ];
+		if (e->type == E_SCROLL && e->key == unit) {
+			e->y += y;
+			return;
+		}
+	}
+	put(E_SCROLL, 0, y, unit);
 }
 
 static int mkbm()
@@ -127,13 +136,17 @@ static void resized()
 	for (i = 0; i < [s length]; ++i) {
 		c = [s characterAtIndex:i];
 		switch (c) {
-		case NSUpArrowFunctionKey:
 		case NSPageUpFunctionKey:
-			roll(0);
+			scrl(-1, S_PAGE);
+			continue;
+		case NSPageDownFunctionKey:
+			scrl(1, S_PAGE);
+			continue;
+		case NSUpArrowFunctionKey:
+			scrl(-1, S_STEP);
 			continue;
 		case NSDownArrowFunctionKey:
-		case NSPageDownFunctionKey:
-			roll(1);
+			scrl(1, S_STEP);
 			continue;
 		case 3:			/* Enter on the keypad */
 			c = '\r';
@@ -162,14 +175,23 @@ static void resized()
 - (void)rightMouseDown:(NSEvent *)ev { [self click:ev button:3]; }
 - (void)otherMouseDown:(NSEvent *)ev { [self click:ev button:2]; }
 
-/* 3 steps of the wheel (or the trackpad's lines) scroll a page */
+/* a wheel: a quarter of the window a step; a trackpad: pixels */
 - (void)scrollWheel:(NSEvent *)ev
 {
-	wheel += [ev deltaY];
-	if (wheel >= 3 || wheel <= -3) {
-		roll(wheel < 0);
-		wheel = 0;
-	}
+	int n, unit = S_STEP;
+
+#if defined(MAC_OS_X_VERSION_10_7) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7
+	if ([ev respondsToSelector:@selector(hasPreciseScrollingDeltas)] &&
+		[ev hasPreciseScrollingDeltas]) {
+		wheel += [ev scrollingDeltaY];
+		unit = S_PIXEL;
+	} else
+#endif
+		wheel += [ev deltaY];
+	n = (int)wheel;
+	wheel -= n;
+	if (n)
+		scrl(-n, unit);
 }
 @end
 

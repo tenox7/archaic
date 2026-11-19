@@ -14,13 +14,16 @@
  *		key or click starts ends before the script goes on.
  *
  * Keys: Tab next field, Return sends the form, Backspace, Ctrl-U clears
- * the field, Esc stops a load. Space and b scroll when no field has
- * the keyboard, so does the right mouse button. Ctrl-Q quits.
+ * the field, Esc stops a load. Space and b scroll a window when no field
+ * has the keyboard, so does the right mouse button. The displays send
+ * E_SCROLL for the wheel, the arrows, Page Up and Page Down. Ctrl-Q quits.
  *
  * WRP's form: Archaic sets WRP's settings itself and does not show them.
  * W and H: the picture fills the window. M, T, C: ISMAP, GIF, 2 colors
- * (with -a, the menus for these are shown and used). WRP's buttons
- * (Bk, St, Re, Up, Dn, Bs, Rt) are drawn as pictures: see icons[].
+ * (with -a, the menus for these are shown and used). SL=1: a WRP that
+ * knows it sends a picture of the whole page (the tall picture, below),
+ * and leaves out its Up and Dn buttons. WRP's buttons (Bk, St, Re, Up,
+ * Dn, Bs, Rt) are drawn as pictures: see icons[].
  */
 #include "archaic.h"
 
@@ -43,6 +46,31 @@ static char base[MAXURL];	/* this page's URL */
 static int winw, winh, viewh;	/* the window, the page part of it */
 static int fh, fb, cw;		/* font height, baseline, width of "0" */
 static int doch, top;		/* page height, how far scrolled */
+
+/* The tall picture: WRP's picture of a whole page (sl=1), higher than
+ * the window. Its item is a frame under WRP's form, tallh high, that
+ * shows the page from row oy down; only the frame scrolls. The picture
+ * comes in slices as high as the frame: page rows sbase + k * ssize up
+ * to the next slice. Archaic keeps NSLICE of them: the ones in the
+ * frame, and the next one below and above, which it gets while the user
+ * reads (slicework). */
+#define NSLICE 4
+typedef struct slice {
+	Image im;
+	long y0;		/* the page row of its first row */
+	int state;		/* 0 empty, 1 loading, 2 here */
+} Slice;
+static Slice slices[NSLICE];
+static int tall = -1;		/* its item, or -1 */
+static int tallh;		/* the frame's height */
+static long oy;			/* the page row at the top of the frame */
+static long sbase, ssize;	/* where the slices start, how high */
+static int sdir = 1;		/* the last scroll: 1 down, -1 up */
+static int sstop;		/* Esc or an error: no slices until a scroll */
+static int quiet;		/* getting a slice the user did not ask for */
+static char surl[MAXURL];	/* a slice's address */
+static char spage[MAXURL];	/* the address WRP showed before */
+static char ssave[200];		/* the status line before a slice */
 static int focus = -1;		/* field with the keyboard */
 static int popup = -1;		/* menu with its list open */
 static int pressed = -1;	/* button shown pressed */
@@ -343,6 +371,38 @@ int i;
 		fill(x + w - 1 - a / 2 - 3 + j, y + h / 2 - 2 + j, 7 - 2 * j, 1, 1);
 }
 
+/* screen rows r0 up to r1 of the tall picture's frame: the slices that
+ * are here (rows still on their way are white) */
+static void drawtall(r0, r1)
+int r0, r1;
+{
+	Item *it = &items[tall];
+	Slice *s;
+	int y = it->y - top, a, b, i, sa, sb;
+	long p;
+
+	a = y > r0 ? y : r0;
+	if (a < 0)
+		a = 0;
+	b = y + it->h;
+	if (b > r1)
+		b = r1;
+	if (b > viewh)
+		b = viewh;
+	for (i = 0; i < NSLICE && b > a; ++i) {
+		s = &slices[i];
+		if (!s->state || !s->im.bits)
+			continue;
+		p = y + s->y0 - oy;	/* the screen row of its first row */
+		if (p >= b || p + s->im.h <= a)
+			continue;
+		sa = p > a ? (int)p : a;
+		sb = p + s->im.h < b ? (int)(p + s->im.h) : b;
+		g_bits(it->x, sa, s->im.w, sb - sa,
+			s->im.bits + (sa - p) * s->im.bpl, s->im.bpl);
+	}
+}
+
 /* screen rows r0 up to r1 of image item i */
 static void drawimage(i, r0, r1)
 int i, r0, r1;
@@ -351,6 +411,10 @@ int i, r0, r1;
 	Image *im = it->img >= 0 ? &imgs[it->img] : 0;
 	int y = it->y - top, a, b;
 
+	if (i == tall) {
+		drawtall(r0, r1);
+		return;
+	}
 	if (!im || !im->bits) {
 		box(it->x, y, it->w, it->h);
 		return;
@@ -524,7 +588,10 @@ Item *it;
 		break;
 	case I_IMAGE:
 		im = it->img >= 0 ? &imgs[it->img] : 0;
-		if (im && im->w > 0) {
+		if (tall >= 0 && it == &items[tall]) {	/* the tall picture's frame */
+			it->w = it->iw;
+			it->h = tallh;
+		} else if (im && im->w > 0) {
 			it->w = im->w;
 			it->h = im->h;
 		} else {
@@ -536,7 +603,7 @@ Item *it;
 }
 
 /* place the items in lines, left to right, as wide as the window */
-static void layout()
+static void place()
 {
 	Item *it;
 	int i, j, x, y, lh, l0, sp, gap;
@@ -587,6 +654,27 @@ static void layout()
 			lh = it->h;
 	}
 	doch = y + M;
+}
+
+/* place the items; the tall picture's frame goes down to the bottom of
+ * the window, but not past the end of the picture */
+static void layout()
+{
+	Item *it;
+	int h;
+
+	tallh = viewh;
+	place();
+	if (tall < 0)
+		return;
+	it = &items[tall];
+	h = viewh - it->y - M;
+	if (h < 50)
+		h = 50;
+	if (h > it->ih)
+		h = it->ih;
+	tallh = h;
+	place();
 }
 
 /* Is it one of WRP's settings that Archaic sets itself? w and h always;
@@ -751,6 +839,7 @@ int f, b;
 		addq("w", num);
 		sprintf(num, "%d", h);
 		addq("h", num);
+		addq("sl", "1");	/* the whole page, in slices */
 		if (!allset) {
 			addq("m", "ismap");
 			addq("t", "gif");
@@ -776,20 +865,98 @@ int f, b;
 	}
 }
 
+/* how far the page scrolls: to its end. With a tall picture, only to the
+ * end of the frame, if the window is too small for all of it: the form
+ * stays at the top, and WRP's last line below the window. */
+static int maxtop()
+{
+	int m;
+
+	if (tall >= 0)
+		m = items[tall].y + items[tall].h + M - viewh;
+	else
+		m = doch - viewh;
+	return m > 0 ? m : 0;
+}
+
+/* scroll d pixels, down if d > 0. With a tall picture: down, first the
+ * picture in its frame, then the page (if the frame does not fit); up,
+ * first the page back to its top, then the picture. */
 static void scroll(d)
 int d;
 {
-	int t = top + d;
+	Item *it;
+	long o, ooy = oy;
+	int t, otop = top, opop = popup, a, b;
 
-	if (t > doch - viewh)
-		t = doch - viewh;
+	if (d == 0)
+		return;
+	sdir = d > 0 ? 1 : -1;
+	sstop = 0;
+	if (tall >= 0) {
+		it = &items[tall];
+		if (d < 0 && top > 0) {
+			t = top + d < 0 ? 0 : top + d;
+			d -= t - top;
+			top = t;
+		}
+		o = oy + d;
+		if (o > it->ih - it->h)
+			o = it->ih - it->h;
+		if (o < 0)
+			o = 0;
+		d -= (int)(o - oy);
+		oy = o;
+		if (d < 0)
+			d = 0;
+	}
+	t = top + d;
+	if (t > maxtop())
+		t = maxtop();
 	if (t < 0)
 		t = 0;
-	if (t == top)
+	top = t;
+	if (top == otop && oy == ooy)
 		return;
 	popup = -1;
-	top = t;
-	redraw(0, 0, winw, viewh);
+	if (top == otop && opop < 0) {	/* only the frame changed */
+		it = &items[tall];
+		a = it->y - top;
+		b = a + it->h;
+		if (a < 0)
+			a = 0;
+		if (b > viewh)
+			b = viewh;
+		redraw(0, a, winw, b - a);
+	} else
+		redraw(0, 0, winw, viewh);
+}
+
+/* a window's worth of scrolling: the frame (or the window) less 2 lines */
+static int pagestep()
+{
+	int n = (tall >= 0 ? items[tall].h : viewh) - 2 * fh;
+
+	return n > fh ? n : fh;
+}
+
+/* after a layout: keep oy inside the picture; when the frame's height
+ * changed, slices of the new height, one starting at the top of the frame */
+static void tallfix()
+{
+	Item *it;
+
+	if (tall < 0)
+		return;
+	it = &items[tall];
+	if (oy > it->ih - it->h)
+		oy = it->ih - it->h;
+	if (oy < 0)
+		oy = 0;
+	if (ssize != it->h) {
+		ssize = it->h;
+		sbase = oy % ssize;
+	}
 }
 
 static void key(k)
@@ -820,9 +987,9 @@ int k;
 	}
 	if (focus < 0) {
 		if (k == ' ' || k == 'F' - 64)
-			scroll(viewh - 2 * fh);
+			scroll(pagestep());
 		else if (k == 'b' || k == 'B' - 64)
-			scroll(2 * fh - viewh);
+			scroll(-pagestep());
 		return;
 	}
 	it = &items[focus];
@@ -865,7 +1032,7 @@ int x, y, b;
 	if (y >= viewh)
 		return;
 	if (b == 3) {
-		scroll(y < viewh / 2 ? 2 * fh - viewh : viewh - 2 * fh);
+		scroll(y < viewh / 2 ? -pagestep() : pagestep());
 		return;
 	}
 	i = hit(x, y + top);
@@ -890,9 +1057,9 @@ int x, y, b;
 	case I_IMAGE:
 		if (!it->href)
 			break;
-		if (it->ismap) {
-			sprintf(u, "%.1500s?%d,%d", it->href, x - it->x,
-				y + top - it->y);
+		if (it->ismap) {	/* the tall picture: rows of the whole page */
+			sprintf(u, "%.1500s?%d,%ld", it->href, x - it->x,
+				y + top - it->y + (i == tall ? oy : 0L));
 			go(u, (char *)0);
 		} else
 			go(it->href, (char *)0);
@@ -907,6 +1074,8 @@ int x, y, b;
 static void event(e)
 Event *e;
 {
+	int n;
+
 	switch (e->type) {
 	case E_KEY:
 		key(e->key);
@@ -925,11 +1094,21 @@ Event *e;
 		viewh = winh - fh - 3;
 		popup = -1;
 		layout();
-		if (top > doch - viewh)
-			top = doch - viewh;
+		tallfix();
+		if (top > maxtop())
+			top = maxtop();
 		if (top < 0)
 			top = 0;
 		redraw(0, 0, winw, winh);
+		break;
+	case E_SCROLL:
+		n = tall >= 0 ? items[tall].h : viewh;
+		if (e->key == S_PAGE)
+			scroll(e->y * pagestep());
+		else if (e->key == S_STEP)
+			scroll(e->y * (n / 4));
+		else
+			scroll(e->y);
 		break;
 	case E_QUIT:
 		quit = stop = 1;
@@ -955,18 +1134,35 @@ int y, n;
 {
 	Item *it;
 	int i, a;
+	long p;
 
 	http_pump();
 	if (headless)
 		return;
 	for (i = 0; i < nitems; ++i) {
 		it = &items[i];
-		if (it->type != I_IMAGE || it->img < 0 || &imgs[it->img] != im)
+		if (it->type != I_IMAGE || it->img < 0 || &imgs[it->img] != im ||
+			i == tall)
 			continue;
 		a = it->y - top + y;
 		drawimage(i, a, a + n);
 		if (popup >= 0 && a < py + ph && a + n > py)
 			drawpop();
+	}
+	for (i = 0; tall >= 0 && i < NSLICE; ++i) {
+		if (im != &slices[i].im)
+			continue;
+		p = items[tall].y - top + slices[i].y0 - oy + y;
+		if (p < viewh && p + n > 0) {
+			a = p < 0 ? 0 : (int)p;
+			drawtall(a, p + n < viewh ? (int)(p + n) : viewh);
+			if (popup >= 0 && a < py + ph && p + n > py)
+				drawpop();
+		}
+	}
+	if (quiet) {
+		g_flush();
+		return;
 	}
 	if (http_len > 0)
 		sprintf(msg, "Picture %ld of %ld bytes", http_got, http_len);
@@ -986,6 +1182,19 @@ static void freeimgs()
 		imgs[i].w = imgs[i].h = 0;
 	}
 	nimgs = 0;
+}
+
+static void freeslices()
+{
+	Slice *s;
+
+	for (s = slices; s < slices + NSLICE; ++s) {
+		if (s->im.bits)
+			free((char *)s->im.bits);
+		s->im.bits = 0;
+		s->im.w = s->im.h = 0;
+		s->state = 0;
+	}
 }
 
 static void loadimg(i)
@@ -1015,6 +1224,199 @@ int i;
 	if (im->w > 0 && (im->w != it->w || im->h != it->h)) {
 		layout();
 		redraw(0, 0, winw, winh);
+	}
+}
+
+/* the slice k of the tall picture: page rows *a up to *b; 0 if none */
+static int srows(k, a, b)
+long k, *a, *b;
+{
+	*a = sbase + k * ssize;
+	*b = *a + ssize;
+	if (*a < 0)
+		*a = 0;
+	if (*b > items[tall].ih)
+		*b = items[tall].ih;
+	return *b > *a;
+}
+
+/* the slice that has page row r */
+static long sk(r)
+long r;
+{
+	return r < sbase ? -1L : (r - sbase) / ssize;
+}
+
+/* is slot i the slice k? */
+static int sis(i, k)
+int i;
+long k;
+{
+	long a, b;
+
+	return slices[i].state == 2 && srows(k, &a, &b) &&
+		slices[i].y0 == a && slices[i].y0 + slices[i].im.h == b;
+}
+
+/* how far slot i is from the frame (0: it shows in it) */
+static long sdist(i)
+int i;
+{
+	Slice *s = &slices[i];
+	long e = oy + items[tall].h;
+
+	if (s->y0 >= e)
+		return s->y0 - e + 1;
+	if (s->y0 + s->im.h <= oy)
+		return oy - s->y0 - s->im.h + 1;
+	return 0;
+}
+
+/* get page rows a up to b of the tall picture into slot i */
+static void getslice(i, a, b)
+int i;
+long a, b;
+{
+	Slice *s = &slices[i];
+	int n, c, ok = 0;
+
+	if (s->im.bits)
+		free((char *)s->im.bits);
+	s->im.bits = 0;
+	s->im.w = s->im.h = 0;
+	s->y0 = a;
+	s->state = 1;
+	url_join(base, items[tall].text, surl);
+	for (n = 0; surl[n] && surl[n] != '?'; ++n)
+		;
+	c = surl[n] ? '&' : '?';
+	n = len(surl);
+	scopy(ssave, sline, (int)sizeof ssave);
+	loading = 1;
+	if (n > MAXURL - 30)
+		say("Picture: the address is too long");
+	else {
+		sprintf(surl + n, "%cy=%ld&h=%ld", c, a, b - a);
+		if (http_open(surl, (char *)0) < 0)
+			say(http_err);
+		else {
+			if (http_status != 200) {
+				sprintf(msg, "Picture: HTTP %d", http_status);
+				say(msg);
+			} else if (gif_load(&s->im) < 0) {
+				if (!stop)
+					say("Picture: can't show the slice");
+			} else if (s->im.h != b - a)	/* the server ignored y and h */
+				say("Picture: WRP did not send the rows asked for");
+			else
+				ok = 1;
+			http_close();
+		}
+	}
+	loading = 0;
+	if (ok && !stop) {
+		s->state = 2;
+		if (!quiet)
+			say(ssave);
+		return;
+	}
+	if (s->im.bits)
+		free((char *)s->im.bits);
+	s->im.bits = 0;
+	s->im.w = s->im.h = 0;
+	s->state = 0;
+	if (!pending)		/* Esc, or an error: wait for a scroll */
+		sstop = 1;
+	if (stop && !pending)
+		say("Stopped");
+}
+
+/* get one slice: one the frame shows that is missing, else (near) the
+ * next one below or above. 1 if it got one, or tried */
+static int slicework(near)
+int near;
+{
+	static long want[4];
+	long a, b, k0, k1;
+	int i, j, k, n, v, best;
+
+	if (tall < 0 || ssize <= 0 || sstop)
+		return 0;
+	k0 = sk(oy);
+	k1 = sk(oy + items[tall].h - 1);
+	n = 0;
+	want[n++] = k0;
+	if (k1 != k0)
+		want[n++] = k1;
+	v = n;			/* want[0] up to want[v - 1] are in the frame */
+	if (near) {
+		want[n++] = sdir > 0 ? k1 + 1 : k0 - 1;
+		want[n++] = sdir > 0 ? k0 - 1 : k1 + 1;
+	}
+	for (i = 0; i < n; ++i) {
+		if (!srows(want[i], &a, &b))
+			continue;
+		for (j = 0; j < NSLICE && !sis(j, want[i]); ++j)
+			;
+		if (j < NSLICE)
+			continue;	/* here */
+		/* a slot: an empty one, else the farthest one not wanted */
+		best = -1;
+		for (j = 0; j < NSLICE; ++j) {
+			if (!slices[j].state) {
+				best = j;
+				break;
+			}
+			for (k = 0; k < n && !sis(j, want[k]); ++k)
+				;
+			if (k == n && (best < 0 || sdist(j) > sdist(best)))
+				best = j;
+		}
+		if (best < 0)
+			return 0;
+		quiet = i >= v;
+		getslice(best, a, b);
+		quiet = 0;
+		return 1;
+	}
+	return 0;
+}
+
+/* the address in WRP's form (the page WRP shows), or "" */
+static char *wrpurl()
+{
+	Item *it;
+	int i;
+
+	for (i = 0; i < nitems; ++i) {
+		it = &items[i];
+		if (it->type == I_FIELD && it->form >= 0 && it->form < MAXFORM &&
+			wrpf[it->form] && it->name && strieq(it->name, "url") &&
+			it->val)
+			return it->val;
+	}
+	return empty;
+}
+
+/* WRP's ISMAP picture on a page with WRP's form. It is the tall picture
+ * if it is higher than its frame: load() sees after the layout. */
+static void findtall()
+{
+	Item *it;
+	int f, i;
+
+	tall = -1;
+	for (f = 0; f < nforms && f < MAXFORM && !wrpf[f]; ++f)
+		;
+	if (f >= nforms || f >= MAXFORM)
+		return;
+	for (i = 0; i < nitems; ++i) {
+		it = &items[i];
+		if (it->type == I_IMAGE && it->ismap && it->href && it->iw > 0 &&
+			it->ih > 0) {
+			tall = i;
+			return;
+		}
 	}
 }
 
@@ -1069,10 +1471,13 @@ char *url, *post;
 	fname[0] = 0;
 	if (focus >= 0 && items[focus].name)
 		scopy(fname, items[focus].name, (int)sizeof fname);
+	scopy(spage, wrpurl(), MAXURL);
 	scopy(base, http_url, MAXURL);
 	focus = popup = pressed = -1;
 	top = 0;
+	tall = -1;
 	freeimgs();
+	freeslices();
 	if (html_parse(page, n) < 0)
 		say("The page is too big: only its start is shown");
 	for (i = 0; i < nitems; ++i)
@@ -1081,7 +1486,17 @@ char *url, *post;
 	if (!headless)
 		g_title(title[0] ? title : "Archaic");
 	wrpforms();
+	findtall();
 	layout();
+	if (tall >= 0 && items[tall].ih <= items[tall].h) {
+		tall = -1;	/* it fits: an ordinary picture */
+		layout();
+	}
+	if (tall < 0 || !spage[0] || !strieq(spage, wrpurl()))
+		oy = 0;		/* a new page: its top. The same page: stay */
+	ssize = 0;
+	sstop = 0;
+	tallfix();
 	for (i = 0; fname[0] && i < nitems; ++i) {
 		it = &items[i];
 		if (it->type == I_FIELD && it->name && strieq(it->name, fname)) {
@@ -1091,8 +1506,10 @@ char *url, *post;
 	}
 	redraw(0, 0, winw, winh);
 	for (i = 0; i < nitems && !stop; ++i)
-		if (items[i].type == I_IMAGE && items[i].img >= 0)
+		if (items[i].type == I_IMAGE && items[i].img >= 0 && i != tall)
 			loadimg(i);
+	while (!stop && slicework(0))	/* the frame of the tall picture */
+		;
 	if (stop) {
 		if (!pending)
 			say("Stopped");
@@ -1130,6 +1547,7 @@ static void dump()
 		"hidden", "select", "image" };
 	Item *it;
 	Image *im;
+	Slice *s;
 	Opt *o;
 	int i, j;
 
@@ -1164,7 +1582,15 @@ static void dump()
 			printf(" href=%s", it->href);
 		if (it->ismap)
 			printf(" ismap");
-		if (it->type == I_IMAGE && it->img >= 0) {
+		if (i == tall) {	/* the slice at the top of the frame */
+			for (j = 0; j < NSLICE; ++j) {
+				s = &slices[j];
+				if (s->state == 2 && s->y0 <= oy && oy < s->y0 + s->im.h)
+					printf(" got %dx%d sum %08lx", s->im.w, s->im.h,
+						sum(&s->im));
+			}
+			printf(" tall %dx%d at %ld", it->iw, it->ih, oy);
+		} else if (it->type == I_IMAGE && it->img >= 0) {
 			im = &imgs[it->img];
 			printf(" got %dx%d sum %08lx", im->w, im->h, sum(im));
 		}
@@ -1182,6 +1608,10 @@ static void writepbm()
 	for (i = 0; i < nimgs && !im; ++i)
 		if (imgs[i].bits)
 			im = &imgs[i];
+	for (i = 0; i < NSLICE && !im; ++i)	/* the tall picture's first slice */
+		if (slices[i].state == 2 && slices[i].y0 <= oy &&
+			oy < slices[i].y0 + slices[i].im.h)
+			im = &slices[i].im;
 	if (!im) {
 		fprintf(stderr, "archaic: no picture for %s\n", pbm);
 		return;
@@ -1318,6 +1748,8 @@ char **argv;
 		}
 		if (headless)
 			break;
+		if (slicework(1))	/* the frame's slices, then the next ones */
+			continue;
 		if (g_event(&e, 1))
 			event(&e);
 	}

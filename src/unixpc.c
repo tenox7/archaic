@@ -15,8 +15,9 @@
  * - Keys come from wgetc() in keypad mode. When Archaic waits, a read
  *   waits at most 0.1 s (VMIN 0, VTIME 1); a poll does not wait (VTIME 0).
  *   Exit and Cancl (also the frame's close box) quit, Rfrsh draws again.
- *   Page, Shift+Page, Next, Prev and the Roll keys scroll. The scroll
- *   arrows in the frame send the Roll keys (so does FreeBee's wheel).
+ *   Page, Shift+Page, Next and Prev scroll a window; the Roll keys and
+ *   the arrows a quarter of it (E_SCROLL). The scroll arrows in the
+ *   frame send the Roll keys (so does FreeBee's wheel).
  * - A mouse click comes as the Mouse key, then wreadmouse() says where.
  *   The left button is 4, the middle one 2, the right one 1.
  * - The frame's resize box sends SIGWIND: then the new size is an E_SIZE.
@@ -432,16 +433,15 @@ int on;
 	waiting = on;
 }
 
-/* a click of the right button at the top or the bottom: main.c
- * scrolls up or down a page for it */
-static int roll(e, down)
+/* scroll y units (S_STEP, S_PAGE), down if y > 0 */
+static int scrl(e, y, unit)
 Event *e;
-int down;
+int y, unit;
 {
-	e->type = E_DOWN;
-	e->key = 3;
+	e->type = E_SCROLL;
 	e->x = 0;
-	e->y = down ? wh - 30 : 0;
+	e->y = y;
+	e->key = unit;
 	return 1;
 }
 
@@ -487,14 +487,16 @@ int wait;
 			return 1;
 		case KC_UP:
 		case KC_ROLLUP:
+			return scrl(e, -1, S_STEP);
 		case KC_SPAGE:
 		case KC_PREV:
-			return roll(e, 0);
+			return scrl(e, -1, S_PAGE);
 		case KC_DOWN:
 		case KC_ROLLDN:
+			return scrl(e, 1, S_STEP);
 		case KC_PAGE:
 		case KC_NEXT:
-			return roll(e, 1);
+			return scrl(e, 1, S_PAGE);
 		case KC_MOUSE:
 			wreadmouse(wn, &x, &y, &b, &r);
 			if (!(r & MSDOWN) || !b)
