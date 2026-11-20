@@ -1,6 +1,7 @@
 /* cocoa.m - Archaic's display for macOS (Cocoa, Mac OS X 10.6 and
  * later): a window that shows fb.c's screen in memory. On a Retina
- * screen each pixel is 2x2, with no smoothing.
+ * screen each pixel is 2x2, with no smoothing. The colors: as many as
+ * the screen shows (its depth).
  *
  * Built without ARC: retain and release by hand, as in old Cocoa.
  * Keys: the characters as typed; Return, Backspace, Tab, Esc and
@@ -458,6 +459,21 @@ int *w, *h;
 	*w = gw;
 	*h = gh;
 	return 0;
+}
+
+/* the screen's colors: 2 to the bits of its pixels (of gray, or of
+ * all three colors) */
+long g_colors()
+{
+	NSScreen *sc = [win screen] ? [win screen] : [NSScreen mainScreen];
+	NSWindowDepth d = [sc depth];
+	long b = NSBitsPerPixelFromDepth(d);
+
+	if (NSNumberOfColorComponents(NSColorSpaceFromDepth(d)) < 3)
+		b = NSBitsPerSampleFromDepth(d);
+	else if (b > 24)
+		b = 3 * NSBitsPerSampleFromDepth(d);
+	return b < 1 ? 2L : b > 24 ? 1L << 24 : 1L << b;
 }
 
 void g_close()

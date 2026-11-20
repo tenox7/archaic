@@ -39,6 +39,18 @@ long pos, max, vis;
 {
 }
 
+/* black and white only: no colors, so Archaic never calls g_pix */
+long g_colors()
+{
+	return 2L;
+}
+
+void g_pix(x, y, w, h, pix, bpl, pal)
+int x, y, w, h, bpl;
+unsigned char *pix, *pal;
+{
+}
+
 /* The pointer: an arrow with its tip, the hot spot, at 0,0.
  * - The Idris server draws the root window's X cursor 7 pixels up and
  *   left of where it clicks (it seems to take the hot spot off twice).

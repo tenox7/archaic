@@ -3,8 +3,10 @@
  * and finished rows go to the screen at once (img_rows), so the page
  * shows from the top down while it loads.
  *
- * Pixels become 1 bit: each color's brightness against a 4x4 ordered
- * dither. WRP's 2-color GIFs (black and white only) come out exact.
+ * im->depth says what the pixels become. 1: 1 bit, each color's
+ * brightness against a 4x4 ordered dither; WRP's 2-color GIFs (black
+ * and white only) come out exact. 8: the color numbers themselves, a
+ * byte each, and the colors in im->pal, for a display that shows them.
  */
 #include "archaic.h"
 
@@ -16,6 +18,7 @@ void free();
 #endif
 
 static int gray[256];			/* brightness 0..255 of each color */
+static unsigned char rgb[768];		/* red, green, blue of each color */
 static short prefix[4096];		/* LZW: code = prefix code + suffix */
 static unsigned char suffix[4096];
 static unsigned char stk[4097];
@@ -56,9 +59,29 @@ int n;
 		b = http_getc();
 		if (b < 0)
 			return -1;
+		rgb[3 * i] = r;
+		rgb[3 * i + 1] = g;
+		rgb[3 * i + 2] = b;
 		gray[i] = (int)(((long)r * 77 + (long)g * 150 + (long)b * 29) >> 8);
 	}
 	return 0;
+}
+
+/* 8 bits: the colors into im->pal, and all pixels the lightest color
+ * (white, mostly) until their rows come */
+static void setpal()
+{
+	long i, n;
+	int c, k;
+
+	for (i = 0; i < 768; ++i)
+		im->pal[i] = rgb[i];
+	for (c = k = 0; k < 256; ++k)
+		if (gray[k] > gray[c])
+			c = k;
+	n = (long)im->bpl * im->h;
+	for (i = 0; i < n; ++i)
+		im->bits[i] = c;
 }
 
 /* skip data blocks up to the empty one */
@@ -127,14 +150,20 @@ static void putrow()
 
 	y = top + ry;
 	if (y < im->h) {
-		b = im->bits + (long)y * im->bpl;
-		t = dither[y & 3];
 		n = iw;
 		if (left + n > im->w)
 			n = im->w - left;
-		for (x = 0; x < n; ++x)
-			if (gray[row[x]] < t[(left + x) & 3])
-				b[(left + x) >> 3] |= bit[(left + x) & 7];
+		if (im->depth == 8) {
+			b = im->bits + (long)y * im->bpl + left;
+			for (x = 0; x < n; ++x)
+				b[x] = row[x];
+		} else {
+			b = im->bits + (long)y * im->bpl;
+			t = dither[y & 3];
+			for (x = 0; x < n; ++x)
+				if (gray[row[x]] < t[(left + x) & 3])
+					b[(left + x) >> 3] |= bit[(left + x) & 7];
+		}
 		if (npend > 0 && y == pend0 + npend)
 			++npend;
 		else {
@@ -237,7 +266,8 @@ static int lzw()
 	return 0;
 }
 
-/* read a GIF into img (bits from malloc): 0 ok, -1 not a GIF or broken */
+/* read a GIF into img (bits and pal from malloc): 0 ok, -1 not a GIF or
+ * broken */
 int gif_load(img)
 Image *img;
 {
@@ -246,6 +276,9 @@ Image *img;
 
 	im = img;
 	npend = 0;
+	if (im->depth != 8)
+		im->depth = 1;
+	im->pal = 0;
 	if (http_getc() != 'G' || http_getc() != 'I' || http_getc() != 'F')
 		return -1;
 	for (i = 0; i < 3; ++i)
@@ -256,21 +289,32 @@ Image *img;
 	http_getc();
 	if (http_getc() < 0 || w <= 0 || h <= 0 || w > MAXW || h > 8192)
 		return -1;
-	for (i = 0; i < 256; ++i)
+	for (i = 0; i < 256; ++i) {
 		gray[i] = i & 1 ? 0 : 255;
+		rgb[3 * i] = rgb[3 * i + 1] = rgb[3 * i + 2] = gray[i];
+	}
 	if ((flags & 0200) && colors(2 << (flags & 7)) < 0)
 		return -1;
 	im->w = w;
 	im->h = h;
-	im->bpl = (w + 7) / 8;
+	im->bpl = im->depth == 8 ? w : (w + 7) / 8;
 	n = (long)im->bpl * h;
 	if (n != (long)(unsigned)n)
 		return -1;	/* too big for this machine's malloc */
 	im->bits = (unsigned char *)malloc((unsigned)n);
 	if (!im->bits)
 		return -1;
-	while (--n >= 0)
-		im->bits[n] = 0;
+	if (im->depth == 8) {
+		im->pal = (unsigned char *)malloc(768);
+		if (!im->pal) {
+			free((char *)im->bits);
+			im->bits = 0;
+			return -1;
+		}
+		setpal();
+	} else
+		while (--n >= 0)
+			im->bits[n] = 0;
 	r = -1;
 	for (;;) {
 		c = http_getc();
@@ -290,10 +334,21 @@ Image *img;
 		if (flags < 0 || iw <= 0 || ih <= 0 || iw > MAXW || left >= w ||
 			top >= h)
 			break;
-		if ((flags & 0200) && colors(2 << (flags & 7)) < 0)
-			break;
+		if (flags & 0200) {		/* its own colors */
+			if (colors(2 << (flags & 7)) < 0)
+				break;
+			if (im->depth == 8)
+				setpal();
+		}
 		ilace = flags & 0100;
 		r = lzw();
+		if (r == 0) {			/* read to the end: all of it counts */
+			while (!dend && blk > 0 && http_getc() >= 0)
+				--blk;
+			if (!dend)
+				skip();
+			http_getc();		/* ';' */
+		}
 		break;				/* only the first image */
 	}
 	flush();

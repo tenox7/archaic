@@ -1,14 +1,18 @@
 /* main.c - Archaic: the page on the screen, the mouse and the keys.
  *
- *	archaic [=WxH+X+Y] [-a] [-t] [-v] [-o file.pbm] [-s script] [url]
+ *	archaic [=WxH+X+Y] [-a] [-c n] [-t] [-v] [-o file] [-s script] [url]
  *
  * url		WRP's address: host:port or http://host:port/
  *		(default $WRP, else DEFURL)
  * =WxH+X+Y	window size and place (or -g WxH+X+Y)
  * -a		show WRP's M, T and C menus (mode, picture type, colors)
+ * -c n		start with pictures of n colors (2 to 256), not as many
+ *		as the display shows (g_colors). With -t: as if the
+ *		display showed n
  * -t		test: no window; print the page and its pictures
  * -v		status messages to stderr too
- * -o file	at the end, write the first picture as a PBM file
+ * -o file	at the end, write the first picture: PBM, or PPM if it
+ *		has colors
  * -s script	act out a script, then quit: characters are keys, ~ is
  *		Return, @x,y; is a click, % waits 2 seconds. A load that a
  *		key or click starts ends before the script goes on (so do
@@ -22,8 +26,12 @@
  * its own (drawbar). Ctrl-Q quits.
  *
  * WRP's form: Archaic sets WRP's settings itself and does not show them.
- * W and H: the picture fills the window. M, T, C: ISMAP, GIF, 2 colors
- * (with -a, the menus for these are shown and used). SL=1: a WRP that
+ * W and H: the picture fills the window. M, T: ISMAP, GIF (with -a, the
+ * menus for M, T and C are shown and used). C, the colors: on a display
+ * that shows colors, WRP's C menu stays, set to the display's colors (or
+ * the nearest it has, or to -c's); a new choice there sends the form at
+ * once, with St, so that WRP takes the picture again in those colors.
+ * On a black and white display, C is hidden: 2, or -c's. SL=1: a WRP that
  * knows it sends a picture of the whole page (the tall picture, below),
  * and leaves out its Up and Dn buttons. WRP's buttons (Bk, St, Re, Up,
  * Dn, Bs, Rt) are drawn as pictures: see icons[].
@@ -125,6 +133,11 @@ static long lbytes;		/* the bytes of this page so far */
 static char nb[24];
 static char msg[200];
 static int loading, quit, pending, pendpost, headless, verbose, allset;
+static long dcolors;		/* the colors the display shows (g_colors) */
+static int ncol;		/* the colors asked of WRP, 2 to 256 */
+static int copt;		/* -c's colors, or 0 */
+static int cmenu;		/* WRP's C menu is shown */
+static int idepth = 1;		/* the pictures' pixels: 1 or 8 bits */
 static int wrpf[MAXFORM];	/* the form is WRP's */
 static char num[16];
 static char pendurl[MAXURL], pendbody[MAXURL];
@@ -143,6 +156,17 @@ char *s;
 
 	while (s[n])
 		++n;
+	return n;
+}
+
+/* the number at the start of s */
+static int atoin(s)
+char *s;
+{
+	int n = 0;
+
+	while (s && *s >= '0' && *s <= '9' && n < 10000)
+		n = n * 10 + *s++ - '0';
 	return n;
 }
 
@@ -573,6 +597,20 @@ int i;
 		fill(x + w - 1 - a / 2 - 3 + j, y + h / 2 - 2 + j, 7 - 2 * j, 1, 1);
 }
 
+/* rows r up to r + h of picture im, at x, y */
+static void drawpic(x, y, w, h, im, r)
+int x, y, w, h;
+Image *im;
+long r;
+{
+	unsigned char *p = im->bits + r * im->bpl;
+
+	if (im->depth != 8)
+		g_bits(x, y, w, h, p, im->bpl);
+	else if (im->pal)
+		g_pix(x, y, w, h, p, im->bpl, im->pal);
+}
+
 /* screen rows r0 up to r1 of the tall picture's frame: the slices that
  * are here (rows still on their way are white) */
 static void drawtall(r0, r1)
@@ -602,8 +640,7 @@ int r0, r1;
 		sb = p + s->im.h < b ? (int)(p + s->im.h) : b;
 		w = it->x + s->im.w > vieww ? vieww - it->x : s->im.w;
 		if (w > 0)
-			g_bits(it->x, sa, w, sb - sa,
-				s->im.bits + (sa - p) * s->im.bpl, s->im.bpl);
+			drawpic(it->x, sa, w, sb - sa, &s->im, sa - p);
 	}
 }
 
@@ -633,8 +670,7 @@ int i, r0, r1;
 		b = viewh;
 	w = it->x + im->w > vieww ? vieww - it->x : im->w;
 	if (b > a && w > 0)
-		g_bits(it->x, a, w, b - a, im->bits + (long)(a - y) * im->bpl,
-			im->bpl);
+		drawpic(it->x, a, w, b - a, im, (long)(a - y));
 }
 
 static void drawpop()
@@ -1000,7 +1036,7 @@ static void layout()
 }
 
 /* Is it one of WRP's settings that Archaic sets itself? w and h always;
- * m, t and c unless -a. */
+ * m, t and c unless -a, and c not if its menu is shown. */
 static int ours(it)
 Item *it;
 {
@@ -1011,8 +1047,38 @@ Item *it;
 		return 0;
 	for (i = 0; i < (allset ? 2 : 5); ++i)
 		if (strieq(it->name, set[i]))
-			return 1;
+			return i < 4 || !cmenu;
 	return 0;
+}
+
+/* Is it WRP's C menu, shown? */
+static int iscmenu(it)
+Item *it;
+{
+	return it->type == I_SELECT && it->name && strieq(it->name, "c") &&
+		it->form >= 0 && it->form < MAXFORM && wrpf[it->form];
+}
+
+/* WRP's C menu: the choice nearest ncol, and not above it if it can */
+static void setcol(it)
+Item *it;
+{
+	Opt *o;
+	int j, v, best = -1, bv = 0;
+
+	for (j = 0; j < it->nopt; ++j) {
+		o = &opts[it->opt + j];
+		v = atoin(o->val);
+		if (o->dis || v < 2)
+			continue;
+		if (best < 0 || (v <= ncol ? bv > ncol || v > bv :
+			bv > ncol && v < bv)) {
+			best = j;
+			bv = v;
+		}
+	}
+	if (best >= 0)
+		it->sel = best;
 }
 
 /* A new page: find WRP's form (it has a url and a w field), and hide
@@ -1040,6 +1106,9 @@ static void wrpforms()
 			strieq(it[-1].text, it->name))
 			it[-1].type = I_HIDDEN;	/* no name: not sent */
 	}
+	for (i = 0; cmenu && !allset && i < nitems; ++i)
+		if (iscmenu(&items[i]))
+			setcol(&items[i]);
 }
 
 /* The size of WRP's next picture: as wide as the window, and as high as
@@ -1165,7 +1234,13 @@ int f, b;
 		if (!allset) {
 			addq("m", "ismap");
 			addq("t", "gif");
-			addq("c", "2");
+			for (i = 0; i < nitems; ++i)
+				if (items[i].form == f && iscmenu(&items[i]))
+					break;
+			if (i == nitems) {	/* no C menu: Archaic's colors */
+				sprintf(num, "%d", ncol);
+				addq("c", num);
+			}
 		}
 	}
 	if (b >= 0) {
@@ -1410,15 +1485,36 @@ int k;
 	drawone(focus);
 }
 
+/* a new choice in WRP's C menu: send the form now, with St (stop), so
+ * that WRP takes the picture again in those colors */
+static void newcol(it)
+Item *it;
+{
+	Item *b;
+	int i;
+
+	ncol = atoin(opts[it->opt + it->sel].val);
+	if (ncol < 2 || ncol > 256)
+		ncol = ncol < 2 ? 2 : 256;
+	for (i = 0; i < nitems; ++i) {
+		b = &items[i];
+		if (b->type == I_BUTTON && b->form == it->form && b->name &&
+			strieq(b->name, "Fn") && b->text && strieq(b->text, "St"))
+			break;
+	}
+	submit(it->form, i < nitems ? i : -1);
+}
+
 static void click(x, y, b)
 int x, y, b;
 {
 	Item *it;
-	int i, j;
+	int i, j, old;
 
 	if (popup >= 0) {
 		i = popup;
 		it = &items[i];
+		old = it->sel;
 		if (x >= px && x < px + pw && y > py && y < py + ph - 1) {
 			j = (y - py - 1) / prow;
 			if (j >= 0 && j < it->nopt && !opts[it->opt + j].dis)
@@ -1426,6 +1522,8 @@ int x, y, b;
 		}
 		closepop();
 		drawone(i);
+		if (it->sel != old && cmenu && !allset && iscmenu(it))
+			newcol(it);
 		return;
 	}
 	if (y >= viewh)
@@ -1589,16 +1687,23 @@ int y, n;
 	g_flush();
 }
 
+static void imfree(im)
+Image *im;
+{
+	if (im->bits)
+		free((char *)im->bits);
+	if (im->pal)
+		free((char *)im->pal);
+	im->bits = im->pal = 0;
+	im->w = im->h = 0;
+}
+
 static void freeimgs()
 {
 	int i;
 
-	for (i = 0; i < nimgs; ++i) {
-		if (imgs[i].bits)
-			free((char *)imgs[i].bits);
-		imgs[i].bits = 0;
-		imgs[i].w = imgs[i].h = 0;
-	}
+	for (i = 0; i < nimgs; ++i)
+		imfree(&imgs[i]);
 	nimgs = 0;
 }
 
@@ -1607,10 +1712,7 @@ static void freeslices()
 	Slice *s;
 
 	for (s = slices; s < slices + NSLICE; ++s) {
-		if (s->im.bits)
-			free((char *)s->im.bits);
-		s->im.bits = 0;
-		s->im.w = s->im.h = 0;
+		imfree(&s->im);
 		s->state = 0;
 	}
 }
@@ -1637,7 +1739,10 @@ int i, k, n;
 		http_close();
 		return;
 	}
-	if (gif_load(im) < 0 && !stop) {
+	im->depth = idepth;
+	if (gif_load(im) == 0)
+		progress();
+	else if (!stop) {
 		sprintf(msg, "Picture: can't show %s", http_type[0] ? http_type : "it");
 		say(msg);
 	}
@@ -1703,10 +1808,8 @@ long a, b;
 	int n, c, ok = 0;
 	long k, m;
 
-	if (s->im.bits)
-		free((char *)s->im.bits);
-	s->im.bits = 0;
-	s->im.w = s->im.h = 0;
+	imfree(&s->im);
+	s->im.depth = idepth;
 	s->y0 = a;
 	s->state = 1;
 	k = sk(a) - sk(0L) + 1;
@@ -1738,6 +1841,7 @@ long a, b;
 			else {
 				ok = 1;
 				lbytes += http_got;
+				progress();	/* all of it */
 			}
 			http_close();
 		}
@@ -1748,10 +1852,7 @@ long a, b;
 		say(ssave);
 		return;
 	}
-	if (s->im.bits)
-		free((char *)s->im.bits);
-	s->im.bits = 0;
-	s->im.w = s->im.h = 0;
+	imfree(&s->im);
 	s->state = 0;
 	if (!pending)		/* Esc, or an error: wait for a scroll */
 		sstop = 1;
@@ -1968,6 +2069,8 @@ Image *im;
 	n = (long)im->bpl * im->h;
 	for (i = 0; i < n; ++i)
 		s = (s * 31 + im->bits[i]) & 0xffffffffL;
+	for (i = 0; im->depth == 8 && im->pal && i < 768; ++i)
+		s = (s * 31 + im->pal[i]) & 0xffffffffL;
 	return s;
 }
 
@@ -2017,13 +2120,14 @@ static void dump()
 			for (j = 0; j < NSLICE; ++j) {
 				s = &slices[j];
 				if (s->state == 2 && s->y0 <= oy && oy < s->y0 + s->im.h)
-					printf(" got %dx%d sum %08lx", s->im.w, s->im.h,
-						sum(&s->im));
+					printf(" got %dx%d sum %08lx%s", s->im.w, s->im.h,
+						sum(&s->im), s->im.depth == 8 ? " colors" : "");
 			}
 			printf(" tall %dx%d at %ld", it->iw, it->ih, oy);
 		} else if (it->type == I_IMAGE && it->img >= 0) {
 			im = &imgs[it->img];
-			printf(" got %dx%d sum %08lx", im->w, im->h, sum(im));
+			printf(" got %dx%d sum %08lx%s", im->w, im->h, sum(im),
+				im->depth == 8 ? " colors" : "");
 		}
 		printf("\n");
 	}
@@ -2034,7 +2138,8 @@ static void writepbm()
 {
 	FILE *f;
 	Image *im = 0;
-	int i;
+	long n;
+	int i, c;
 
 	for (i = 0; i < nimgs && !im; ++i)
 		if (imgs[i].bits)
@@ -2056,9 +2161,33 @@ static void writepbm()
 		fprintf(stderr, "archaic: can't write %s\n", pbm);
 		return;
 	}
-	fprintf(f, "P4\n%d %d\n", im->w, im->h);
-	fwrite((char *)im->bits, 1, (int)((long)im->bpl * im->h), f);
+	if (im->depth == 8 && im->pal) {
+		fprintf(f, "P6\n%d %d\n255\n", im->w, im->h);
+		for (n = 0; n < (long)im->bpl * im->h; ++n) {
+			c = im->bits[n] * 3;
+			putc(im->pal[c], f);
+			putc(im->pal[c + 1], f);
+			putc(im->pal[c + 2], f);
+		}
+	} else {
+		fprintf(f, "P4\n%d %d\n", im->w, im->h);
+		fwrite((char *)im->bits, 1, (int)((long)im->bpl * im->h), f);
+	}
 	fclose(f);
+}
+
+/* the display's colors, in words */
+static char *cname(n)
+long n;
+{
+	if (n <= 2)
+		return "black and white";
+	if (n >= 1L << 24)
+		return "millions of colors";
+	if (n > 256)
+		return "thousands of colors";
+	sprintf(nb, "%ld colors", n);
+	return nb;
 }
 
 /* one step of the -s script */
@@ -2118,15 +2247,21 @@ char **argv;
 			else
 				verbose = 1;
 		} else if (a[0] == '-' && a[1] && !a[2] && i + 1 < argc &&
-			(a[1] == 'o' || a[1] == 's' || a[1] == 'g')) {
+			(a[1] == 'o' || a[1] == 's' || a[1] == 'g' || a[1] == 'c')) {
 			if (a[1] == 'o')
 				pbm = argv[++i];
 			else if (a[1] == 's')
 				script = argv[++i];
-			else
+			else if (a[1] == 'c') {
+				copt = atoin(argv[++i]);
+				if (copt < 2 || copt > 256) {
+					fprintf(stderr, "archaic: -c takes 2 to 256 colors\n");
+					return 2;
+				}
+			} else
 				geom = argv[++i];
 		} else if (a[0] == '-') {
-			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-t] [-v] [-o file.pbm] [-s script] [url]\n");
+			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-t] [-v] [-o file] [-s script] [url]\n");
 			return 2;
 		} else
 			url = a;
@@ -2162,8 +2297,21 @@ char **argv;
 	bar = !headless && g_bar;
 	vieww = bar ? winw - SBW : winw;
 	viewh = winh - fh - 3;
-	sprintf(msg, "Archaic %s", VERSION);
+	/* the colors: what the display shows (-t: none, or -c's) */
+	dcolors = headless ? (copt ? (long)copt : 2L) : g_colors();
+	if (dcolors < 2)
+		dcolors = 2;
+	ncol = copt ? copt : dcolors > 256 ? 256 : (int)dcolors;
+	cmenu = dcolors > 2;
+	idepth = cmenu ? 8 : 1;
+	sprintf(msg, "Archaic %s, %s", VERSION, cname(dcolors));
 	say(msg);
+	/* WRP's start page as the next ones: its C menu (WRP shows it
+	 * for GIF), and no Up and Dn (slices) */
+	for (i = 7; u[i] && u[i] != '/'; ++i)
+		;
+	if (!allset && u[i] == '/' && !u[i + 1] && i < MAXURL - 50)
+		sprintf(u + i + 1, "?m=ismap&t=gif&c=%d&sl=1", ncol);
 	go(u, (char *)0);
 	while (!quit) {
 		if (pending) {

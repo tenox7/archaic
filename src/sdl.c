@@ -1,6 +1,7 @@
 /* sdl.c - Archaic's display for SDL 2 (macOS, Linux, Windows ...): a
  * window that shows fb.c's screen in memory. On a Retina screen each
- * pixel is 2x2, with no smoothing.
+ * pixel is 2x2, with no smoothing. The colors: as many as the screen
+ * shows (its display mode).
  *
  * Keys: SDL's text events give the characters; Return, Backspace, Tab,
  * Esc, Delete and Ctrl+letter come as key events. Page Up and Page Down
@@ -85,6 +86,18 @@ int *w, *h;
 	*w = gw;
 	*h = gh;
 	return 0;
+}
+
+/* the screen's colors: 2 to the bits of its pixels */
+long g_colors()
+{
+	SDL_DisplayMode dm;
+	int i = win ? SDL_GetWindowDisplayIndex(win) : 0, b;
+
+	if (SDL_GetCurrentDisplayMode(i < 0 ? 0 : i, &dm) < 0)
+		return 1L << 24;
+	b = SDL_BITSPERPIXEL(dm.format);
+	return b < 1 ? 2L : b > 24 ? 1L << 24 : 1L << b;
 }
 
 void g_close()

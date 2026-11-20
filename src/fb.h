@@ -14,4 +14,4 @@ extern int fbx0, fby0, fbx1, fby1;	/* changed since fb_done(): x0 <= x < x1 */
 int fb_size P((int w, int h));	/* a new size, all white: 0 ok, -1 no memory */
 void fb_done P((void));		/* the display has shown the changes */
 int fb_geom P((char *g, int *w, int *h, int *x, int *y));	/* =WxH+X+Y */
-int fb_shot P((char *file));	/* write the screen: PNG, or PBM for *.pbm */
+int fb_shot P((char *file));	/* write the screen: PNG, or PBM for *.pbm, PPM for *.ppm */

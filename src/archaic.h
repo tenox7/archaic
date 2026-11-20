@@ -105,7 +105,11 @@ typedef struct form {
 typedef struct image {
 	int w, h;		/* 0 until the GIF header has come */
 	int bpl;		/* bytes in a row */
-	unsigned char *bits;	/* rows of pixels, 1 = black, high bit left */
+	int depth;		/* the pixels: 1 or 8 bits (set before gif_load) */
+	unsigned char *bits;	/* rows of pixels. 1 bit: 1 = black, high bit
+				 * left. 8 bits: a color number each */
+	unsigned char *pal;	/* 8 bits: 256 colors, 3 bytes each (red,
+				 * green, blue 0 to 255); 1 bit: 0 */
 } Image;
 
 /* html.c: the page */
@@ -139,7 +143,7 @@ int strieq P((char *a, char *b));
 int strnieq P((char *a, char *b, int n));
 void scopy P((char *d, char *s, int max));
 
-/* gif.c */
+/* gif.c: the pixels as im->depth says */
 int gif_load P((Image *im));
 
 /* main.c: called from the other files */
@@ -177,6 +181,11 @@ typedef struct event {
  * Colors: 0 white, 1 black. x, y are the top left corner, also for
  * text. sdl.c and cocoa.m draw with fb.c (a screen in memory). g_fd:
  * the display's file, for the network's select(); -1 if it has none.
+ * g_colors: how many colors the display shows, 2 if only black and
+ * white (1L << 24 for true color). A display with more than 2 draws the
+ * pictures' colors with g_pix: rows of 8-bit color numbers, and pal,
+ * the red, green and blue (0 to 255) of each of the 256. Archaic calls
+ * g_pix only if g_colors is more than 2.
  * g_event: wait 0 = don't wait, 1 = wait for an event, 2 = wait at most
  * about 1/10 s (the repeat of Archaic's scroll bar); a display that
  * can't wait for a time waits as for 1.
@@ -199,6 +208,9 @@ void g_text P((int x, int y, char *s, int n, int inv));
 int g_textw P((char *s, int n));
 void g_font P((int *height, int *base));
 void g_bits P((int x, int y, int w, int h, unsigned char *bits, int bpl));
+long g_colors P((void));
+void g_pix P((int x, int y, int w, int h, unsigned char *pix, int bpl,
+	unsigned char *pal));
 void g_flush P((void));
 int g_event P((Event *e, int wait));
 int g_fd P((void));

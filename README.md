@@ -97,17 +97,18 @@ Wikipedia's AT&T UNIX PC article, after one click on the ↓ button:
 ## Using it
 
 ```
-archaic [=WxH+X+Y] [-a] [-t] [-v] [-o file.pbm] [-s script] [url]
+archaic [=WxH+X+Y] [-a] [-c n] [-t] [-v] [-o file] [-s script] [url]
 ```
 
 | Option | Meaning |
 |---|---|
 | `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris and the 3B1: `10.0.2.2`, Unix: `127.0.0.1`) |
 | `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default: the whole screen. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
-| `-a` | also show WRP's M, T and C menus (for future color ports; Idris does not need it) |
+| `-a` | also show WRP's M, T and C menus, and send them as they are set |
+| `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
 | `-t` | test mode: no window. Prints the page items and a checksum of each picture |
 | `-v` | status messages also go to stderr |
-| `-o file.pbm` | at the end, save the first picture as a PBM file |
+| `-o file` | at the end, save the first picture: PBM, or PPM if it has colors |
 | `-s script` | play a script, then quit (see Testing) |
 
 **WRP's settings are set by Archaic, and not shown:**
@@ -117,10 +118,11 @@ archaic [=WxH+X+Y] [-a] [-t] [-v] [-o file.pbm] [-s script] [url]
 | W, H | the window's size: the picture fills the window. Always, also with `-a` |
 | M (mode) | ISMAP |
 | T (picture type) | GIF |
-| C (colors) | 2 |
+| C (colors) | black and white display: 2 (or `-c n`), not shown. A display with colors: the menu shows (see Colors) |
 | SL (slices) | 1: the whole page, in slices (see Scrolling). An older WRP ignores it |
 
-So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom) and **K** (keys).
+So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom),
+**C** (colors, only on a display with colors) and **K** (keys).
 
 **WRP's buttons are pictures**, like in a modern browser.
 (WRP names them with 2 letters, because old browsers can only put text on a button.)
@@ -133,6 +135,36 @@ So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom) 
 | ↑ and ↓ arrows | Up, Dn | scroll the web page one screen up or down. Only an older WRP shows them: see Scrolling |
 | ⌫ | Bs | Backspace, for the web page |
 | ↵ | Rt | Return (Enter), for the web page |
+
+### Colors
+
+Archaic asks the display how many colors it shows.
+The first status line says what it found, like `Archaic 0.3, millions of colors`.
+
+| Display | Colors |
+|---|---|
+| 3B1, Idris (X10) | black and white (they are) |
+| X11 | the default visual. Depth 1: black and white. TrueColor: millions. A colormap (8-bit PseudoColor, as on old workstations): its size, like 256 |
+| Cocoa, SDL | the screen's depth: millions |
+| `archaic-headless` | millions, like SDL (`-c 2` for black and white) |
+
+On a display with colors:
+
+- WRP's **C** menu shows. It is set to the display's colors: the nearest of WRP's
+  choices (256, 216, 128, 64, 16, 2) that is not more, or to `-c n`.
+- Choose another number there, and Archaic sends WRP's form at once with St (stop).
+  WRP takes the picture again in those colors, and does not load the page again.
+  The frame stays where it was.
+- The pictures keep their colors: a byte for each pixel, and the GIF's colors.
+- X11 with a colormap: Archaic gets the picture's colors in the default colormap,
+  shared with the other programs. When the colormap is full, it takes the nearest color
+  the colormap has. A new picture's colors free the last ones.
+
+On a black and white display, the C menu is hidden. Archaic asks WRP for 2 colors
+(or for `-c n`). The pictures are 1 bit a pixel; one with more colors gets a 4x4 dither.
+
+Archaic's own start page request asks WRP for the same settings as the next ones
+(`/?m=ismap&t=gif&c=256&sl=1`), so that WRP's form does not change after the first page.
 
 To type into a box on the web page: click the box in the picture, type in **K**,
 press Return (WRP types it into the page), then click ↵ if the page needs Enter.
@@ -199,7 +231,8 @@ With a WRP that knows slices (`sl=1`), WRP makes a picture of the whole page onc
 - A click on the picture goes to WRP as a place on the whole page.
 - After a click or keys on the same page, the frame stays where it was. A new page starts at its top.
 - WRP leaves out its Up and Dn buttons.
-- A slice is a 2-color GIF: about 5 to 9 KB for 632 x 351 pixels.
+- A slice in 2 colors is about 5 to 9 KB for 632 x 351 pixels.
+  In 256 colors it is bigger: about 20 to 100 KB.
 
 | Input | Scrolls the frame |
 |---|---|
@@ -242,7 +275,7 @@ X10 has no events for the mouse moving with a button down, and can't wait for a 
 | `src/main.c` | the page on the screen: layout, drawing, mouse, keys, forms |
 | `src/html.c` | HTML reader: forms, menus, links, images, text |
 | `src/http.c` | URLs and HTTP/1.0, with a 16 KB read buffer |
-| `src/gif.c` | GIF decoder: to black and white, 4x4 dither |
+| `src/gif.c` | GIF decoder: the colors, or black and white with a 4x4 dither |
 | `src/x10.c` | display for X10 (Idris) |
 | `src/nidris.c` | network for Idris: TCP through netd |
 | `src/x11.c` | display for X11 (Unix, macOS with XQuartz) |
@@ -306,7 +339,7 @@ At the end of the input, Archaic quits.
 | `wheel N` | N steps of the mouse wheel (a quarter of the window each); down if N > 0, up if N < 0 |
 | `pixels N` | N pixels, as a trackpad; down if N > 0, up if N < 0 |
 | `size W H` | the window is now W x H |
-| `shot FILE` | write the screen to FILE: PNG, or PBM if the name ends in `.pbm` |
+| `shot FILE` | write the screen to FILE: PNG (in colors if the screen has them), PBM if the name ends in `.pbm`, PPM if `.ppm` |
 | `sleep MS` | wait MS milliseconds. While a part of the scroll bar is held down, the time is counted in steps of 1/10 s and not waited, so a held arrow repeats the same way in every run |
 | `quit` | quit |
 
@@ -323,11 +356,15 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 
 1. GIF decoding gives **exactly** the same pixels as ImageMagick.
 2. Gray and color GIFs decode at the right size.
+   With colors (`-c 256`), the colors are **exactly** ImageMagick's.
 3. HTML: title, entities, fields, menus, hidden fields, buttons, links, comments.
 4. A button click sends the form with the right query.
 5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons are pictures, Go stays text.
+   With colors: C shows, set to the colors (for 100 colors: 64); another choice sends St at once;
+   the start page request has WRP's settings.
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
+   A color picture on the screen is exactly the GIF's, and the PNG is in colors.
 8. The tall picture, with no WRP: the test server cuts a random 600 x 1500 GIF into slices.
    After a wheel step, a window and a scroll to the end, the frame must show exactly the right rows.
    Also: the next slice comes before it is needed, and a click sends the place on the whole page.
@@ -344,6 +381,8 @@ To see the real window without a desktop, use Xvfb:
 Xvfb :7 -screen 0 660x420x24 -listen tcp -nolisten local -nolisten unix &
 PATH=/opt/X11/bin:$PATH sh test/xshot.sh 127.0.0.1:7 shot.png 1 '%%' 127.0.0.1:8089
 ```
+
+`-screen 0 660x420x8` gives an 8-bit colormap (PseudoColor), as on old workstations.
 
 ---
 
@@ -610,6 +649,8 @@ A port is **one display file** and **one network file**.
 | `g_text(x, y, s, n, inv)` | n characters, x, y = top left |
 | `g_textw(s, n)`, `g_font(&height, &base)` | font size |
 | `g_bits(x, y, w, h, bits, bpl)` | 1-bit rows, 1 = black, high bit left |
+| `g_colors()` | how many colors the display shows (a long): 2 for black and white, up to `1L << 24` |
+| `g_pix(x, y, w, h, pix, bpl, pal)` | 8-bit rows, a color number for each pixel; pal: 256 colors, 3 bytes each (red, green, blue). Archaic calls it only if `g_colors()` is more than 2: a black and white port leaves it empty |
 | `g_event(&e, wait)` | next key, click (`E_DOWN`, `E_UP`, and `E_MOVE` with a button down), expose, resize, quit, scroll (`E_SCROLL`: pixels, quarter windows, windows, or to a place). wait 0: don't wait; 1: wait for an event; 2: wait at most 1/10 s (or as 1) |
 | `g_fd()` | the display's file descriptor, or -1 |
 | `g_bar` | a variable: 0 if the system has scroll bars (Archaic then calls `g_sbar`), 1 if Archaic must draw its own |

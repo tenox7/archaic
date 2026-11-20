@@ -69,6 +69,20 @@ for f in hn216 ex16; do
 	fi
 done
 
+# 2b. With colors (-c 256: as on a display with colors), the pixels
+#     keep their colors: the same as ImageMagick's, exactly.
+for f in hn216 ex16 hn2; do
+	"$bin" -t -c 256 -o "$tmp/$f.ppm" "http://127.0.0.1:$port/$f.gif" >"$tmp/$f.cout" 2>&1
+	magick "$here/data/$f.gif[0]" -depth 8 "$tmp/$f-ref.ppm"
+	if grep -q ' got [0-9]*x[0-9]* sum [0-9a-f]* colors$' "$tmp/$f.cout" &&
+		[ "$(head -c 2 "$tmp/$f.ppm")" = P6 ] &&
+		magick compare -metric AE "$tmp/$f.ppm" "$tmp/$f-ref.ppm" null: 2>/dev/null; then
+		ok "$f.gif decodes in its colors exactly"
+	else
+		bad "$f.gif: its colors differ from ImageMagick's"
+	fi
+done
+
 # 3. HTML: forms, menus, links, entities, comments.
 cat >"$tmp/t.html" <<'EOF'
 <HTML><HEAD><TITLE>T&amp;T &#65;&#x42;</TITLE></HEAD><BODY>
@@ -115,6 +129,8 @@ fi
 # 5. WRP's form: Archaic hides W, H, M, T, C (and their labels) and sends
 #    its own values: the window's size, ISMAP, GIF, 2 colors. With -a,
 #    M, T and C are shown and sent as set. WRP's buttons get pictures.
+#    With colors (-c), C is shown, set to them, and a new choice there
+#    sends the form at once with St.
 cat >"$tmp/wrp.html" <<'EOF'
 <HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
 <FORM ACTION="/wrp" METHOD="GET">
@@ -130,6 +146,15 @@ H <INPUT TYPE="TEXT" NAME="h" VALUE="600" SIZE="4">
 Z <SELECT NAME="z"><OPTION DISABLED>Zoom</OPTION><OPTION VALUE="1.0" SELECTED>1.0 x</OPTION></SELECT>
 M <SELECT NAME="m"><OPTION VALUE="ismap" SELECTED>ISMAP</OPTION><OPTION VALUE="html">HTML</OPTION></SELECT>
 T <SELECT NAME="t"><OPTION VALUE="gip" SELECTED>GIP</OPTION><OPTION VALUE="gif">GIF</OPTION></SELECT>
+C <SELECT NAME="c">
+<OPTION DISABLED>Ncol</OPTION>
+<OPTION VALUE="256">256</OPTION>
+<OPTION VALUE="216" SELECTED>216</OPTION>
+<OPTION VALUE="128">128</OPTION>
+<OPTION VALUE="64">64</OPTION>
+<OPTION VALUE="16">16</OPTION>
+<OPTION VALUE="2">2</OPTION>
+</SELECT>
 K <INPUT TYPE="TEXT" NAME="k" VALUE="" SIZE="4">
 <INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Bs">
 <INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Rt">
@@ -141,7 +166,7 @@ cp "$tmp/wrp.html" "$here/data/wrp.html"
 shown=$(awk '$2 != "hidden" && $8 ~ /^"?[whmtcWHMTC]"?$/' "$tmp/f.out")
 if [ -z "$shown" ] && grep -q 'select.* z sel' "$tmp/f.out" &&
 	grep -q 'field.* k =' "$tmp/f.out"; then
-	ok "wrp form: W, H, M, T hidden; Z and K shown"
+	ok "wrp form: W, H, M, T, C hidden; Z and K shown"
 else
 	bad "wrp form: shows the wrong things:"
 	echo "$shown"
@@ -158,6 +183,14 @@ x=$(awk '$2 == "field" && $8 == "url" { print $3 + 5; exit }' "$tmp/f.out")
 y=$(awk '$2 == "field" && $8 == "url" { print $4 + 5; exit }' "$tmp/f.out")
 "$bin" -t -s "@$x,$y;x~" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
 "$bin" -t -a -s "@$x,$y;y~" "http://127.0.0.1:$port/wrp.html" >"$tmp/fa.out" 2>&1
+"$bin" -t -c 256 "http://127.0.0.1:$port/wrp.html" >"$tmp/fc.out" 2>&1
+"$bin" -t -c 100 "http://127.0.0.1:$port/wrp.html" >"$tmp/fc100.out" 2>&1
+cx=$(awk '$2 == "select" && $8 == "c" { print $3 + 5; exit }' "$tmp/fc.out")
+cy=$(awk '$2 == "select" && $8 == "c" { print $4 + 5; exit }' "$tmp/fc.out")
+oy=$(awk '$2 == "select" && $8 == "c" { print $4 + $6 + 1 + 5 * 15 + 7; exit }' "$tmp/fc.out")
+"$bin" -t -c 256 -s "@$x,$y;z~" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
+"$bin" -t -c 256 -s "@$cx,$cy;@$cx,$oy;" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
+"$bin" -t -c 256 "http://127.0.0.1:$port/" >/dev/null 2>&1
 rm -f "$here/data/wrp.html"
 if grep -Eq 'GET /wrp\?url=x&z=1\.0&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log"; then
 	ok "wrp form: sends $(grep -Eo 'w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2' "$tmp/http.log")"
@@ -165,11 +198,27 @@ else
 	bad "wrp form: the query is wrong:"
 	grep 'GET /wrp?url=x' "$tmp/http.log"
 fi
-if grep -Eq 'GET /wrp\?url=y&z=1\.0&m=ismap&t=gip&k=&w=632&h=[0-9]+&sl=1 ' "$tmp/http.log"; then
-	ok "wrp form -a: shows M and T, sends them as set"
+if grep -Eq 'GET /wrp\?url=y&z=1\.0&m=ismap&t=gip&c=216&k=&w=632&h=[0-9]+&sl=1 ' "$tmp/http.log"; then
+	ok "wrp form -a: shows M, T and C, sends them as set"
 else
 	bad "wrp form -a: the query is wrong:"
 	grep 'GET /wrp?url=y' "$tmp/http.log"
+fi
+if grep -q 'select .* c sel 1: -Ncol=Ncol 256=256' "$tmp/fc.out" &&
+	grep -q 'select .* c sel 4: ' "$tmp/fc100.out" &&
+	! awk '$2 != "hidden" && $8 ~ /^"?[whmtWHMT]"?$/' "$tmp/fc.out" | grep -q .; then
+	ok "wrp form, colors: C shown, set to 256 (or for 100 colors to 64)"
+else
+	bad "wrp form, colors: the C menu is wrong:"
+	grep -E 'select|"C"' "$tmp/fc.out" "$tmp/fc100.out"
+fi
+if grep -Eq 'GET /wrp\?url=z&z=1\.0&c=256&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log" &&
+	grep -Eq 'GET /wrp\?url=&Fn=St&z=1\.0&c=16&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log" &&
+	grep -q 'GET /?m=ismap&t=gif&c=256&sl=1 ' "$tmp/http.log"; then
+	ok "wrp form, colors: sends C's 256; 16 chosen sends St at once; WRP's start page asked with the C menu"
+else
+	bad "wrp form, colors: the queries are wrong:"
+	grep -E 'GET /(wrp\?url=[z&]|\?)' "$tmp/http.log"
 fi
 
 # 6. WRP, when it runs: the start page, then a page with its picture,
@@ -228,6 +277,29 @@ if [ -x "$hl" ]; then
 	fi
 else
 	echo "skip  headless: no $hl"
+fi
+
+# 7b. The headless display shows colors (like SDL and Cocoa): a color
+#     GIF on the screen exactly, and the PNG shot in colors.
+if [ -x "$hl" ]; then
+	echo '<HTML><BODY><IMG SRC="/ex16.gif" WIDTH="632" HEIGHT="330"></BODY></HTML>' \
+		>"$here/data/col.html"
+	"$bin" -t "http://127.0.0.1:$port/col.html" >"$tmp/col.out" 2>&1
+	ix=$(awk '$2 == "image" { print $3; exit }' "$tmp/col.out")
+	iy=$(awk '$2 == "image" { print $4; exit }' "$tmp/col.out")
+	printf '%s\n' "shot $tmp/c1.png" quit |
+		"$hl" -g 640x400 "http://127.0.0.1:$port/col.html" >"$tmp/hc.out" 2>&1
+	rm -f "$here/data/col.html"
+	magick "$tmp/c1.png" -crop "600x330+$ix+$iy" +repage "$tmp/c1c.png"
+	magick "$here/data/ex16.gif[0]" -crop 600x330+0+0 +repage "$tmp/c1r.png"
+	if magick identify -format '%[channels]' "$tmp/c1.png" | grep -q '^srgb' &&
+		magick compare -metric AE "$tmp/c1c.png" "$tmp/c1r.png" null: 2>/dev/null; then
+		ok "headless: a color picture on the screen exactly; the shot in colors"
+	else
+		bad "headless: the color picture is wrong ($(magick identify -format '%[channels]' "$tmp/c1.png"))"
+	fi
+else
+	echo "skip  headless colors: no $hl"
 fi
 
 # 8. The tall picture: WRP's picture of a whole page (sl=1), in a frame

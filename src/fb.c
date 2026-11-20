@@ -1,7 +1,8 @@
 /* fb.c - drawing into a screen in memory, for the displays that show
  * the pixels themselves (sdl.c, cocoa.m, headless.c). Black and white,
- * and one font: the X11 6x13 font (font6x13.h), so the page looks the
- * same as with x11.c. fb_shot writes the screen to a file.
+ * the pictures in their colors (g_pix), and one font: the X11 6x13 font
+ * (font6x13.h), so the page looks the same as with x11.c. fb_shot
+ * writes the screen to a file.
  */
 #include "archaic.h"
 #include "fb.h"
@@ -177,6 +178,29 @@ unsigned char *bits;
 	}
 }
 
+/* rows of 8-bit color numbers; pal: the red, green, blue of each */
+void g_pix(x, y, w, h, pix, bpl, pal)
+int x, y, w, h, bpl;
+unsigned char *pix, *pal;
+{
+	static unsigned int map[256];
+	unsigned char *b;
+	unsigned int *p;
+	int i, j, x0 = x, y0 = y, cw = w, ch = h;
+
+	if (!clip(&x0, &y0, &cw, &ch))
+		return;
+	for (i = 0; i < 256; ++i)
+		map[i] = (unsigned int)pal[3 * i] << 16 |
+			(unsigned int)pal[3 * i + 1] << 8 | pal[3 * i + 2];
+	for (j = y0 - y; j < y0 - y + ch; ++j) {
+		b = pix + (long)j * bpl;
+		p = fb + (long)(y + j) * fbw + x;
+		for (i = x0 - x; i < x0 - x + cw; ++i)
+			p[i] = map[b[i]];
+	}
+}
+
 static char *num(s, v)
 char *s;
 int *v;
@@ -225,6 +249,15 @@ int *w, *h, *x, *y;
 static unsigned long crctab[256];
 static unsigned long crc, adla, adlb;
 static FILE *shot;
+static int rgb;			/* the shot has colors: 8 bits red, green, blue */
+
+/* is pixel v black (dark)? */
+static int dark(v)
+unsigned int v;
+{
+	return (v >> 16 & 0377) * 77 + (v >> 8 & 0377) * 150 + (v & 0377) * 29 <
+		128 * 256;
+}
 
 static void put4(v)
 unsigned long v;
@@ -262,11 +295,11 @@ unsigned long len;
 		cput(*type++);
 }
 
-/* the picture: 1 bit a pixel (0 black, 1 white), each row after a 0
- * (no filter), in zlib blocks that are not compressed */
+/* the picture: 1 bit a pixel (0 black, 1 white), or 3 bytes (rgb), each
+ * row after a 0 (no filter), in zlib blocks that are not compressed */
 static void pngdata()
 {
-	long rb = (fbw + 7) / 8 + 1, n = rb * fbh, left, i;
+	long rb = rgb ? 3L * fbw + 1 : (fbw + 7) / 8 + 1, n = rb * fbh, left, i;
 	unsigned int *p;
 	int b, c, x, y, k;
 
@@ -288,6 +321,9 @@ static void pngdata()
 		for (i = 0; i < k; ++i) {
 			if (x == 0)
 				c = 0;
+			else if (rgb)
+				c = (int)(fb[(long)y * fbw + (x - 1) / 3] >>
+					(16 - 8 * ((x - 1) % 3)) & 0377);
 			else {
 				p = fb + (long)y * fbw + (x - 1) * 8;
 				for (c = 0, b = 0; b < 8; ++b)
@@ -327,12 +363,25 @@ char *file;
 			for (x = 0; x < fbw; x += 8) {
 				p = fb + (long)y * fbw + x;
 				for (b = k = 0; k < 8; ++k)
-					if (x + k < fbw && p[k] == FB_BLACK)
+					if (x + k < fbw && dark(p[k]))
 						b |= 0x80 >> k;
 				putc(b, shot);
 			}
 		return fclose(shot) == 0 ? 0 : -1;
 	}
+	if (n > 4 && strieq(file + n - 4, ".ppm")) {
+		fprintf(shot, "P6\n%d %d\n255\n", fbw, fbh);
+		for (c = 0; c < (unsigned long)fbw * fbh; ++c) {
+			putc((int)(fb[c] >> 16 & 0377), shot);
+			putc((int)(fb[c] >> 8 & 0377), shot);
+			putc((int)(fb[c] & 0377), shot);
+		}
+		return fclose(shot) == 0 ? 0 : -1;
+	}
+	/* a PNG: 1 bit if the screen is only black and white */
+	rgb = 0;
+	for (c = 0; c < (unsigned long)fbw * fbh && !rgb; ++c)
+		rgb = fb[c] != FB_BLACK && fb[c] != FB_WHITE;
 	for (i = 0; i < 256; ++i) {
 		c = i;
 		for (k = 0; k < 8; ++k)
@@ -349,8 +398,8 @@ char *file;
 	cput(fbh >> 16 & 0377);
 	cput(fbh >> 8 & 0377);
 	cput(fbh & 0377);
-	cput(1);	/* 1 bit */
-	cput(0);	/* gray */
+	cput(rgb ? 8 : 1);	/* bits */
+	cput(rgb ? 2 : 0);	/* rgb or gray */
 	cput(0);
 	cput(0);
 	cput(0);

@@ -1,6 +1,7 @@
 /* headless.c - Archaic's display with no window, for tests and
  * automation. It draws into fb.c's screen in memory, the same pixels as
- * sdl.c (with Archaic's own scroll bar: g_bar), and reads commands from
+ * sdl.c (with Archaic's own scroll bar: g_bar, and the pictures' colors:
+ * use -c 2 for black and white only), and reads commands from
  * standard input, one per line. It reads the next command only when
  * Archaic has nothing else to do, so a command that loads a page ends
  * before the next one starts. At the end of the input, Archaic quits.
@@ -44,6 +45,12 @@ static int hasnext;
 static long idle;		/* sleep: milliseconds left */
 
 int g_bar = 1;
+
+/* fb.c's screen has millions of colors */
+long g_colors()
+{
+	return 1L << 24;
+}
 
 void g_sbar(pos, max, vis)
 long pos, max, vis;

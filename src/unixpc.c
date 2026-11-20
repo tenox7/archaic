@@ -85,6 +85,18 @@ long pos, max, vis;
 {
 }
 
+/* black and white only: no colors, so Archaic never calls g_pix */
+long g_colors()
+{
+	return 2L;
+}
+
+void g_pix(x, y, w, h, pix, bpl, pal)
+int x, y, w, h, bpl;
+unsigned char *pix, *pal;
+{
+}
+
 /* wrastop() on the window, clipped to the inside */
 static void rop(src, bpr, sx, sy, x, y, w, h, sop, dop, pat)
 unsigned short *src, *pat;
