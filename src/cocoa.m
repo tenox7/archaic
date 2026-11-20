@@ -16,9 +16,10 @@
  * button is let go: so the page moves, and its slices come, while the
  * knob moves. A click in the slot scrolls a window (or jumps there, as
  * set in System Settings; Option the other way); held down, it repeats.
- * g_event takes these mouse events before AppKit, so the scroll bar is
+ * A clear view over the scroll bar takes its mouse, so the scroll bar is
  * a plain NSScroller: AppKit draws a subclass of it in an older style,
- * thinner, and pale (as if off) under the pointer.
+ * thinner, and pale (as if off) under the pointer. AppKit sends the
+ * mouse to the view, so the window's corner still resizes it.
  */
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
@@ -35,10 +36,6 @@
 #define NSEventModifierFlagControl NSControlKeyMask
 #define NSEventModifierFlagOption NSAlternateKeyMask
 #define NSControlSizeRegular NSRegularControlSize
-#define NSEventTypeLeftMouseDown NSLeftMouseDown
-#define NSEventTypeLeftMouseDragged NSLeftMouseDragged
-#define NSEventTypeLeftMouseUp NSLeftMouseUp
-#define NSEventTypeScrollWheel NSScrollWheel
 #endif
 #define SB_UPLINE 4		/* NSScrollerDecrementLine: Mac OS X 10.6's arrows */
 #define SB_DNLINE 5		/* NSScrollerIncrementLine */
@@ -60,6 +57,7 @@ static NSPoint spt;		/* the pointer, in the scroll bar */
 static NSPoint swin;		/* the pointer, in the window (for testPart:) */
 static double srep;		/* when a held part does it again */
 static int sheld;		/* the button went down on the scroll bar */
+static NSView *sgrip;		/* the clear view over it */
 
 int g_bar = 0;
 
@@ -148,6 +146,60 @@ int p;
 static int srepeats()
 {
 	return spart && spart != NSScrollerKnob;
+}
+
+/* the button down on the scroll bar */
+static void sdown(ev)
+NSEvent *ev;
+{
+	NSRect knob;
+	int part, jump;
+
+	spart = 0;
+	if (![sbar isEnabled])
+		return;
+	swin = [ev locationInWindow];
+	spt = [sbar convertPoint:swin fromView:nil];
+	part = (int)[sbar testPart:swin];	/* testPart: takes window points */
+	if (part == NSScrollerDecrementPage || part == NSScrollerIncrementPage) {
+		jump = [[NSUserDefaults standardUserDefaults]
+			boolForKey:@"AppleScrollerPagingBehavior"];
+		if ([ev modifierFlags] & NSEventModifierFlagOption)
+			jump = !jump;
+		if (jump) {		/* the knob's middle to the pointer */
+			sgrab = [sbar rectForPart:NSScrollerKnob].size.height / 2;
+			spart = NSScrollerKnob;
+			sto(knobat(spt));
+			return;
+		}
+	}
+	if (part == NSScrollerKnob) {
+		knob = [sbar rectForPart:NSScrollerKnob];
+		sgrab = [sbar isFlipped] ? spt.y - knob.origin.y :
+			NSMaxY(knob) - spt.y;
+	} else if (part == NSScrollerDecrementPage ||
+		part == NSScrollerIncrementPage || part == SB_UPLINE ||
+		part == SB_DNLINE) {
+		sstep(part);
+		srep = [NSDate timeIntervalSinceReferenceDate] + 0.4;
+	} else
+		return;
+	spart = part;
+}
+
+/* the button moved, or let go (up), after sdown */
+static void sdrag(ev, up)
+NSEvent *ev;
+int up;
+{
+	if (!sheld)
+		return;
+	swin = [ev locationInWindow];
+	spt = [sbar convertPoint:swin fromView:nil];
+	if (spart == NSScrollerKnob)
+		sto(knobat(spt));
+	if (up)
+		sheld = spart = 0;
 }
 
 static int mkbm()
@@ -277,6 +329,18 @@ static void resized()
 }
 @end
 
+/* the clear view over the scroll bar: its mouse */
+@interface ArchaicGrip : NSView
+@end
+
+@implementation ArchaicGrip
+- (BOOL)acceptsFirstMouse:(NSEvent *)ev { return YES; }
+- (void)mouseDown:(NSEvent *)ev { sheld = 1; sdown(ev); }
+- (void)mouseDragged:(NSEvent *)ev { sdrag(ev, 0); }
+- (void)mouseUp:(NSEvent *)ev { sdrag(ev, 1); }
+- (void)scrollWheel:(NSEvent *)ev { [view scrollWheel:ev]; }
+@end
+
 @interface ArchaicDelegate : NSObject
 @end
 
@@ -374,8 +438,11 @@ int *w, *h;
 		[sbar setScrollerStyle:NSScrollerStyleLegacy];
 #endif
 	[sbar setEnabled:NO];
+	sgrip = [[ArchaicGrip alloc] initWithFrame:[sbar frame]];
+	[sgrip setAutoresizingMask:NSViewMinXMargin | NSViewHeightSizable];
 	[box addSubview:view];
 	[box addSubview:sbar];
+	[box addSubview:sgrip];
 	[win setContentView:box];
 	[box release];
 	[win setDelegate:del];
@@ -402,9 +469,11 @@ void g_close()
 	[win release];
 	[view release];
 	[sbar release];
+	[sgrip release];
 	win = nil;
 	view = nil;
 	sbar = nil;
+	sgrip = nil;
 	if (bm)
 		CGContextRelease(bm);
 	bm = 0;
@@ -467,84 +536,6 @@ long pos, max, vis;
 	[pool release];
 }
 
-/* the button down on the scroll bar */
-static void sdown(ev)
-NSEvent *ev;
-{
-	NSRect knob;
-	int part, jump;
-
-	spart = 0;
-	if (![sbar isEnabled])
-		return;
-	swin = [ev locationInWindow];
-	spt = [sbar convertPoint:swin fromView:nil];
-	part = (int)[sbar testPart:swin];	/* testPart: takes window points */
-	if (part == NSScrollerDecrementPage || part == NSScrollerIncrementPage) {
-		jump = [[NSUserDefaults standardUserDefaults]
-			boolForKey:@"AppleScrollerPagingBehavior"];
-		if ([ev modifierFlags] & NSEventModifierFlagOption)
-			jump = !jump;
-		if (jump) {		/* the knob's middle to the pointer */
-			sgrab = [sbar rectForPart:NSScrollerKnob].size.height / 2;
-			spart = NSScrollerKnob;
-			sto(knobat(spt));
-			return;
-		}
-	}
-	if (part == NSScrollerKnob) {
-		knob = [sbar rectForPart:NSScrollerKnob];
-		sgrab = [sbar isFlipped] ? spt.y - knob.origin.y :
-			NSMaxY(knob) - spt.y;
-	} else if (part == NSScrollerDecrementPage ||
-		part == NSScrollerIncrementPage || part == SB_UPLINE ||
-		part == SB_DNLINE) {
-		sstep(part);
-		srep = [NSDate timeIntervalSinceReferenceDate] + 0.4;
-	} else
-		return;
-	spart = part;
-}
-
-/* a mouse event for the scroll bar: worked here (1), or not one (0) */
-static int barevent(ev)
-NSEvent *ev;
-{
-	NSEventType t = [ev type];
-	NSPoint p;
-
-	if (!sbar || [ev window] != win)
-		return 0;
-	if (t != NSEventTypeLeftMouseDown && t != NSEventTypeLeftMouseDragged &&
-		t != NSEventTypeLeftMouseUp && t != NSEventTypeScrollWheel)
-		return 0;
-	p = [sbar convertPoint:[ev locationInWindow] fromView:nil];
-	if (t == NSEventTypeLeftMouseDown) {
-		if (![sbar mouse:p inRect:[sbar bounds]])
-			return 0;
-		if (![win isKeyWindow])
-			[win makeKeyAndOrderFront:nil];
-		sheld = 1;
-		sdown(ev);
-		return 1;
-	}
-	if (t == NSEventTypeScrollWheel) {
-		if (![sbar mouse:p inRect:[sbar bounds]])
-			return 0;
-		[view scrollWheel:ev];	/* the wheel on the bar: the page's */
-		return 1;
-	}
-	if (!sheld)
-		return 0;
-	swin = [ev locationInWindow];
-	spt = p;
-	if (spart == NSScrollerKnob)
-		sto(knobat(spt));
-	if (t == NSEventTypeLeftMouseUp)
-		sheld = spart = 0;
-	return 1;
-}
-
 int g_event(e, wait)
 Event *e;
 int wait;
@@ -585,7 +576,7 @@ int wait;
 			[NSDate dateWithTimeIntervalSinceReferenceDate:u];
 		ev = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:until
 			inMode:NSDefaultRunLoopMode dequeue:YES];
-		if (ev && !barevent(ev))
+		if (ev)
 			[NSApp sendEvent:ev];
 		[pool release];
 		if (!ev && qout == qin && !(srepeats() &&
