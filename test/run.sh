@@ -368,6 +368,37 @@ else
 	echo "skip  headless colors: no $hl"
 fi
 
+# 7c. A new window width: once the size stays, WRP makes the picture
+# again (St), as wide as the window. A new height alone sends nothing.
+# Text typed in a field (K) stays.
+cat >"$here/data/wrp3.html" <<'EOF'
+<HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
+<FORM ACTION="/wrp3.html" METHOD="GET">
+<INPUT TYPE="TEXT" NAME="url" VALUE="http://x.org/" SIZE="20">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="St">
+W <INPUT TYPE="TEXT" NAME="w" VALUE="1152" SIZE="4">
+K <INPUT TYPE="TEXT" NAME="k" VALUE="" SIZE="4">
+</FORM>
+<A HREF="/x.map"><IMG SRC="/hn2.gif" WIDTH="615" HEIGHT="200" ISMAP></A>
+</BODY></HTML>
+EOF
+"$bin" -t "http://127.0.0.1:$port/wrp3.html" >"$tmp/r0.out" 2>&1
+kx=$(awk '$2 == "field" && $8 == "k" { print $3 + 5; exit }' "$tmp/r0.out")
+ky=$(awk '$2 == "field" && $8 == "k" { print $4 + 5; exit }' "$tmp/r0.out")
+printf '%s\n' "click $kx $ky" 'type ab' 'size 640 300' 'sleep 600' 'size 500 300' \
+	'sleep 600' 'key return' 'sleep 300' 'quit' |
+	"$hl" -g 640x400 "http://127.0.0.1:$port/wrp3.html" >"$tmp/r.out" 2>&1
+rm -f "$here/data/wrp3.html"
+q3='url=http%3A%2F%2Fx\.org%2F'
+if [ "$(grep -c 'GET /wrp3\.html?.*Fn=St' "$tmp/http.log")" = 1 ] &&
+	grep -Eq "GET /wrp3\.html\?$q3&Fn=St&k=ab&w=475&h=[0-9]+&sl=1&m=ismap&t=gif&c=256 " "$tmp/http.log" &&
+	grep -Eq "GET /wrp3\.html\?$q3&k=ab&w=475&h=[0-9]+&sl=1&m=ismap&t=gif&c=256 " "$tmp/http.log"; then
+	ok "new width: one St with w=475 (none for a new height), and K's text stays"
+else
+	bad "new width: wrong:"
+	grep 'GET /wrp3' "$tmp/http.log"
+fi
+
 # 8. The tall picture: WRP's picture of a whole page (sl=1), in a frame
 #    under the form, in slices. A random 600x1500 picture; each shot's
 #    frame must be exactly the picture's rows at the scroll position.

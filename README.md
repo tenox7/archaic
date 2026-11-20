@@ -203,7 +203,7 @@ the text and the button's key together as keys: `k=text%0D`. This works with eve
 | Page, Next / Shift+Page, Prev | scroll a window down / up |
 | ↓ / ↑, the scroll arrows (also FreeBee's mouse wheel) | scroll a quarter of the window down / up. The frame's scroll arrows are the window's own scroll bar: Archaic draws none on the 3B1 |
 | Rfrsh, Clear | draw the window again |
-| the resize box | a new window size. Then click ↻ for a picture that fits |
+| the resize box | a new window size. A new width: WRP makes the picture again, as wide (see A new window size) |
 
 **On macOS (Cocoa) and with SDL:** Page Up and Page Down scroll a window.
 The up and down arrows and each step of the mouse wheel scroll a quarter of it.
@@ -248,6 +248,17 @@ Archaic keeps WRP's page and shows the error on the status line, like
 - A picture or a file from WRP is not shown: the status line says what it was.
 - No page at all (WRP did not answer at the start): the status line says
   `can't connect to ... Return: try again`. Start WRP, then press Return.
+
+**A new window size**
+
+Make the window wider or narrower: once its size has stayed the same for 0.4 s,
+Archaic asks WRP for the page again, as wide as the window. It sends WRP's form with St,
+so WRP does not load the page again: the browser lays it out at the new width, and WRP
+takes a new picture. The frame keeps its place on the page, in proportion
+(a narrower page is longer). Text you typed in a box stays.
+
+A new height alone needs no new picture: the frame gets taller or shorter.
+On the 3B1 and Idris (no clock), the new picture is asked for at once.
 
 **Scrolling: the whole page in slices**
 
@@ -398,6 +409,7 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
    A color picture on the screen is exactly the GIF's, and the PNG is in colors.
+   A new width: one St with the new width, once the size stays (none for a new height); typed text stays.
 8. The tall picture, with no WRP: the test server cuts a random 600 x 1500 GIF into slices.
    After a wheel step, a window and a scroll to the end, the frame must show exactly the right rows.
    Also: the next slice comes before it is needed, and a click sends the place on the whole page.

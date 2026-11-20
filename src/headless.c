@@ -43,6 +43,7 @@ static char *text;		/* type: characters not given yet */
 static Event next;		/* click: the button let go, given next */
 static int hasnext;
 static long idle;		/* sleep: milliseconds left */
+static long vms;		/* the milliseconds the counted waits skipped */
 
 int g_bar = 1;
 
@@ -137,13 +138,14 @@ int g_fd()
 	return -1;
 }
 
-/* a clock in milliseconds (for the spinner) */
+/* a clock in milliseconds: the real one, and the time the counted waits
+ * skipped (so a sleep counts the same in every run) */
 long g_ms()
 {
 	struct timeval tv;
 
 	gettimeofday(&tv, (struct timezone *)0);
-	return (tv.tv_sec % 1000000L) * 1000L + tv.tv_usec / 1000;
+	return (tv.tv_sec % 1000000L) * 1000L + tv.tv_usec / 1000 + vms;
 }
 
 /* a key by its name */
@@ -274,6 +276,7 @@ int wait;
 		if (idle > 0) {
 			if (wait == 2) {	/* counted, not waited */
 				idle -= 100;
+				vms += 100;
 				return 0;
 			}
 			tv.tv_sec = idle / 1000;

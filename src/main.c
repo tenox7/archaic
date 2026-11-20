@@ -40,6 +40,11 @@
  * one at once (St). While WRP's next page comes, a click on the old
  * picture does nothing: its map is about to go.
  *
+ * A new window width: once the size has stayed the same for 0.4 s,
+ * Archaic sends WRP's form with St and the new width, so WRP makes the
+ * picture again, as wide as the window (St: the page is not loaded
+ * again). The frame keeps its place on the page, in proportion.
+ *
  * WRP's form: Archaic sets WRP's settings itself and does not show them.
  * W and H: the picture fills the window. M, T: ISMAP, GIF (with -a, the
  * menus for M, T and C are shown and used). C, the colors: on a display
@@ -162,6 +167,9 @@ static int wrpf[MAXFORM];	/* the form is WRP's */
 static int oldpic;		/* WRP's next page comes: the picture shown is old */
 static int pclick;		/* the pending load is a click on WRP's picture */
 static char *note;		/* the next load's last status line, or 0 */
+static int resz;		/* the window's width changed: a new picture comes */
+static long rest;		/* g_ms() at that change */
+static int pwide;		/* the pending load is that new picture */
 static char num[16];
 static char pendurl[MAXURL], pendbody[MAXURL];
 static char lurl[MAXURL], lbody[MAXURL];
@@ -1310,7 +1318,7 @@ static void go(url, post)
 char *url, *post;
 {
 	url_join(base, url, pendurl);
-	pclick = 0;
+	pclick = pwide = 0;
 	pendpost = post != 0;
 	if (post)
 		scopy(pendbody, post, MAXURL);
@@ -1797,6 +1805,10 @@ Event *e;
 	case E_SIZE:
 		if (e->w == winw && e->h == winh)
 			break;
+		if (e->w != winw) {	/* WRP's picture again: see rewide */
+			resz = 1;
+			rest = g_ms();
+		}
 		winw = e->w;
 		winh = e->h;
 		vieww = bar ? winw - SBW : winw;
@@ -2147,6 +2159,55 @@ static void findtall()
 	}
 }
 
+/* v * a / b, for page rows: no long overflows */
+static long lscale(v, a, b)
+long v, a, b;
+{
+	while (a > 30000L || b > 30000L) {
+		a >>= 1;
+		b >>= 1;
+	}
+	return b > 0 ? v / b * a + v % b * a / b : v;
+}
+
+/* the width of WRP's picture on this page, or 0 */
+static int picw()
+{
+	Item *it;
+	int i;
+
+	for (i = 0; i < nitems; ++i) {
+		it = &items[i];
+		if (it->type == I_IMAGE && it->ismap && it->href)
+			return it->iw > 0 ? it->iw :
+				it->img >= 0 ? imgs[it->img].w : 0;
+	}
+	return 0;
+}
+
+/* The window's width changed: once it has stayed the same for 0.4 s
+ * (with no clock: at once), and WRP's picture is not as wide as the
+ * window, send WRP's form with St and the new width. 1 if it did. */
+static int rewide()
+{
+	long t = g_ms();
+	int f, w, h, pw;
+
+	if (t >= 0 && t >= rest && t - rest < 400)
+		return 0;
+	resz = 0;
+	f = wrpform();
+	pw = picw();
+	if (f < 0 || pw <= 0)
+		return 0;
+	picsize(&w, &h);
+	if (w >= pw - 1 && w <= pw + 1)
+		return 0;	/* as wide (WRP's zoom may round it) */
+	submit(f, stbutton(f));
+	pwide = 1;
+	return 1;
+}
+
 /* Has the page (n bytes at p) a form? */
 static int hasform(p, n)
 char *p;
@@ -2198,10 +2259,13 @@ char *url, *post;
 {
 	Item *it;
 	static char fname[40];
+	static char fval[MAXVAL];
 	int i, n, c, k, nk, fromwrp = wrpform() >= 0, byclick = pclick;
+	int byresize = pwide;
 	char *done = note;	/* the last status line, if not the usual one */
+	long oldh;
 
-	pclick = 0;
+	pclick = pwide = 0;
 	note = 0;
 	scopy(lurl, url, MAXURL);
 	if (post)
@@ -2266,9 +2330,13 @@ char *url, *post;
 		}
 	}
 	/* the new page */
-	fname[0] = 0;
-	if (focus >= 0 && items[focus].name)
+	fname[0] = fval[0] = 0;
+	if (focus >= 0 && items[focus].name) {
 		scopy(fname, items[focus].name, (int)sizeof fname);
+		if (items[focus].val)
+			scopy(fval, items[focus].val, MAXVAL);
+	}
+	oldh = tall >= 0 ? (long)items[tall].ih : 0L;
 	scopy(spage, wrpurl(), MAXURL);
 	scopy(base, http_url, MAXURL);
 	focus = popup = pressed = -1;
@@ -2293,6 +2361,8 @@ char *url, *post;
 	}
 	if (tall < 0 || !spage[0] || !strieq(spage, wrpurl()))
 		oy = 0;		/* a new page: its top. The same page: stay */
+	else if (byresize && oldh > 0)	/* in proportion: it is wider */
+		oy = lscale(oy, (long)items[tall].ih, oldh);
 	ssize = 0;
 	sstop = 0;
 	tallfix();
@@ -2300,6 +2370,8 @@ char *url, *post;
 		it = &items[i];
 		if (it->type == I_FIELD && it->name && strieq(it->name, fname)) {
 			focus = i;
+			if (byresize && it->val)	/* keep what was typed */
+				scopy(it->val, fval, MAXVAL);
 			break;
 		}
 	}
@@ -2612,6 +2684,11 @@ char **argv;
 		}
 		if (headless)
 			break;
+		if (resz) {		/* a new width: WRP's picture again */
+			if (!rewide() && resz && g_event(&e, 2))
+				event(&e);
+			continue;
+		}
 		if (slicework(1))	/* the frame's slices, then the next ones */
 			continue;
 		/* a part of the scroll bar held down: wait 1/10 s at most */
