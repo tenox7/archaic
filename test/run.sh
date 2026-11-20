@@ -228,10 +228,10 @@ else
 fi
 
 # 8. The tall picture: WRP's picture of a whole page (sl=1), in a frame
-#    under the form, in slices. A random 632x1500 picture; each shot's
+#    under the form, in slices. A random 600x1500 picture; each shot's
 #    frame must be exactly the picture's rows at the scroll position.
 if [ -x "$hl" ]; then
-	magick -size 632x1500 xc: +noise Random -colorspace gray -threshold 50% \
+	magick -size 600x1500 xc: +noise Random -colorspace gray -threshold 50% \
 		-type bilevel "$here/data/tall.gif"
 	cat >"$here/data/tall.html" <<'EOF'
 <HTML><HEAD><TITLE>Tall</TITLE></HEAD><BODY>
@@ -241,20 +241,25 @@ if [ -x "$hl" ]; then
 W <INPUT TYPE="TEXT" NAME="w" VALUE="632" SIZE="4">
 </FORM>
 <BR>
-<A HREF="/map"><IMG SRC="/tall.gif" WIDTH="632" HEIGHT="1500" ISMAP></A>
+<A HREF="/map"><IMG SRC="/tall.gif" WIDTH="600" HEIGHT="1500" ISMAP></A>
 </BODY></HTML>
 EOF
 	"$bin" -t "http://127.0.0.1:$port/tall.html" >"$tmp/tall.out" 2>&1
 	fx=$(awk '$2 == "image" { print $3; exit }' "$tmp/tall.out")
 	fy=$(awk '$2 == "image" { print $4; exit }' "$tmp/tall.out")
 	fh=$(awk '$2 == "image" { print $6; exit }' "$tmp/tall.out")
-	if grep -q "image .* ismap got 632x$fh sum [0-9a-f]* tall 632x1500 at 0" "$tmp/tall.out" &&
+	if grep -q "image .* ismap got 600x$fh sum [0-9a-f]* tall 600x1500 at 0" "$tmp/tall.out" &&
 		grep -q "GET /tall.gif?y=0&h=$fh " "$tmp/http.log"; then
 		ok "tall: a frame ${fh} high, its first slice"
 	else
 		bad "tall: no frame or no slice:"
 		grep image "$tmp/tall.out"
 	fi
+	frame() {	# is shot $1's frame the picture's rows from $2?
+		magick "$1" -crop "600x$fh+$fx+$fy" +repage "$tmp/f.png"
+		magick "$here/data/tall.gif" -crop "600x$fh+0+$2" +repage "$tmp/r.png"
+		magick compare -metric AE "$tmp/f.png" "$tmp/r.png" null: 2>/dev/null
+	}
 	q=$((fh / 4))
 	p=$((fh - 26))
 	last=$((1500 - fh))
@@ -262,13 +267,10 @@ EOF
 		"shot $tmp/t2.png" 'pixels 5000' "shot $tmp/t3.png" \
 		"click $((fx + 10)) $((fy + 20))" quit |
 		"$hl" -g 640x400 "http://127.0.0.1:$port/tall.html" >"$tmp/th.out" 2>&1
-	rm -f "$here/data/tall.html"
 	n=0
 	for s in "t0 0" "t1 $q" "t2 $((q + p))" "t3 $last"; do
 		set -- $s
-		magick "$tmp/$1.png" -crop "632x$fh+$fx+$fy" +repage "$tmp/$1f.png"
-		magick "$here/data/tall.gif" -crop "632x$fh+0+$2" +repage "$tmp/$1r.png"
-		if magick compare -metric AE "$tmp/$1f.png" "$tmp/$1r.png" null: 2>/dev/null; then
+		if frame "$tmp/$1.png" $2; then
 			n=$((n + 1))
 		else
 			bad "tall: shot $1 is not rows $2 to $(($2 + fh - 1))"
@@ -282,7 +284,62 @@ EOF
 		bad "tall: slices or the click are wrong:"
 		grep -E 'GET /(tall|map)' "$tmp/http.log"
 	fi
-	rm -f "$here/data/tall.gif"
+
+	# 9. Archaic's own scroll bar (SDL, X11, X10 have it): the arrows, a
+	#    click in the shaft, the elevator dragged, an arrow held down.
+	#    In each shot the frame must show the right rows, and column 638
+	#    of the bar (no dots there) only the lines of the arrow boxes and
+	#    of the elevator. The window is 640x400: the page part 384 high,
+	#    the shaft rows 16 to 368, an arrow box 16 high.
+	m=$last
+	sh=352
+	eh=$((sh * fh / 1500))
+	room=$((sh - eh))
+	sbrows() {	# the black rows of column 638 in shot $1
+		magick "$1" -crop 1x400+638+0 +repage -depth 8 gray:- | od -An -tu1 -v |
+			awk '{ for (i = 1; i <= NF; ++i) if ($i < 128)
+				printf "%s%d", (n++ ? " " : ""), r + i - 1; r += NF }'
+	}
+	want() {	# what sbrows gives at place $1; $2: the down arrow held
+		e=$((16 + room * $1 / m))
+		w=16
+		[ $e != 16 ] && w="$w $e"
+		w="$w $((e + eh - 1))"
+		[ $((e + eh - 1)) != 367 ] && w="$w 367"
+		[ -n "$2" ] && w="$w$(awk 'BEGIN { for (i = 368; i < 384; ++i) printf " %d", i }')"
+		echo "$w 384"
+	}
+	nmap=$(grep -c 'GET /map' "$tmp/http.log")
+	g=$((100 - 16 - room * p / m))		# where the drag takes the elevator
+	v4=$(((200 - g - 16) * m / room))
+	bx=630
+	printf '%s\n' "shot $tmp/s0.png" "click $bx 377" "shot $tmp/s1.png" \
+		"click $bx 300" "shot $tmp/s2.png" "click $bx 5" "shot $tmp/s3.png" \
+		"down $bx 100" "move $bx 200" "shot $tmp/s4.png" "move $bx 100" \
+		"shot $tmp/s5.png" "move $bx 2000" "up $bx 2000" "shot $tmp/s6.png" \
+		"click $bx 50" "shot $tmp/s7.png" 'pixels -5000' "down $bx 377" \
+		"shot $tmp/s8.png" 'sleep 1000' "up $bx 377" "shot $tmp/s9.png" quit |
+		"$hl" -g 640x400 "http://127.0.0.1:$port/tall.html" >"$tmp/sb.out" 2>&1
+	n=0
+	for s in "s0 0" "s1 $q" "s2 $((q + p))" "s3 $p" "s4 $v4" "s5 $p" "s6 $m" \
+		"s7 $((m - p))" "s8 $q dn" "s9 $((8 * q))"; do
+		set -- $s
+		got=$(sbrows "$tmp/$1.png")
+		if ! frame "$tmp/$1.png" $2; then
+			bad "scroll bar: shot $1's frame is not rows $2 to $(($2 + fh - 1))"
+		elif [ "$got" != "$(want $2 $3)" ]; then
+			bad "scroll bar: shot $1 (place $2): bar rows $got, want $(want $2 $3)"
+		else
+			n=$((n + 1))
+		fi
+	done
+	[ $n = 10 ] && ok "scroll bar: arrows, shaft, elevator dragged (and back, and past the end), an arrow held for 1 s"
+	if [ "$(grep -c 'GET /map' "$tmp/http.log")" = "$nmap" ]; then
+		ok "scroll bar: its clicks do not go to the page"
+	else
+		bad "scroll bar: a click on it went to the page"
+	fi
+	rm -f "$here/data/tall.html" "$here/data/tall.gif"
 else
 	echo "skip  tall: no $hl"
 fi

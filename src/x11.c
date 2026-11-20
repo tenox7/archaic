@@ -1,10 +1,14 @@
 /* x11.c - Archaic's display for X11: Xlib only, calls that X11R2
- * already had. Black and white, one font.
+ * already had. Black and white, one font. Xlib has no scroll bars:
+ * Archaic draws its own (g_bar).
  */
 #include "archaic.h"
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 static Display *dpy;
 static Window win;
@@ -13,6 +17,13 @@ static XFontStruct *font;
 static int scr, ww, wh;
 static unsigned long black, white;
 static Atom wmdel;
+
+int g_bar = 1;
+
+void g_sbar(pos, max, vis)
+long pos, max, vis;
+{
+}
 
 int g_open(geom, w, h)
 char *geom;
@@ -51,7 +62,7 @@ int *w, *h;
 	XSetNormalHints(dpy, win, &hints);
 	XStoreName(dpy, win, "Archaic");
 	XSelectInput(dpy, win, ExposureMask | KeyPressMask | ButtonPressMask |
-		StructureNotifyMask);
+		ButtonReleaseMask | ButtonMotionMask | StructureNotifyMask);
 	gc = XCreateGC(dpy, win, 0L, (XGCValues *)0);
 	XSetFont(dpy, gc, font->fid);
 	/* the window manager's close button (ICCCM, X11R4 and later) */
@@ -151,14 +162,26 @@ int g_event(e, wait)
 Event *e;
 int wait;
 {
-	static XEvent ev;
+	static XEvent ev, nx;
 	static char s[8];
+	fd_set r;
+	struct timeval tv;
 	KeySym ks;
-	int n;
+	int n, fd;
 
 	for (;;) {
 		if (!wait && !XPending(dpy))
 			return 0;
+		if (wait == 2 && !XPending(dpy)) {	/* 1/10 s at most */
+			fd = ConnectionNumber(dpy);
+			FD_ZERO(&r);
+			FD_SET(fd, &r);
+			tv.tv_sec = 0;
+			tv.tv_usec = 100000L;
+			if (select(fd + 1, &r, (fd_set *)0, (fd_set *)0, &tv) <= 0 ||
+				!XPending(dpy))
+				return 0;
+		}
 		XNextEvent(dpy, &ev);
 		switch (ev.type) {
 		case Expose:
@@ -187,6 +210,27 @@ int wait;
 				e->y = e->key == 4 ? -1 : 1;
 				e->key = S_STEP;
 			}
+			return 1;
+		case ButtonRelease:
+			if (ev.xbutton.button > 3)	/* the wheel */
+				break;
+			e->type = E_UP;
+			e->x = ev.xbutton.x;
+			e->y = ev.xbutton.y;
+			e->key = ev.xbutton.button;
+			return 1;
+		case MotionNotify:
+			/* a button is down; only the last place counts */
+			while (XPending(dpy)) {
+				XPeekEvent(dpy, &nx);
+				if (nx.type != MotionNotify)
+					break;
+				XNextEvent(dpy, &ev);
+			}
+			e->type = E_MOVE;
+			e->x = ev.xmotion.x;
+			e->y = ev.xmotion.y;
+			e->key = 0;
 			return 1;
 		case ConfigureNotify:
 			if (ev.xconfigure.width != ww || ev.xconfigure.height != wh) {

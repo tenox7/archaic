@@ -1,11 +1,15 @@
 /* headless.c - Archaic's display with no window, for tests and
  * automation. It draws into fb.c's screen in memory, the same pixels as
- * sdl.c and cocoa.m, and reads commands from standard input, one per
- * line. It reads the next command only when Archaic has nothing else to
- * do, so a command that loads a page ends before the next one starts.
- * At the end of the input, Archaic quits.
+ * sdl.c (with Archaic's own scroll bar: g_bar), and reads commands from
+ * standard input, one per line. It reads the next command only when
+ * Archaic has nothing else to do, so a command that loads a page ends
+ * before the next one starts. At the end of the input, Archaic quits.
  *
- *	click X Y [B]	mouse button B (1 left, 2 middle, 3 right) at X, Y
+ *	click X Y [B]	press mouse button B (1 left, 2 middle, 3 right)
+ *			at X, Y and let it go
+ *	down X Y [B]	press it and hold it down
+ *	move X Y	move the mouse, with the button down
+ *	up X Y [B]	let it go
  *	key K		a character, or return, tab, esc, backspace,
  *			delete, space, pgup, pgdn, up, down, ctrl-X
  *	type TEXT	the rest of the line, as keys
@@ -15,7 +19,10 @@
  *	pixels N	N pixels, as a trackpad, down if N > 0
  *	size W H	the window is now W x H
  *	shot FILE	write the screen to FILE: PNG, or PBM for *.pbm
- *	sleep MS	wait MS milliseconds
+ *	sleep MS	wait MS milliseconds. While a part of the scroll
+ *			bar is held down, the time is counted, not waited:
+ *			each 1/10 s is one wait 2 that ends with no event.
+ *			So a repeat gives the same steps in every run.
  *	quit
  * Empty lines and lines that start with # do nothing. Standard output
  * gets "title TEXT" for each page, and "shot FILE WxH" for each shot.
@@ -32,6 +39,16 @@
 
 static char line[1024];
 static char *text;		/* type: characters not given yet */
+static Event next;		/* click: the button let go, given next */
+static int hasnext;
+static long idle;		/* sleep: milliseconds left */
+
+int g_bar = 1;
+
+void g_sbar(pos, max, vis)
+long pos, max, vis;
+{
+}
 
 /* scroll y units (S_PIXEL, S_STEP, S_PAGE), down if y > 0 */
 static int scrl(e, y, unit)
@@ -51,6 +68,25 @@ int k;
 {
 	e->type = E_KEY;
 	e->key = k & 0377;
+	return 1;
+}
+
+/* a mouse event at X Y [B] */
+static int mouse(e, type, a)
+Event *e;
+int type;
+char *a;
+{
+	int x, y, b = 1;
+
+	if (sscanf(a, "%d %d %d", &x, &y, &b) < 2) {
+		fprintf(stderr, "archaic: click, down, move and up take X Y\n");
+		return 0;
+	}
+	e->type = type;
+	e->x = x;
+	e->y = y;
+	e->key = type == E_MOVE ? 0 : b;
 	return 1;
 }
 
@@ -128,9 +164,8 @@ static int command(e, s)
 Event *e;
 char *s;
 {
-	struct timeval tv;
 	char *a;
-	int n, x, y, b, w, h;
+	int n, w, h;
 
 	while (*s == ' ' || *s == '\t')
 		++s;
@@ -142,17 +177,21 @@ char *s;
 	while (*a == ' ' || *a == '\t')
 		++a;
 	if (n == 5 && !strncmp(s, "click", 5)) {
-		b = 1;
-		if (sscanf(a, "%d %d %d", &x, &y, &b) < 2) {
-			fprintf(stderr, "archaic: click X Y [B]\n");
+		if (!mouse(e, E_DOWN, a))
 			return 0;
-		}
-		e->type = E_DOWN;
-		e->x = x;
-		e->y = y;
-		e->key = b;
+		next.type = E_UP;
+		next.x = e->x;
+		next.y = e->y;
+		next.key = e->key;
+		hasnext = 1;
 		return 1;
 	}
+	if (n == 4 && !strncmp(s, "down", 4))
+		return mouse(e, E_DOWN, a);
+	if (n == 4 && !strncmp(s, "move", 4))
+		return mouse(e, E_MOVE, a);
+	if (n == 2 && !strncmp(s, "up", 2))
+		return mouse(e, E_UP, a);
 	if (n == 3 && !strncmp(s, "key", 3))
 		return keyname(e, a);
 	if (n == 4 && !strncmp(s, "type", 4)) {
@@ -185,10 +224,7 @@ char *s;
 		return 0;
 	}
 	if (n == 5 && !strncmp(s, "sleep", 5)) {
-		n = atoi(a);
-		tv.tv_sec = n / 1000;
-		tv.tv_usec = n % 1000 * 1000L;
-		select(0, (fd_set *)0, (fd_set *)0, (fd_set *)0, &tv);
+		idle = atol(a);
 		return 0;
 	}
 	if (n == 4 && !strncmp(s, "quit", 4)) {
@@ -199,17 +235,36 @@ char *s;
 	return 0;
 }
 
-/* commands only when Archaic waits for the user (wait 1): never while a
- * page loads */
+/* commands only when Archaic waits for the user (wait 1 or 2): never
+ * while a page loads */
 int g_event(e, wait)
 Event *e;
 int wait;
 {
+	struct timeval tv;
 	int n;
 
 	if (!wait)
 		return 0;
 	for (;;) {
+		if (hasnext) {
+			hasnext = 0;
+			e->type = next.type;
+			e->x = next.x;
+			e->y = next.y;
+			e->key = next.key;
+			return 1;
+		}
+		if (idle > 0) {
+			if (wait == 2) {	/* counted, not waited */
+				idle -= 100;
+				return 0;
+			}
+			tv.tv_sec = idle / 1000;
+			tv.tv_usec = idle % 1000 * 1000L;
+			select(0, (fd_set *)0, (fd_set *)0, (fd_set *)0, &tv);
+			idle = 0;
+		}
 		if (text && *text) {
 			if (*text == '\n') {
 				text = 0;

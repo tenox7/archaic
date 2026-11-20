@@ -11,12 +11,15 @@
  * -o file	at the end, write the first picture as a PBM file
  * -s script	act out a script, then quit: characters are keys, ~ is
  *		Return, @x,y; is a click, % waits 2 seconds. A load that a
- *		key or click starts ends before the script goes on.
+ *		key or click starts ends before the script goes on (so do
+ *		the slices of the tall picture that a scroll needs).
  *
  * Keys: Tab next field, Return sends the form, Backspace, Ctrl-U clears
  * the field, Esc stops a load. Space and b scroll a window when no field
  * has the keyboard, so does the right mouse button. The displays send
- * E_SCROLL for the wheel, the arrows, Page Up and Page Down. Ctrl-Q quits.
+ * E_SCROLL for the wheel, the arrows, Page Up and Page Down, and for the
+ * system's scroll bar (g_sbar). Where the system has none, Archaic draws
+ * its own (drawbar). Ctrl-Q quits.
  *
  * WRP's form: Archaic sets WRP's settings itself and does not show them.
  * W and H: the picture fills the window. M, T, C: ISMAP, GIF, 2 colors
@@ -43,7 +46,8 @@ int stop;		/* end the load that is running */
 static Image imgs[MAXIMG];
 static int nimgs;
 static char base[MAXURL];	/* this page's URL */
-static int winw, winh, viewh;	/* the window, the page part of it */
+static int winw, winh;		/* the window */
+static int vieww, viewh;	/* its page part: less the scroll bar, the status line */
 static int fh, fb, cw;		/* font height, baseline, width of "0" */
 static int doch, top;		/* page height, how far scrolled */
 
@@ -71,6 +75,42 @@ static int quiet;		/* getting a slice the user did not ask for */
 static char surl[MAXURL];	/* a slice's address */
 static char spage[MAXURL];	/* the address WRP showed before */
 static char ssave[200];		/* the status line before a slice */
+
+/* Archaic's own scroll bar, for systems that have none (g_bar), in the
+ * style of the Atari ST's GEM: at the right of the page part, an arrow
+ * box at each end, between them a dotted shaft with a white elevator.
+ * The elevator's length shows how much of the page is in the window,
+ * its place where. An arrow scrolls a quarter of the window, a click in
+ * the shaft a window; held down, they repeat. The elevator is dragged. */
+#define SBW 17			/* the bar's width: a line and 16 pixels */
+#define SBH 16			/* an arrow box's height, less its line */
+#define B_UP 1			/* the parts of the bar */
+#define B_DN 2
+#define B_PGUP 3
+#define B_PGDN 4
+#define B_DRAG 5
+#define AW 11			/* the arrow */
+#define AH 11
+static char *arrow[] = {
+	".....#.....",
+	"....#.#....",
+	"...#...#...",
+	"..#.....#..",
+	".#.......#.",
+	"####...####",
+	"...#...#...",
+	"...#...#...",
+	"...#...#...",
+	"...#...#...",
+	"...#####..."
+};
+static int bar;			/* Archaic draws the scroll bar */
+static int bpart;		/* the part held down, or 0 */
+static int bticks;		/* waits of 1/10 s since it was pressed */
+static int bpx, bpy;		/* the pointer while it is held */
+static int by0, bgrab;		/* B_DRAG: the row pressed, its row in the elevator */
+static long bpos0;		/* B_DRAG: the page's place then */
+static long lpos = -1, lmax, lvis;	/* what g_sbar showed last */
 static int focus = -1;		/* field with the keyboard */
 static int popup = -1;		/* menu with its list open */
 static int pressed = -1;	/* button shown pressed */
@@ -116,6 +156,8 @@ int x, y, w, h, c;
 	}
 	if (y + h > viewh)
 		h = viewh - y;
+	if (x + w > vieww)
+		w = vieww - x;
 	if (w > 0 && h > 0)
 		g_fill(x, y, w, h, c);
 }
@@ -129,15 +171,22 @@ int x, y, w, h;
 	}
 	if (y + h > viewh)
 		h = viewh - y;
+	if (x + w > vieww)
+		w = vieww - x;
 	if (w > 0 && h > 0)
 		g_invert(x, y, w, h);
 }
 
+/* text: whole lines only, and only the letters left of the scroll bar */
 static void text(x, y, s, n)
 int x, y, n;
 char *s;
 {
-	if (n > 0 && y >= 0 && y + fh <= viewh)
+	if (y < 0 || y + fh > viewh)
+		return;
+	while (n > 0 && x + tw(s, n) > vieww)
+		--n;
+	if (n > 0)
 		g_text(x, y, s, n, 0);
 }
 
@@ -312,23 +361,33 @@ Item *it;
 	return (char **)0;
 }
 
-/* picture p at x, y: drawn only when all of it is on the page part */
+/* picture p, w x h (16 x 16 at most), at x, y; upside down if flip */
+static void pict(x, y, p, w, h, flip)
+int x, y, w, h, flip;
+char **p;
+{
+	static unsigned char b[16 * 2];
+	int bpl = (w + 7) / 8, r, c;
+	char *s;
+
+	for (r = 0; r < h * bpl; ++r)
+		b[r] = 0;
+	for (r = 0; r < h; ++r) {
+		s = p[flip ? h - 1 - r : r];
+		for (c = 0; c < w && s[c]; ++c)
+			if (s[c] == '#')
+				b[r * bpl + c / 8] |= 0x80 >> (c & 7);
+	}
+	g_bits(x, y, w, h, b, bpl);
+}
+
+/* a button's picture p at x, y: only when all of it is on the page part */
 static void drawicon(x, y, p)
 int x, y;
 char **p;
 {
-	static unsigned char b[IH * ((IW + 7) / 8)];
-	int bpl = (IW + 7) / 8, r, c;
-
-	if (y < 0 || y + IH > viewh)
-		return;
-	for (r = 0; r < IH * bpl; ++r)
-		b[r] = 0;
-	for (r = 0; r < IH; ++r)
-		for (c = 0; c < IW && p[r][c]; ++c)
-			if (p[r][c] == '#')
-				b[r * bpl + c / 8] |= 0x80 >> (c & 7);
-	g_bits(x, y, IW, IH, b, bpl);
+	if (y >= 0 && y + IH <= viewh && x + IW <= vieww)
+		pict(x, y, p, IW, IH, 0);
 }
 
 static void drawbutton(i)
@@ -378,7 +437,7 @@ int r0, r1;
 {
 	Item *it = &items[tall];
 	Slice *s;
-	int y = it->y - top, a, b, i, sa, sb;
+	int y = it->y - top, a, b, i, sa, sb, w;
 	long p;
 
 	a = y > r0 ? y : r0;
@@ -398,8 +457,10 @@ int r0, r1;
 			continue;
 		sa = p > a ? (int)p : a;
 		sb = p + s->im.h < b ? (int)(p + s->im.h) : b;
-		g_bits(it->x, sa, s->im.w, sb - sa,
-			s->im.bits + (sa - p) * s->im.bpl, s->im.bpl);
+		w = it->x + s->im.w > vieww ? vieww - it->x : s->im.w;
+		if (w > 0)
+			g_bits(it->x, sa, w, sb - sa,
+				s->im.bits + (sa - p) * s->im.bpl, s->im.bpl);
 	}
 }
 
@@ -409,7 +470,7 @@ int i, r0, r1;
 {
 	Item *it = &items[i];
 	Image *im = it->img >= 0 ? &imgs[it->img] : 0;
-	int y = it->y - top, a, b;
+	int y = it->y - top, a, b, w;
 
 	if (i == tall) {
 		drawtall(r0, r1);
@@ -427,8 +488,9 @@ int i, r0, r1;
 		b = r1;
 	if (b > viewh)
 		b = viewh;
-	if (b > a)
-		g_bits(it->x, a, im->w, b - a, im->bits + (long)(a - y) * im->bpl,
+	w = it->x + im->w > vieww ? vieww - it->x : im->w;
+	if (b > a && w > 0)
+		g_bits(it->x, a, w, b - a, im->bits + (long)(a - y) * im->bpl,
 			im->bpl);
 }
 
@@ -455,22 +517,137 @@ static void drawpop()
 	}
 }
 
+/* how far the page scrolls: to its end. With a tall picture, only to the
+ * end of the frame, if the window is too small for all of it: the form
+ * stays at the top, and WRP's last line below the window. */
+static int maxtop()
+{
+	int m;
+
+	if (tall >= 0)
+		m = items[tall].y + items[tall].h + M - viewh;
+	else
+		m = doch - viewh;
+	return m > 0 ? m : 0;
+}
+
+/* The page's place, for the scroll bar: top and the frame's oy as one
+ * number, 0 up to maxpos(). Down, the picture moves first in its frame,
+ * then the page (if the frame does not fit); up, first the page. */
+static long curpos()
+{
+	return top + (tall >= 0 ? oy : 0L);
+}
+
+static long maxpos()
+{
+	return maxtop() + (tall >= 0 ? (long)(items[tall].ih - items[tall].h) : 0L);
+}
+
+/* how much of it shows: the frame, or the page part */
+static long vispos()
+{
+	return tall >= 0 ? (long)items[tall].h : (long)viewh;
+}
+
+/* Archaic's scroll bar: the shaft is rows *a up to *b (with the lines
+ * of the arrow boxes), the elevator rows *ey up to *ey + *eh. 0 if the
+ * page part is too low for an elevator. */
+static int barpos(a, b, ey, eh)
+int *a, *b, *ey, *eh;
+{
+	long m = maxpos(), v = vispos(), t;
+
+	*a = SBH;
+	*b = viewh - SBH;
+	t = *b - *a;
+	*ey = *a;
+	*eh = (int)t;
+	if (t < SBH + 2)
+		return 0;
+	if (m > 0) {
+		*eh = (int)(t * v / (v + m));
+		if (*eh < SBH)
+			*eh = SBH;
+		*ey = *a + (int)((t - *eh) * curpos() / m);
+	}
+	return 1;
+}
+
+static void drawbar()
+{
+	static unsigned char pat[68 * 2];	/* the shaft: 1 dot in 8, as GEM's */
+	static int made;
+	int x = vieww + 1, w = SBW - 1, a, b, ey, eh, y, n;
+
+	if (!made) {
+		for (y = 0; y < 68; ++y)
+			pat[2 * y] = pat[2 * y + 1] = (y & 1) ? ((y & 2) ? 0x11 : 0x44) : 0;
+		made = 1;
+	}
+	g_fill(vieww, 0, 1, viewh, 1);		/* the line left of it */
+	g_fill(x, 0, w, viewh, 0);
+	if (viewh < 2 * SBH + 2)
+		return;
+	pict(x + (w - AW) / 2, (SBH - AH) / 2, arrow, AW, AH, 0);
+	g_fill(x, SBH, w, 1, 1);
+	pict(x + (w - AW) / 2, viewh - SBH + (SBH - AH + 1) / 2, arrow, AW, AH, 1);
+	g_fill(x, viewh - SBH - 1, w, 1, 1);
+	if (bpart == B_UP)		/* held down */
+		g_invert(x, 0, w, SBH);
+	if (bpart == B_DN)
+		g_invert(x, viewh - SBH, w, SBH);
+	if (!barpos(&a, &b, &ey, &eh))
+		return;
+	for (y = a + 1; y < b - 1; y += n) {
+		n = b - 1 - y < 64 ? b - 1 - y : 64;
+		g_bits(x, y, w, n, pat + 2 * (y & 3), 2);
+	}
+	g_fill(x, ey + 1, w, eh - 2, 0);	/* the elevator */
+	g_fill(x, ey, w, 1, 1);
+	g_fill(x, ey + eh - 1, w, 1, 1);
+}
+
+/* the scroll bar shows the page's place: Archaic's own, or the system's */
+static void showbar()
+{
+	long p, m, v;
+
+	if (headless)
+		return;
+	if (bar) {
+		drawbar();
+		return;
+	}
+	p = curpos();
+	m = maxpos();
+	v = vispos();
+	if (p != lpos || m != lmax || v != lvis) {
+		lpos = p;
+		lmax = m;
+		lvis = v;
+		g_sbar(p, m, v);
+	}
+}
+
 /* draw the part x, y, w, h of the window again */
 static void redraw(rx, ry, rw, rh)
 int rx, ry, rw, rh;
 {
 	Item *it;
-	int i, y, r1 = ry + rh;
+	int i, y, r1 = ry + rh, r = rx + rw;
 
 	if (headless)
 		return;
-	if (ry < viewh) {
-		fill(rx, ry, rw, rh, 0);
+	if (r > vieww)
+		r = vieww;
+	if (ry < viewh && rx < r) {
+		fill(rx, ry, r - rx, rh, 0);
 		for (i = 0; i < nitems; ++i) {
 			it = &items[i];
 			y = it->y - top;
 			if (it->w <= 0 || it->h <= 0 || y >= r1 || y + it->h <= ry ||
-				it->x >= rx + rw || it->x + it->w <= rx)
+				it->x >= r || it->x + it->w <= rx)
 				continue;
 			switch (it->type) {
 			case I_TEXT:
@@ -493,9 +670,11 @@ int rx, ry, rw, rh;
 			}
 		}
 		if (popup >= 0 && ry < py + ph && r1 > py && rx < px + pw &&
-			rx + rw > px)
+			r > px)
 			drawpop();
 	}
+	if (ry < viewh && (!bar || rx + rw > vieww))
+		showbar();
 	if (r1 > viewh)
 		drawstatus();
 	g_flush();
@@ -521,16 +700,16 @@ int i;
 		if (k > w)
 			w = k;
 	}
-	if (w > winw)
-		w = winw;
+	if (w > vieww)
+		w = vieww;
 	k = it->nopt;
 	if (k * prow + 2 > viewh)
 		k = (viewh - 2) / prow;
 	pw = w;
 	ph = k * prow + 2;
 	px = it->x;
-	if (px + pw > winw)
-		px = winw - pw;
+	if (px + pw > vieww)
+		px = vieww - pw;
 	if (px < 0)
 		px = 0;
 	py = it->y - top + it->h;
@@ -639,7 +818,7 @@ static void place()
 			continue;
 		}
 		sp = it->sp && x > M ? cw : 0;
-		if (x + sp + it->w > winw - M && x > M) {
+		if (x + sp + it->w > vieww - M && x > M) {
 			for (j = l0; j < i; ++j)
 				items[j].y = y + (lh - items[j].h) / 2;
 			y += lh + 2;
@@ -736,7 +915,7 @@ int *w, *h;
 			y = items[i].y;
 			break;
 		}
-	*w = winw - 2 * M;
+	*w = vieww - 2 * M;
 	*h = viewh - y - M;
 	if (*h < 50)
 		*h = 50;
@@ -865,57 +1044,28 @@ int f, b;
 	}
 }
 
-/* how far the page scrolls: to its end. With a tall picture, only to the
- * end of the frame, if the window is too small for all of it: the form
- * stays at the top, and WRP's last line below the window. */
-static int maxtop()
-{
-	int m;
-
-	if (tall >= 0)
-		m = items[tall].y + items[tall].h + M - viewh;
-	else
-		m = doch - viewh;
-	return m > 0 ? m : 0;
-}
-
-/* scroll d pixels, down if d > 0. With a tall picture: down, first the
- * picture in its frame, then the page (if the frame does not fit); up,
- * first the page back to its top, then the picture. */
-static void scroll(d)
-int d;
+/* scroll to place v of the page (see curpos) */
+static void scrollto(v)
+long v;
 {
 	Item *it;
-	long o, ooy = oy;
-	int t, otop = top, opop = popup, a, b;
+	long r, ooy = oy, m = maxpos();
+	int otop = top, opop = popup, a, b;
 
-	if (d == 0)
-		return;
-	sdir = d > 0 ? 1 : -1;
-	sstop = 0;
-	if (tall >= 0) {
-		it = &items[tall];
-		if (d < 0 && top > 0) {
-			t = top + d < 0 ? 0 : top + d;
-			d -= t - top;
-			top = t;
-		}
-		o = oy + d;
-		if (o > it->ih - it->h)
-			o = it->ih - it->h;
-		if (o < 0)
-			o = 0;
-		d -= (int)(o - oy);
-		oy = o;
-		if (d < 0)
-			d = 0;
+	if (v > m)
+		v = m;
+	if (v < 0)
+		v = 0;
+	if (v != curpos()) {
+		sdir = v > curpos() ? 1 : -1;
+		sstop = 0;
 	}
-	t = top + d;
-	if (t > maxtop())
-		t = maxtop();
-	if (t < 0)
-		t = 0;
-	top = t;
+	if (tall >= 0) {
+		r = items[tall].ih - items[tall].h;
+		oy = v < r ? v : r;
+		v -= oy;
+	}
+	top = (int)v;
 	if (top == otop && oy == ooy)
 		return;
 	popup = -1;
@@ -932,12 +1082,118 @@ int d;
 		redraw(0, 0, winw, viewh);
 }
 
+/* scroll d pixels, down if d > 0 */
+static void scroll(d)
+int d;
+{
+	if (d == 0)
+		return;
+	sdir = d > 0 ? 1 : -1;
+	sstop = 0;
+	scrollto(curpos() + d);
+}
+
 /* a window's worth of scrolling: the frame (or the window) less 2 lines */
 static int pagestep()
 {
 	int n = (tall >= 0 ? items[tall].h : viewh) - 2 * fh;
 
 	return n > fh ? n : fh;
+}
+
+/* a quarter of the frame (or the page part): a step of the wheel, an arrow */
+static int stepsize()
+{
+	return (tall >= 0 ? items[tall].h : viewh) / 4;
+}
+
+/* the part of Archaic's scroll bar at row y */
+static int barpart(y)
+int y;
+{
+	int a, b, ey, eh;
+
+	if (y < SBH)
+		return B_UP;
+	if (y >= viewh - SBH)
+		return B_DN;
+	if (!barpos(&a, &b, &ey, &eh))
+		return 0;
+	if (y < ey)
+		return B_PGUP;
+	if (y >= ey + eh)
+		return B_PGDN;
+	return B_DRAG;
+}
+
+/* what part p of the bar does, once */
+static void baract(p)
+int p;
+{
+	if (p == B_UP)
+		scroll(-stepsize());
+	else if (p == B_DN)
+		scroll(stepsize());
+	else if (p == B_PGUP)
+		scroll(-pagestep());
+	else if (p == B_PGDN)
+		scroll(pagestep());
+}
+
+/* the elevator taken to row y: the page to the place it shows */
+static void drag(y)
+int y;
+{
+	int a, b, ey, eh;
+
+	if (!barpos(&a, &b, &ey, &eh) || b - a - eh <= 0)
+		return;
+	if (y == by0)
+		scrollto(bpos0);
+	else
+		scrollto((long)(y - bgrab - a) * maxpos() / (b - a - eh));
+}
+
+/* a button pressed on the bar at x, y */
+static void barpress(x, y)
+int x, y;
+{
+	int a, b, ey, eh;
+
+	bpart = barpart(y);
+	bticks = 0;
+	bpx = x;
+	bpy = by0 = y;
+	if (bpart == B_DRAG) {
+		barpos(&a, &b, &ey, &eh);
+		bgrab = y - ey;
+		bpos0 = curpos();
+	} else
+		baract(bpart);
+	drawbar();
+	g_flush();
+}
+
+/* the button let go at row y. A display with no E_MOVE (X10) moves the
+ * elevator only here, as GEM did. */
+static void barup(y)
+int y;
+{
+	if (bpart == B_DRAG)
+		drag(y);
+	bpart = 0;
+	drawbar();
+	g_flush();
+}
+
+/* a part of the bar held down 1/10 s more: after 4/10 s, the arrows and
+ * the shaft do it again, while the pointer stays on them */
+static void bartick()
+{
+	if (bpart == B_DRAG || ++bticks < 4)
+		return;
+	if (bpx >= vieww && bpx < winw && barpart(bpy) == bpart)
+		baract(bpart);
 }
 
 /* after a layout: keep oy inside the picture; when the frame's height
@@ -1031,6 +1287,10 @@ int x, y, b;
 	}
 	if (y >= viewh)
 		return;
+	if (bar && x >= vieww) {
+		barpress(x, y);
+		return;
+	}
 	if (b == 3) {
 		scroll(y < viewh / 2 ? -pagestep() : pagestep());
 		return;
@@ -1074,14 +1334,24 @@ int x, y, b;
 static void event(e)
 Event *e;
 {
-	int n;
-
 	switch (e->type) {
 	case E_KEY:
 		key(e->key);
 		break;
 	case E_DOWN:
+		if (bpart)		/* its E_UP did not come */
+			barup(bpy);
 		click(e->x, e->y, e->key);
+		break;
+	case E_UP:
+		if (bpart)
+			barup(e->y);
+		break;
+	case E_MOVE:
+		bpx = e->x;
+		bpy = e->y;
+		if (bpart == B_DRAG)
+			drag(e->y);
 		break;
 	case E_EXPOSE:
 		redraw(e->x, e->y, e->w, e->h);
@@ -1091,6 +1361,7 @@ Event *e;
 			break;
 		winw = e->w;
 		winh = e->h;
+		vieww = bar ? winw - SBW : winw;
 		viewh = winh - fh - 3;
 		popup = -1;
 		layout();
@@ -1102,11 +1373,12 @@ Event *e;
 		redraw(0, 0, winw, winh);
 		break;
 	case E_SCROLL:
-		n = tall >= 0 ? items[tall].h : viewh;
 		if (e->key == S_PAGE)
 			scroll(e->y * pagestep());
 		else if (e->key == S_STEP)
-			scroll(e->y * (n / 4));
+			scroll(e->y * stepsize());
+		else if (e->key == S_TO)
+			scrollto((long)e->y);
 		else
 			scroll(e->y);
 		break;
@@ -1660,6 +1932,10 @@ static void runscript()
 		return;
 	}
 	event(&e);
+	if (e.type == E_DOWN) {
+		e.type = E_UP;
+		event(&e);
+	}
 }
 
 int main(argc, argv)
@@ -1724,6 +2000,8 @@ char **argv;
 		g_font(&fh, &fb);
 	}
 	cw = tw("0", 1);
+	bar = !headless && g_bar;
+	vieww = bar ? winw - SBW : winw;
 	viewh = winh - fh - 3;
 	sprintf(msg, "Archaic %s", VERSION);
 	say(msg);
@@ -1743,6 +2021,9 @@ char **argv;
 			if (!headless)
 				while (g_event(&e, 0))
 					event(&e);
+			/* the slices a scroll needs come before the next step */
+			if (!headless && slicework(1))
+				continue;
 			runscript();
 			continue;
 		}
@@ -1750,8 +2031,11 @@ char **argv;
 			break;
 		if (slicework(1))	/* the frame's slices, then the next ones */
 			continue;
-		if (g_event(&e, 1))
+		/* a part of the scroll bar held down: wait 1/10 s at most */
+		if (g_event(&e, bpart && bpart != B_DRAG ? 2 : 1))
 			event(&e);
+		else if (bpart)
+			bartick();
 	}
 	if (pbm)
 		writepbm();

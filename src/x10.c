@@ -9,6 +9,10 @@
  * - a resized window comes as ExposeWindow with the new size
  * - the ST's left mouse button comes as MiddleButton (1), the right one
  *   as RightButton (0)
+ * - no scroll bars: Archaic draws its own (g_bar). No motion events
+ *   are asked for: the elevator moves where the button is let go, as in
+ *   GEM. X10 can't wait for a time, so wait 2 waits as 1: held arrows
+ *   don't repeat.
  * - $ARCHAICDBG set: every X event is printed to stderr
  */
 #include "archaic.h"
@@ -27,6 +31,13 @@ static int ww, wh;
 static short band[1024];		/* 2048 bytes of bits at a time */
 static unsigned char rev[256];		/* a byte's bits the other way round */
 static char gbuf[64];
+
+int g_bar = 1;
+
+void g_sbar(pos, max, vis)
+long pos, max, vis;
+{
+}
 
 /* The pointer: an arrow with its tip, the hot spot, at 0,0.
  * - The Idris server draws the root window's X cursor 7 pixels up and
@@ -129,7 +140,8 @@ int *w, *h;
 		return -1;
 	XStoreName(win, "Archaic");
 	mkcursor();
-	XSelectInput(win, KeyPressed | ButtonPressed | ExposeWindow | ExposeRegion);
+	XSelectInput(win, KeyPressed | ButtonPressed | ButtonReleased |
+		ExposeWindow | ExposeRegion);
 	XMapWindow(win);
 	XWarpMouse(win, gw / 2, gh / 2);
 	for (i = 0; i < 256; ++i) {
@@ -293,8 +305,9 @@ int wait;
 			}
 			break;
 		case ButtonPressed:
+		case ButtonReleased:
 			k = (XKeyOrButtonEvent *)&ev;
-			e->type = E_DOWN;
+			e->type = ev.type == ButtonPressed ? E_DOWN : E_UP;
 			e->x = k->x;
 			e->y = k->y;
 			switch (k->detail & ValueMask) {

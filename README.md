@@ -141,6 +141,7 @@ press Return (WRP types it into the page), then click ↵ if the page needs Ente
 
 - Left button: click links, buttons, fields, menus, and the picture.
 - Right button: scroll a window. Top half of the window = up, bottom half = down.
+- The scroll bar at the right: see Scrolling below.
 
 **Keys**
 
@@ -160,7 +161,7 @@ press Return (WRP types it into the page), then click ↵ if the page needs Ente
 |---|---|
 | Exit, Cancl, the close box | quit |
 | Page, Next / Shift+Page, Prev | scroll a window down / up |
-| ↓ / ↑, the scroll arrows (also FreeBee's mouse wheel) | scroll a quarter of the window down / up |
+| ↓ / ↑, the scroll arrows (also FreeBee's mouse wheel) | scroll a quarter of the window down / up. The frame's scroll arrows are the window's own scroll bar: Archaic draws none on the 3B1 |
 | Rfrsh, Clear | draw the window again |
 | the resize box | a new window size. Then click ↻ for a picture that fits |
 
@@ -168,6 +169,7 @@ press Return (WRP types it into the page), then click ↵ if the page needs Ente
 The up and down arrows and each step of the mouse wheel scroll a quarter of it.
 A trackpad scrolls smoothly, by pixels. Ctrl+click is the right button.
 Cmd-Q and the window's close button quit.
+Cocoa has the Mac's own scroll bar; SDL has Archaic's (see Scrolling).
 
 The help line at the bottom of the screen lists the main keys.
 
@@ -191,6 +193,29 @@ With a WRP that knows slices (`sl=1`), WRP makes a picture of the whole page onc
 | a trackpad (Cocoa, SDL) | by pixels |
 
 An older WRP ignores `sl=1`: then the picture fills the window, and WRP's Up and Dn buttons scroll the page.
+
+**The scroll bar**
+
+A system that has scroll bars uses its own. Where it has none, Archaic draws one.
+
+| Display | Scroll bar |
+|---|---|
+| Cocoa (macOS) | the Mac's own (NSScroller), always shown. A click in its track scrolls as Page Down or Page Up, or jumps to that place, as set in System Settings (with Option, the other one) |
+| the 3B1 | the window frame's scroll arrows |
+| SDL, X11, X10 (the Atari ST), headless | Archaic's own, in the style of the Atari ST's GEM |
+
+Archaic's own scroll bar is at the right of the window, 17 pixels wide:
+
+![Archaic's own scroll bar at the right, in GEM style: Wikipedia's Atari ST article](screenshots/scrollbar.png)
+
+| Part | Does |
+|---|---|
+| ⇧ and ⇩ arrow boxes | scroll a quarter of the frame. Hold the button down: again every 1/10 s, after 4/10 s |
+| the dotted shaft, above or below the elevator | scroll as Page Up or Page Down. Held down, it goes on until the elevator gets to the pointer |
+| the white elevator | drag it. Its length shows how much of the page is in the window, its place where |
+
+On X10 the elevator moves when the button is let go (as in GEM), and held parts do not repeat:
+X10 has no events for the mouse moving with a button down, and can't wait for a time.
 
 ---
 
@@ -257,7 +282,9 @@ At the end of the input, Archaic quits.
 
 | Command | Does |
 |---|---|
-| `click X Y [B]` | mouse button B (1 left, 2 middle, 3 right) at X, Y |
+| `click X Y [B]` | press mouse button B (1 left, 2 middle, 3 right) at X, Y, and let it go |
+| `down X Y [B]`, `up X Y [B]` | press the button and hold it down; let it go |
+| `move X Y` | move the mouse, with the button down (to drag the scroll bar's elevator) |
 | `key K` | a character, or `return`, `tab`, `esc`, `backspace`, `delete`, `space`, `pgup`, `pgdn`, `up`, `down`, `ctrl-X` |
 | `type TEXT` | the rest of the line, as keys |
 | `scroll up`, `scroll down` | a window, as Page Up and Page Down |
@@ -265,7 +292,7 @@ At the end of the input, Archaic quits.
 | `pixels N` | N pixels, as a trackpad; down if N > 0, up if N < 0 |
 | `size W H` | the window is now W x H |
 | `shot FILE` | write the screen to FILE: PNG, or PBM if the name ends in `.pbm` |
-| `sleep MS` | wait MS milliseconds |
+| `sleep MS` | wait MS milliseconds. While a part of the scroll bar is held down, the time is counted in steps of 1/10 s and not waited, so a held arrow repeats the same way in every run |
 | `quit` | quit |
 
 Empty lines and lines that start with `#` do nothing. Standard output gets
@@ -286,9 +313,13 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons are pictures, Go stays text.
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
-8. The tall picture, with no WRP: the test server cuts a random 632 x 1500 GIF into slices.
+8. The tall picture, with no WRP: the test server cuts a random 600 x 1500 GIF into slices.
    After a wheel step, a window and a scroll to the end, the frame must show exactly the right rows.
    Also: the next slice comes before it is needed, and a click sends the place on the whole page.
+9. Archaic's scroll bar, on the same picture: the arrows, a click in the shaft, the elevator
+   dragged (back to where it was, and past the end), an arrow held down for 1 s.
+   In 10 shots, the frame must show the right rows, and the elevator must be at the right place.
+   Clicks on the bar must not go to the page.
 
 Run WRP for the tests: `wrp -l 127.0.0.1:8089`.
 
@@ -440,6 +471,8 @@ Test on a copy of your Idris disk.
 - Bitmaps: rows of 16-bit shorts, the **low** bit is the **left** pixel.
 - The **left** mouse button comes as `MiddleButton` (1), the right one as `RightButton` (0).
 - All four arrow keys come as the same key. Archaic does not use them.
+- No scroll bars: Archaic draws its own. Archaic asks for no motion events:
+  the elevator moves when the button is let go, as in GEM.
 - **The root window's X cursor is drawn 7 pixels up and left of where it clicks.**
   Archaic sets its own arrow cursor, with the hot spot at its tip (0,0).
 - Cursor colors are ignored: cursor bit 1 is drawn white, the rest of the mask black.
@@ -562,8 +595,10 @@ A port is **one display file** and **one network file**.
 | `g_text(x, y, s, n, inv)` | n characters, x, y = top left |
 | `g_textw(s, n)`, `g_font(&height, &base)` | font size |
 | `g_bits(x, y, w, h, bits, bpl)` | 1-bit rows, 1 = black, high bit left |
-| `g_event(&e, wait)` | next key, click, expose, resize, quit, scroll (`E_SCROLL`: pixels, quarter windows or windows) |
+| `g_event(&e, wait)` | next key, click (`E_DOWN`, `E_UP`, and `E_MOVE` with a button down), expose, resize, quit, scroll (`E_SCROLL`: pixels, quarter windows, windows, or to a place). wait 0: don't wait; 1: wait for an event; 2: wait at most 1/10 s (or as 1) |
 | `g_fd()` | the display's file descriptor, or -1 |
+| `g_bar` | a variable: 0 if the system has scroll bars (Archaic then calls `g_sbar`), 1 if Archaic must draw its own |
+| `g_sbar(pos, max, vis)` | show the page's place in the system's scroll bar: pos, 0 up to max; vis pixels show. Empty where `g_bar` is 1. The scroll bar sends `E_SCROLL` (`S_TO` for its knob) |
 
 **Network (`n_` functions)**
 

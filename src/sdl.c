@@ -7,7 +7,8 @@
  * scroll a window, the up and down arrows and the wheel's steps a
  * quarter of it (E_SCROLL); a trackpad scrolls by pixels. Ctrl+click is
  * the right button. Cmd-Q and the close button quit. SDL has no file to
- * wait on: g_fd() is -1.
+ * wait on: g_fd() is -1. SDL has no scroll bars: Archaic draws its own
+ * (g_bar).
  */
 #include "fb.h"
 #include <SDL.h>
@@ -18,6 +19,21 @@ static SDL_Texture *tex;
 static float wheel;		/* trackpad pixels not used yet */
 static unsigned char text[64];	/* typed characters not given yet */
 static int ntext, itext;
+
+int g_bar = 1;
+
+void g_sbar(pos, max, vis)
+long pos, max, vis;
+{
+}
+
+/* SDL's mouse button: 1 left, 2 middle, 3 right; 0 others */
+static int button(b)
+int b;
+{
+	return b == SDL_BUTTON_LEFT ? 1 : b == SDL_BUTTON_MIDDLE ? 2 :
+		b == SDL_BUTTON_RIGHT ? 3 : 0;
+}
 
 static int mktex()
 {
@@ -175,13 +191,14 @@ int g_event(e, wait)
 Event *e;
 int wait;
 {
-	SDL_Event ev;
+	SDL_Event ev, nx;
 	int k, w, h;
 
 	for (;;) {
 		if (itext < ntext)
 			return key(e, text[itext++]);
-		if (wait ? !SDL_WaitEvent(&ev) : !SDL_PollEvent(&ev))
+		if (wait == 2 ? !SDL_WaitEventTimeout(&ev, 100) :
+			wait ? !SDL_WaitEvent(&ev) : !SDL_PollEvent(&ev))
 			return 0;
 		switch (ev.type) {
 		case SDL_QUIT:
@@ -241,13 +258,26 @@ int wait;
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
-			if (ev.button.button > SDL_BUTTON_RIGHT)
+		case SDL_MOUSEBUTTONUP:
+			if (!button(ev.button.button))
 				break;
-			e->type = E_DOWN;
+			e->type = ev.type == SDL_MOUSEBUTTONDOWN ? E_DOWN : E_UP;
 			e->x = ev.button.x;
 			e->y = ev.button.y;
-			e->key = ev.button.button == SDL_BUTTON_LEFT ? 1 :
-				ev.button.button == SDL_BUTTON_MIDDLE ? 2 : 3;
+			e->key = button(ev.button.button);
+			return 1;
+		case SDL_MOUSEMOTION:
+			if (!ev.motion.state)	/* no button down */
+				break;
+			/* only the last place counts */
+			while (SDL_PeepEvents(&nx, 1, SDL_PEEKEVENT, SDL_FIRSTEVENT,
+				SDL_LASTEVENT) == 1 && nx.type == SDL_MOUSEMOTION &&
+				nx.motion.state)
+				SDL_PollEvent(&ev);
+			e->type = E_MOVE;
+			e->x = ev.motion.x;
+			e->y = ev.motion.y;
+			e->key = 0;
 			return 1;
 		case SDL_MOUSEWHEEL:
 			/* A wheel gives whole steps: a quarter of the window

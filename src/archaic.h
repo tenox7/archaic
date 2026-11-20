@@ -157,6 +157,9 @@ void say P((char *s));		/* status line */
 #define S_PIXEL 0		/*  pixels (a trackpad) */
 #define S_STEP 1		/*  a quarter of the window (the wheel, the arrows) */
 #define S_PAGE 2		/*  a window less 2 lines (Page Up, Page Down) */
+#define S_TO 3			/*  to place y of the page (0 up to g_sbar's max) */
+#define E_UP 7			/* mouse button key let go at x, y */
+#define E_MOVE 8		/* the mouse moved to x, y with a button down */
 
 typedef struct event {
 	int type;
@@ -167,7 +170,20 @@ typedef struct event {
 /* the display: one of x10.c, x11.c, unixpc.c, sdl.c, cocoa.m ...
  * Colors: 0 white, 1 black. x, y are the top left corner, also for
  * text. sdl.c and cocoa.m draw with fb.c (a screen in memory). g_fd:
- * the display's file, for the network's select(); -1 if it has none. */
+ * the display's file, for the network's select(); -1 if it has none.
+ * g_event: wait 0 = don't wait, 1 = wait for an event, 2 = wait at most
+ * about 1/10 s (the repeat of Archaic's scroll bar); a display that
+ * can't wait for a time waits as for 1.
+ *
+ * The scroll bar: a system that has scroll bars (Cocoa, Win32, the 3B1's
+ * window frame) uses its own, and sets g_bar to 0. Archaic then calls
+ * g_sbar when the page moves: the page is at place pos, 0 up to max, and
+ * vis pixels of it show. The display sends E_SCROLL for its scroll bar.
+ * A system with none (SDL, X11 with no toolkit, X10) sets g_bar to 1:
+ * Archaic draws its own at the right of the window, in the style of the
+ * Atari ST's GEM, and uses E_UP and E_MOVE to drag it. */
+extern int g_bar;
+void g_sbar P((long pos, long max, long vis));
 int g_open P((char *geom, int *w, int *h));
 void g_close P((void));
 void g_title P((char *s));

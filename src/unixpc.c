@@ -17,7 +17,9 @@
  *   Exit and Cancl (also the frame's close box) quit, Rfrsh draws again.
  *   Page, Shift+Page, Next and Prev scroll a window; the Roll keys and
  *   the arrows a quarter of it (E_SCROLL). The scroll arrows in the
- *   frame send the Roll keys (so does FreeBee's wheel).
+ *   frame send the Roll keys (so does FreeBee's wheel). They are the
+ *   window's own scroll bar: Archaic draws none (g_bar 0), and g_sbar
+ *   has nothing to show, as the frame shows no place.
  * - A mouse click comes as the Mouse key, then wreadmouse() says where.
  *   The left button is 4, the middle one 2, the right one 1.
  * - The frame's resize box sends SIGWIND: then the new size is an E_SIZE.
@@ -75,6 +77,13 @@ static unsigned short dark[16];
 static unsigned short band[4096];	/* g_bits: 8192 bytes at a time */
 static unsigned char rev[256];		/* a byte's bits the other way round */
 static char lbuf[WTXTLEN];
+
+int g_bar = 0;
+
+void g_sbar(pos, max, vis)
+long pos, max, vis;
+{
+}
 
 /* wrastop() on the window, clipped to the inside */
 static void rop(src, bpr, sx, sy, x, y, w, h, sop, dop, pat)
@@ -452,7 +461,7 @@ int wait;
 	struct uwdata uw;
 	int k, x, y, b, r;
 
-	setwait(wait);
+	setwait(wait ? 1 : 0);
 	for (;;) {
 		if (resized) {
 			resized = 0;

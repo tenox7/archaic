@@ -8,6 +8,14 @@
  * arrows and the wheel's steps a quarter of it (E_SCROLL); a trackpad
  * scrolls by pixels. Ctrl+click is the right button. Cmd-Q, Cmd-W and
  * the close button quit. Cocoa has no file to wait on: g_fd() is -1.
+ *
+ * The scroll bar is the Mac's own: an NSScroller at the right of the
+ * window, always shown (the legacy style, not the overlay one). So g_bar
+ * is 0, and g_sbar sets the knob. A click or a drag on it is worked here,
+ * not in NSScroller's own loop, which would hold up Archaic until the
+ * button is let go: so the page moves, and its slices come, while the
+ * knob moves. A click in the slot scrolls a window (or jumps there, as
+ * set in System Settings; Option the other way); held down, it repeats.
  */
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
@@ -22,7 +30,11 @@
 #define NSEventMaskAny NSAnyEventMask
 #define NSEventModifierFlagCommand NSCommandKeyMask
 #define NSEventModifierFlagControl NSControlKeyMask
+#define NSEventModifierFlagOption NSAlternateKeyMask
+#define NSControlSizeRegular NSRegularControlSize
 #endif
+#define SB_UPLINE 4		/* NSScrollerDecrementLine: Mac OS X 10.6's arrows */
+#define SB_DNLINE 5		/* NSScrollerIncrementLine */
 
 #define NQ 64
 static Event evq[NQ];		/* events from Cocoa, not given yet */
@@ -33,6 +45,14 @@ static id del;
 static CGContextRef bm;		/* fb as a Quartz bitmap */
 static CGColorSpaceRef rgb;
 static double wheel;		/* wheel steps or trackpad pixels not used yet */
+static NSScroller *sbar;	/* the scroll bar */
+static long smax;		/* the page goes 0 up to smax (g_sbar) */
+static int spart;		/* the scroll bar's part held down, 0 none */
+static double sgrab;		/* the knob: the pointer's place in it */
+static NSPoint spt;		/* the pointer, in the scroll bar */
+static double srep;		/* when a held part does it again */
+
+int g_bar = 0;
 
 static void put(type, x, y, k)
 int type, x, y, k;
@@ -66,6 +86,59 @@ int y, unit;
 		}
 	}
 	put(E_SCROLL, 0, y, unit);
+}
+
+/* the knob's place for the pointer at p: 0 at the top, 1 at the end */
+static double knobat(p)
+NSPoint p;
+{
+	NSRect slot = [sbar rectForPart:NSScrollerKnobSlot];
+	NSRect knob = [sbar rectForPart:NSScrollerKnob];
+	double room = slot.size.height - knob.size.height, d;
+
+	if (room <= 0)
+		return [sbar doubleValue];
+	d = [sbar isFlipped] ? p.y - slot.origin.y : NSMaxY(slot) - p.y;
+	d = (d - sgrab) / room;
+	return d < 0 ? 0 : d > 1 ? 1 : d;
+}
+
+/* the page to place v of it (0 up to 1): a queued S_TO is moved */
+static void sto(v)
+double v;
+{
+	Event *e;
+	int y = (int)(v * smax + 0.5);
+
+	[sbar setDoubleValue:v];
+	if (qin != qout) {
+		e = &evq[(qin + NQ - 1) % NQ];
+		if (e->type == E_SCROLL && e->key == S_TO) {
+			e->y = y;
+			return;
+		}
+	}
+	put(E_SCROLL, 0, y, S_TO);
+}
+
+/* what part p of the scroll bar does, once */
+static void sstep(p)
+int p;
+{
+	if (p == NSScrollerDecrementPage)
+		scrl(-1, S_PAGE);
+	else if (p == NSScrollerIncrementPage)
+		scrl(1, S_PAGE);
+	else if (p == SB_UPLINE)
+		scrl(-1, S_STEP);
+	else if (p == SB_DNLINE)
+		scrl(1, S_STEP);
+}
+
+/* a part held down that does it again (not the knob) */
+static int srepeats()
+{
+	return spart && spart != NSScrollerKnob;
 }
 
 static int mkbm()
@@ -195,6 +268,66 @@ static void resized()
 }
 @end
 
+/* the scroll bar: NSScroller draws it, Archaic works it (no tracking
+ * loop of NSScroller's own) */
+@interface ArchaicScroller : NSScroller
+@end
+
+@implementation ArchaicScroller
+- (BOOL)acceptsFirstMouse:(NSEvent *)ev { return NO; }
+
+- (void)mouseDown:(NSEvent *)ev
+{
+	NSPoint p = [self convertPoint:[ev locationInWindow] fromView:nil];
+	NSRect knob;
+	int part, jump;
+
+	spart = 0;
+	if (![self isEnabled])
+		return;
+	spt = p;
+	part = (int)[self testPart:p];
+	if (part == NSScrollerDecrementPage || part == NSScrollerIncrementPage) {
+		jump = [[NSUserDefaults standardUserDefaults]
+			boolForKey:@"AppleScrollerPagingBehavior"];
+		if ([ev modifierFlags] & NSEventModifierFlagOption)
+			jump = !jump;
+		if (jump) {		/* the knob's middle to the pointer */
+			sgrab = [self rectForPart:NSScrollerKnob].size.height / 2;
+			spart = NSScrollerKnob;
+			sto(knobat(p));
+			return;
+		}
+	}
+	if (part == NSScrollerKnob) {
+		knob = [self rectForPart:NSScrollerKnob];
+		sgrab = [self isFlipped] ? p.y - knob.origin.y : NSMaxY(knob) - p.y;
+	} else if (part == NSScrollerDecrementPage ||
+		part == NSScrollerIncrementPage || part == SB_UPLINE ||
+		part == SB_DNLINE) {
+		sstep(part);
+		srep = [NSDate timeIntervalSinceReferenceDate] + 0.4;
+	} else
+		return;
+	spart = part;
+}
+
+- (void)mouseDragged:(NSEvent *)ev
+{
+	spt = [self convertPoint:[ev locationInWindow] fromView:nil];
+	if (spart == NSScrollerKnob)
+		sto(knobat(spt));
+}
+
+- (void)mouseUp:(NSEvent *)ev
+{
+	[self mouseDragged:ev];
+	spart = 0;
+}
+
+- (void)scrollWheel:(NSEvent *)ev { [view scrollWheel:ev]; }
+@end
+
 @interface ArchaicDelegate : NSObject
 @end
 
@@ -239,6 +372,8 @@ int *w, *h;
 {
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	NSRect r, vis, fr;
+	NSView *box;
+	CGFloat sw = 15;		/* the scroll bar's width */
 	int gw = 800, gh = 600, x = 0, y = 0, f;
 
 	[NSApplication sharedApplication];
@@ -253,7 +388,13 @@ int *w, *h;
 		gw = 200;
 	if (gh < 100)
 		gh = 100;
-	r = NSMakeRect(0, 0, gw, gh);
+#if defined(MAC_OS_X_VERSION_10_7) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7
+	if ([NSScroller respondsToSelector:
+		@selector(scrollerWidthForControlSize:scrollerStyle:)])
+		sw = [NSScroller scrollerWidthForControlSize:NSControlSizeRegular
+			scrollerStyle:NSScrollerStyleLegacy];
+#endif
+	r = NSMakeRect(0, 0, gw + sw, gh);
 	win = [[NSWindow alloc] initWithContentRect:r
 		styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
 			NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
@@ -273,8 +414,21 @@ int *w, *h;
 			f & 8 ? NSMinY(vis) + y + fr.size.height : NSMaxY(vis) - y)];
 	} else
 		[win center];
-	view = [[ArchaicView alloc] initWithFrame:r];
-	[win setContentView:view];
+	/* the page (fb), and the scroll bar at its right */
+	box = [[NSView alloc] initWithFrame:r];
+	view = [[ArchaicView alloc] initWithFrame:NSMakeRect(0, 0, gw, gh)];
+	[view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+	sbar = [[ArchaicScroller alloc] initWithFrame:NSMakeRect(gw, 0, sw, gh)];
+	[sbar setAutoresizingMask:NSViewMinXMargin | NSViewHeightSizable];
+#if defined(MAC_OS_X_VERSION_10_7) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7
+	if ([sbar respondsToSelector:@selector(setScrollerStyle:)])
+		[sbar setScrollerStyle:NSScrollerStyleLegacy];
+#endif
+	[sbar setEnabled:NO];
+	[box addSubview:view];
+	[box addSubview:sbar];
+	[win setContentView:box];
+	[box release];
 	[win setDelegate:del];
 	[win makeFirstResponder:view];
 	rgb = CGColorSpaceCreateDeviceRGB();
@@ -298,8 +452,10 @@ void g_close()
 	[win close];
 	[win release];
 	[view release];
+	[sbar release];
 	win = nil;
 	view = nil;
+	sbar = nil;
 	if (bm)
 		CGContextRelease(bm);
 	bm = 0;
@@ -330,7 +486,7 @@ void g_flush()
 			fbx1 - fbx0, fby1 - fby0)];
 		fb_done();
 	}
-	[view displayIfNeeded];
+	[[win contentView] displayIfNeeded];
 	[CATransaction flush];
 	[pool release];
 }
@@ -340,12 +496,36 @@ int g_fd()
 	return -1;
 }
 
+/* the page is at pos, 0 up to max; vis pixels of it show */
+void g_sbar(pos, max, vis)
+long pos, max, vis;
+{
+	NSAutoreleasePool *pool;
+
+	smax = max;
+	if (!sbar)
+		return;
+	pool = [[NSAutoreleasePool alloc] init];
+	if (max <= 0) {
+		[sbar setEnabled:NO];
+		[sbar setDoubleValue:0];
+		[sbar setKnobProportion:1];
+	} else {
+		[sbar setEnabled:YES];
+		[sbar setDoubleValue:(double)pos / max];
+		[sbar setKnobProportion:(double)vis / (vis + max)];
+	}
+	[pool release];
+}
+
 int g_event(e, wait)
 Event *e;
 int wait;
 {
 	NSAutoreleasePool *pool;
 	NSEvent *ev;
+	NSDate *until;
+	double t, u;
 
 	for (;;) {
 		if (qout != qin) {
@@ -358,14 +538,31 @@ int wait;
 			qout = (qout + 1) % NQ;
 			return 1;
 		}
+		/* a part of the scroll bar held down: again every 1/10 s,
+		 * while the pointer stays on it */
+		t = [NSDate timeIntervalSinceReferenceDate];
+		if (srepeats() && !([NSEvent pressedMouseButtons] & 1))
+			spart = 0;	/* its mouseUp went elsewhere */
+		if (srepeats() && t >= srep) {
+			srep = t + 0.1;
+			if ((int)[sbar testPart:spt] == spart)
+				sstep(spart);
+			continue;
+		}
+		u = !wait ? 0 : wait == 2 ? t + 0.1 : -1;
+		if (srepeats() && (u < 0 || srep < u))
+			u = srep;
 		pool = [[NSAutoreleasePool alloc] init];
-		ev = [NSApp nextEventMatchingMask:NSEventMaskAny
-			untilDate:wait ? [NSDate distantFuture] : [NSDate distantPast]
+		until = u < 0 ? [NSDate distantFuture] : u == 0 ?
+			[NSDate distantPast] :
+			[NSDate dateWithTimeIntervalSinceReferenceDate:u];
+		ev = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:until
 			inMode:NSDefaultRunLoopMode dequeue:YES];
 		if (ev)
 			[NSApp sendEvent:ev];
 		[pool release];
-		if (!ev && qout == qin)
+		if (!ev && qout == qin && !(srepeats() &&
+			[NSDate timeIntervalSinceReferenceDate] >= srep))
 			return 0;
 	}
 }
