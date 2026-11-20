@@ -125,6 +125,8 @@ extern char http_err[];		/* why http_open failed */
 extern long http_len;		/* Content-Length, -1 if none */
 extern long http_got;		/* body bytes read so far */
 extern int http_status;
+extern char http_host[];	/* the server of the last http_open() */
+extern int http_port;
 int http_open P((char *url, char *post));
 int http_getc P((void));
 void http_close P((void));
@@ -145,6 +147,10 @@ extern int stop;		/* set to end the load that is running */
 int ui_poll P((void));		/* handle events while the network waits */
 void img_rows P((Image *im, int y, int n));	/* rows y.. y+n-1 are new */
 void say P((char *s));		/* status line */
+void ui_note P((int phase));	/* http.c: what http_open() does now, */
+#define H_CONNECT 1		/*  connecting to http_host, */
+#define H_WAIT 2		/*  waiting for the answer, */
+#define H_BODY 3		/*  the headers have come; 0: no load */
 
 /* events from the display */
 #define E_NONE 0

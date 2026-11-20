@@ -4,7 +4,9 @@
  * request, reads the headers and follows redirects. Then http_getc()
  * gives the body one byte at a time. While the network has nothing,
  * http_getc() lets the user interface run (ui_poll), so the window can
- * be redrawn and a load can be stopped.
+ * be redrawn and a load can be stopped. ui_note() tells the user
+ * interface what http_open() is doing: connecting, waiting for the
+ * answer, the body.
  */
 #include "archaic.h"
 #ifdef unixpc
@@ -28,9 +30,9 @@ static long rin, rout;		/* bytes put in, taken out */
 static char req[2 * MAXURL + 300];
 static char line[MAXURL + 40];
 static char loc[MAXURL];
-static char host[128];
+char http_host[128];		/* the server of the last http_open() */
+int http_port;
 static char path[MAXURL];
-static int port;
 
 long now()
 {
@@ -109,14 +111,14 @@ char *url;
 		return -1;
 	p += 7;
 	for (i = 0; *p && *p != '/' && *p != ':' && *p != '?' && *p != '#'; ++p)
-		if (i < (int)sizeof host - 1)
-			host[i++] = *p;
-	host[i] = 0;
-	port = 80;
+		if (i < (int)sizeof http_host - 1)
+			http_host[i++] = *p;
+	http_host[i] = 0;
+	http_port = 80;
 	if (*p == ':') {
-		port = 0;
+		http_port = 0;
 		for (++p; *p >= '0' && *p <= '9'; ++p)
-			port = port * 10 + *p - '0';
+			http_port = http_port * 10 + *p - '0';
 	}
 	if (*p == '/')
 		scopy(path, p, MAXURL);
@@ -127,7 +129,7 @@ char *url;
 	for (i = 0; path[i]; ++i)
 		if (path[i] == '#')
 			path[i] = 0;
-	return host[0] && port > 0 ? 0 : -1;
+	return http_host[0] && http_port > 0 ? 0 : -1;
 }
 
 /* ref (maybe relative) seen on page base, as a full URL in out */
@@ -328,15 +330,18 @@ char *url, *post;
 			sprintf(http_err, "can't use this URL (only http://)");
 			return -1;
 		}
-		conn = n_open(host, port, http_err);
-		if (conn < 0)
+		ui_note(H_CONNECT);
+		conn = n_open(http_host, http_port, http_err);
+		if (conn < 0) {
+			ui_note(0);
 			return -1;
+		}
 		rin = rout = 0;
 		beof = 0;
-		if (port == 80)
-			sprintf(line, "%s", host);
+		if (http_port == 80)
+			sprintf(line, "%s", http_host);
 		else
-			sprintf(line, "%s:%d", host, port);
+			sprintf(line, "%s:%d", http_host, http_port);
 		if (post)
 			sprintf(req, "POST %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: text/html, image/gif\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s",
 				path, line, VERSION, slen(post), post);
@@ -344,14 +349,15 @@ char *url, *post;
 			sprintf(req, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: text/html, image/gif\r\n\r\n",
 				path, line, VERSION);
 		if (n_write(conn, req, slen(req)) < 0) {
-			sprintf(http_err, "can't send to %s", host);
+			sprintf(http_err, "can't send to %s", http_host);
 			http_close();
 			return -1;
 		}
+		ui_note(H_WAIT);
 		/* HTTP/1.0 200 OK */
 		if (hline() < 0) {
 			if (!http_err[0])
-				sprintf(http_err, "no answer from %s", host);
+				sprintf(http_err, "no answer from %s", http_host);
 			http_close();
 			return -1;
 		}
@@ -393,6 +399,7 @@ char *url, *post;
 				post = 0;
 			continue;
 		}
+		ui_note(H_BODY);
 		return 0;
 	}
 }
@@ -412,7 +419,9 @@ int http_getc()
 
 void http_close()
 {
-	if (conn >= 0)
+	if (conn >= 0) {
 		n_close(conn);
+		ui_note(0);
+	}
 	conn = -1;
 }

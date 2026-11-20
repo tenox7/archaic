@@ -116,6 +116,13 @@ static int popup = -1;		/* menu with its list open */
 static int pressed = -1;	/* button shown pressed */
 static int px, py, pw, ph, prow;	/* the open list */
 static char sline[200];		/* status line */
+static long pgot, plen;		/* its progress bar: pgot of plen bytes, 0 none */
+static int pdone;		/* the bar's black part, as drawn */
+static char what[60];		/* what is coming: "Page", "Picture 1 of 2" ... */
+static int phase;		/* what http_open() does with it (H_), 0 none */
+static long tphase, tshown;	/* when the phase began; the second shown */
+static long lbytes;		/* the bytes of this page so far */
+static char nb[24];
 static char msg[200];
 static int loading, quit, pending, pendpost, headless, verbose, allset;
 static int wrpf[MAXFORM];	/* the form is WRP's */
@@ -199,25 +206,70 @@ int x, y, w, h;
 	fill(x + w - 1, y, 1, h, 1);
 }
 
+/* the progress bar at the right of the status line: its width */
+static int pbarw()
+{
+	return winw / 5 < 100 ? winw / 5 : 100;
+}
+
+/* its black part, for an inside w wide */
+static int pblack(w)
+int w;
+{
+	long a = pgot, b = plen;
+
+	if (b <= 0 || a <= 0)
+		return 0;
+	if (a > b)
+		a = b;
+	while (b > 100000L) {	/* a * w must fit in a long */
+		a >>= 4;
+		b >>= 4;
+	}
+	return (int)(a * w / b);
+}
+
+/* the bar: all of it, or (all 0) only the black part that changed */
+static void drawprog(all)
+int all;
+{
+	int w = pbarw(), x = winw - M - w, y = viewh + 3, h = fh - 2, b;
+
+	if (all) {
+		g_fill(x, y, w, h, 1);
+		g_fill(x + 1, y + 1, w - 2, h - 2, 0);
+		pdone = 0;
+	}
+	b = pblack(w - 4);
+	if (b > pdone)
+		g_fill(x + 2 + pdone, y + 2, b - pdone, h - 4, 1);
+	else if (b < pdone)
+		g_fill(x + 2 + b, y + 2, pdone - b, h - 4, 0);
+	pdone = b;
+}
+
 static void drawstatus()
 {
-	int n;
+	int n, w = winw - 2 * M;
 
 	if (headless)
 		return;
 	g_fill(0, viewh, winw, winh - viewh, 0);
 	g_fill(0, viewh, winw, 1, 1);
+	if (plen > 0) {
+		drawprog(1);
+		w -= pbarw() + M;
+	}
 	n = len(sline);
-	while (n > 0 && tw(sline, n) > winw - 2 * M)
+	while (n > 0 && tw(sline, n) > w)
 		--n;
 	if (n > 0)
 		g_text(M, viewh + 2, sline, n, 0);
 }
 
-void say(s)
-char *s;
+/* the status line to the screen, and with -v to the log */
+static void showstatus()
 {
-	scopy(sline, s, (int)sizeof sline);
 	if (headless) {
 		if (verbose)
 			printf("status: %s\n", sline);
@@ -227,6 +279,97 @@ char *s;
 		fprintf(stderr, "archaic: %s\n", sline);
 	drawstatus();
 	g_flush();
+}
+
+void say(s)
+char *s;
+{
+	plen = 0;
+	scopy(sline, s, (int)sizeof sline);
+	showstatus();
+}
+
+static int same(a, b)
+char *a, *b;
+{
+	while (*a && *a == *b) {
+		++a;
+		++b;
+	}
+	return *a == *b;
+}
+
+/* status s with the progress bar at got of n bytes (n <= 0: no bar).
+ * Only what changed is drawn again. */
+static void sayp(s, got, n)
+char *s;
+long got, n;
+{
+	if (n < 0)
+		n = 0;
+	if (same(s, sline) && (n > 0) == (plen > 0)) {
+		pgot = got;
+		plen = n;
+		if (n > 0 && !headless && pblack(pbarw() - 4) != pdone) {
+			drawprog(0);
+			g_flush();
+		}
+		return;
+	}
+	pgot = got;
+	plen = n;
+	scopy(sline, s, (int)sizeof sline);
+	showstatus();
+}
+
+/* n bytes, for the status line */
+static char *bytes(n)
+long n;
+{
+	if (n < 1024)
+		sprintf(nb, "%ld bytes", n);
+	else
+		sprintf(nb, "%ld KB", (n + 512) / 1024);
+	return nb;
+}
+
+/* what is coming, and how much of it has come */
+static void progress()
+{
+	long g = http_got, n = http_len;
+
+	if (!what[0])
+		return;
+	if (n > 0 && n < 1024)
+		sprintf(msg, "%.50s: %ld of %ld bytes", what, g, n);
+	else if (n > 0)
+		sprintf(msg, "%.50s: %ld of %ld KB", what, (g + 512) / 1024,
+			(n + 512) / 1024);
+	else
+		sprintf(msg, "%.50s: %s", what, bytes(g));
+	sayp(msg, g, n);
+}
+
+/* http.c: what http_open() does now (H_CONNECT, H_WAIT, H_BODY; 0 at
+ * the end). ui_poll() counts the seconds of the wait. */
+void ui_note(p)
+int p;
+{
+	phase = p;
+	tphase = now();
+	tshown = 0;
+	if (!p || !what[0])
+		return;
+	if (p == H_CONNECT)
+		sprintf(msg, "%.50s: connecting to %.60s port %d", what,
+			http_host, http_port);
+	else if (p == H_WAIT)
+		sprintf(msg, "%.50s: waiting for %.60s", what, http_host);
+	else {
+		progress();
+		return;
+	}
+	say(msg);
 }
 
 static void drawfield(i)
@@ -1392,7 +1535,17 @@ Event *e;
 int ui_poll()
 {
 	static Event e;
+	long t;
 
+	if (phase == H_WAIT && what[0]) {	/* WRP makes the page */
+		t = now() - tphase;
+		if (t != tshown) {
+			tshown = t;
+			sprintf(msg, "%.50s: waiting for %.60s, %ld s", what,
+				http_host, t);
+			say(msg);
+		}
+	}
 	if (!headless)
 		while (!stop && g_event(&e, 0))
 			event(&e);
@@ -1409,6 +1562,7 @@ int y, n;
 	long p;
 
 	http_pump();
+	progress();
 	if (headless)
 		return;
 	for (i = 0; i < nitems; ++i) {
@@ -1432,15 +1586,7 @@ int y, n;
 				drawpop();
 		}
 	}
-	if (quiet) {
-		g_flush();
-		return;
-	}
-	if (http_len > 0)
-		sprintf(msg, "Picture %ld of %ld bytes", http_got, http_len);
-	else
-		sprintf(msg, "Picture %ld bytes", http_got);
-	say(msg);
+	g_flush();
 }
 
 static void freeimgs()
@@ -1469,15 +1615,18 @@ static void freeslices()
 	}
 }
 
-static void loadimg(i)
-int i;
+/* picture k of the n on the page: item i */
+static void loadimg(i, k, n)
+int i, k, n;
 {
 	Item *it = &items[i];
 	Image *im = &imgs[it->img];
 
 	url_join(base, it->text, u);
-	sprintf(msg, "Picture %.150s", u);
-	say(msg);
+	if (n > 1)
+		sprintf(what, "Picture %d of %d", k, n);
+	else
+		scopy(what, "Picture", (int)sizeof what);
 	if (http_open(u, (char *)0) < 0) {
 		say(http_err);
 		return;
@@ -1492,6 +1641,7 @@ int i;
 		sprintf(msg, "Picture: can't show %s", http_type[0] ? http_type : "it");
 		say(msg);
 	}
+	lbytes += http_got;
 	http_close();
 	if (im->w > 0 && (im->w != it->w || im->h != it->h)) {
 		layout();
@@ -1551,6 +1701,7 @@ long a, b;
 {
 	Slice *s = &slices[i];
 	int n, c, ok = 0;
+	long k, m;
 
 	if (s->im.bits)
 		free((char *)s->im.bits);
@@ -1558,6 +1709,10 @@ long a, b;
 	s->im.w = s->im.h = 0;
 	s->y0 = a;
 	s->state = 1;
+	k = sk(a) - sk(0L) + 1;
+	m = sk((long)items[tall].ih - 1) - sk(0L) + 1;
+	sprintf(what, quiet ? "Picture part %ld of %ld (ahead)" :
+		"Picture part %ld of %ld", k, m);
 	url_join(base, items[tall].text, surl);
 	for (n = 0; surl[n] && surl[n] != '?'; ++n)
 		;
@@ -1580,16 +1735,17 @@ long a, b;
 					say("Picture: can't show the slice");
 			} else if (s->im.h != b - a)	/* the server ignored y and h */
 				say("Picture: WRP did not send the rows asked for");
-			else
+			else {
 				ok = 1;
+				lbytes += http_got;
+			}
 			http_close();
 		}
 	}
 	loading = 0;
 	if (ok && !stop) {
 		s->state = 2;
-		if (!quiet)
-			say(ssave);
+		say(ssave);
 		return;
 	}
 	if (s->im.bits)
@@ -1697,7 +1853,7 @@ char *url, *post;
 {
 	Item *it;
 	static char fname[40];
-	int i, n, c;
+	int i, n, c, k, nk;
 
 	scopy(lurl, url, MAXURL);
 	if (post)
@@ -1705,8 +1861,8 @@ char *url, *post;
 	loading = 1;
 	stop = 0;
 	t0 = now();
-	sprintf(msg, "Loading %.150s", lurl);
-	say(msg);
+	lbytes = 0;
+	scopy(what, "Page", (int)sizeof what);
 	if (http_open(lurl, post ? lbody : (char *)0) < 0) {
 		say(http_err);
 		goto out;
@@ -1726,11 +1882,11 @@ char *url, *post;
 		while ((c = http_getc()) >= 0) {
 			if (n < MAXPAGE)
 				page[n++] = c;
-			if ((http_got & 1023) == 0) {
-				sprintf(msg, "Page %ld bytes", http_got);
-				say(msg);
-			}
+			if ((http_got & 255) == 0)
+				progress();
 		}
+		progress();
+		lbytes += http_got;
 		http_close();
 		if (stop) {
 			if (!pending)
@@ -1777,9 +1933,12 @@ char *url, *post;
 		}
 	}
 	redraw(0, 0, winw, winh);
-	for (i = 0; i < nitems && !stop; ++i)
+	for (i = nk = 0; i < nitems; ++i)
 		if (items[i].type == I_IMAGE && items[i].img >= 0 && i != tall)
-			loadimg(i);
+			++nk;
+	for (i = k = 0; i < nitems && !stop; ++i)
+		if (items[i].type == I_IMAGE && items[i].img >= 0 && i != tall)
+			loadimg(i, ++k, nk);
 	while (!stop && slicework(0))	/* the frame of the tall picture */
 		;
 	if (stop) {
@@ -1787,7 +1946,7 @@ char *url, *post;
 			say("Stopped");
 		goto out;
 	}
-	sprintf(msg, "%ld s  %.150s", now() - t0, base);
+	sprintf(msg, "%ld s, %s  %.150s", now() - t0, bytes(lbytes), base);
 	say(msg);
 out:
 	loading = 0;

@@ -171,7 +171,22 @@ A trackpad scrolls smoothly, by pixels. Ctrl+click is the right button.
 Cmd-Q and the window's close button quit.
 Cocoa has the Mac's own scroll bar; SDL has Archaic's (see Scrolling).
 
-The help line at the bottom of the screen lists the main keys.
+On the 3B1, the help line at the bottom of the screen lists the main keys.
+
+**The status line** at the bottom of the window says what Archaic does, as it does it:
+
+| Status line | Means |
+|---|---|
+| `Page: connecting to 127.0.0.1 port 8080` | Archaic connects to WRP |
+| `Page: waiting for 127.0.0.1, 3 s` | the request went out, and WRP makes the page. The seconds count up |
+| `Page: 2 KB` | the page comes |
+| `Picture 1 of 2: 12 of 31 KB` | a picture comes. The bar at the right shows how much has come |
+| `Picture part 3 of 9: 4 of 7 KB` | a part (a slice) of the page's picture comes, for the frame |
+| `Picture part 4 of 9 (ahead): 2 of 7 KB` | the next part comes, before you scroll to it |
+| `2 s, 45 KB  http://...` | the page is done: the time it took, and how much came |
+
+The bar shows when the server sends the size (WRP does for its pictures).
+With `-v`, each status line also goes to standard error (`status:` lines to standard output with `-t`).
 
 **Scrolling: the whole page in slices**
 

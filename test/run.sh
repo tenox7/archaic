@@ -13,13 +13,16 @@ fail=0
 here=$(cd "$(dirname "$0")" && pwd)
 
 # The web server for the tests: python's, and GIFs cut into slices for
-# ?y=Y&h=H, as WRP does for the tall picture (with ImageMagick).
+# ?y=Y&h=H, as WRP does for the tall picture (with ImageMagick). ?wait=S:
+# the answer comes after S seconds, as when WRP makes a page.
 cat >"$tmp/srv.py" <<'EOF'
-import functools, http.server, subprocess, sys, urllib.parse
+import functools, http.server, subprocess, sys, time, urllib.parse
 class H(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlsplit(self.path)
         q = urllib.parse.parse_qs(u.query)
+        if 'wait' in q:
+            time.sleep(float(q['wait'][0]))
         if u.path.endswith('.gif') and 'y' in q and 'h' in q:
             crop = 'x%d+0+%d' % (int(q['h'][0]), int(q['y'][0]))
             b = subprocess.run(['magick', self.translate_path(u.path), '-crop',
@@ -339,6 +342,34 @@ EOF
 	else
 		bad "scroll bar: a click on it went to the page"
 	fi
+
+	# 10. The status line says what is coming, as it comes: connecting,
+	#     waiting for the answer (the seconds count), the page, each part
+	#     of the tall picture in KB of its size, and at the end the time
+	#     and the bytes. The server waits 2 s, as WRP while it makes a page.
+	"$bin" -t -v "http://127.0.0.1:$port/tall.html?wait=2" >"$tmp/st.out" 2>&1
+	sz=$(wc -c <"$here/data/tall.html" | tr -d ' ')
+	parts=$(((1500 + fh - 1) / fh))
+	n=0
+	for w in "Page: connecting to 127.0.0.1 port $port" \
+		"Page: waiting for 127.0.0.1" "Page: waiting for 127.0.0.1, 1 s" \
+		"Page: $sz of $sz bytes" "Picture part 1 of $parts: 0 of [0-9]+ KB" \
+		"[0-9]+ s, [0-9]+ KB  http://127.0.0.1:$port/tall.html[?]wait=2"; do
+		if grep -q -E "^status: $w\$" "$tmp/st.out"; then
+			n=$((n + 1))
+		else
+			bad "status line: no \"$w\""
+		fi
+	done
+	# the last line of the part: all of it
+	if grep "^status: Picture part 1 of $parts: " "$tmp/st.out" | tail -1 |
+		awk '{ if ($7 == $9 && $7 > 0) ok = 1 } END { exit !ok }'; then
+		n=$((n + 1))
+	else
+		bad "status line: the part does not end at its size:"
+		grep "^status: Picture part" "$tmp/st.out" | tail -2
+	fi
+	[ $n = 7 ] && ok "status line: connecting, waiting 2 s (counted), the page in bytes, a part in KB to its end, time and size"
 	rm -f "$here/data/tall.html" "$here/data/tall.gif"
 else
 	echo "skip  tall: no $hl"

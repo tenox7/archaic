@@ -12,7 +12,7 @@ n=0
 while [ "$n" -lt 120 ]; do
 	sleep 0.5
 	n=$((n + 1))
-	[ "$(grep -c ' s  http' "$log")" -ge "$loads" ] && break
+	[ "$(grep -c -E ' s, [0-9]+ (KB|bytes)  http' "$log")" -ge "$loads" ] && break
 	kill -0 "$pid" 2>/dev/null || break
 done
 sleep 0.5
