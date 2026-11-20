@@ -679,6 +679,106 @@ On DOS or Win16, use the large memory model, or make these smaller in `archaic.h
 
 ---
 
+## Roadmap: poor systems with no web browser
+
+Old systems that never had a web browser: the next ports.
+Each port is a display file, plus a network file if the system has no BSD sockets (see Porting).
+
+| Target | What it is | Systems |
+|---|---|---|
+| MGR | a window system on a terminal line | SunOS, Coherent, Xenix, Minix, OS-9, VSTa |
+| Blit, DMD 5620 | a graphics terminal on a serial line | Research Unix, System V (AT&T 3B2) |
+| QNX Windows | QNX's window system before Photon | QNX 2 |
+| SunWindows, SunView | Sun's window system before X11 | SunOS 1 to 4, on Sun-1 to Sun-4 |
+| VWS, EWS | DEC's window systems before X11 | VAX/VMS (VWS), VAXELN (EWS) |
+| NeWS, Display PostScript | PostScript displays | SunOS, SGI, OS/2, VMS, NeXTSTEP, AIX ... |
+
+### MGR
+
+[MGR](https://en.wikipedia.org/wiki/ManaGeR) (ManaGeR) is a window system by Stephen Uhler
+at Bellcore, from 1984. It started on Sun workstations.
+A program in an MGR window writes escape sequences to its terminal:
+text, lines, bitmaps, fonts, menus. Events, like a mouse click, come back as text.
+
+- Plan: one display file, for all the systems with MGR.
+- MGR works on any terminal line, also telnet or a modem. So Archaic can run
+  on another computer (one with a network), and show in an MGR window.
+- Source: MGR 0.69, at [hack.org/mc/mgr](https://hack.org/mc/mgr/).
+
+| System | MGR there |
+|---|---|
+| SunOS (Sun-3, Sun-4) | the first system. Network: BSD sockets, as `nsock.c` |
+| Coherent (PC) | MGR 0.69, Harry Pulley's port |
+| Xenix | an older MGR |
+| Minix (386) | an older MGR |
+| OS-9, VSTa | MGR ran there too |
+
+To find: TCP/IP on Coherent, Xenix, Minix, OS-9 and VSTa.
+
+### Blit and DMD 5620
+
+The [Blit](https://en.wikipedia.org/wiki/Blit_(computer_terminal)) is a graphics terminal
+by Rob Pike and Bart Locanthi at Bell Labs, 1982.
+AT&T and Teletype sold it as the **DMD 5620** (1984): a WE 32100 CPU, 800 x 1024 pixels, 1 bit, green.
+It connects to a Unix host on a serial line, and the host loads programs into it.
+Its window system is mpx or mux (Research Unix), or layers (System V Release 3).
+
+- Plan: Archaic in two parts. On the host: the network, HTML and GIF, as now.
+  In the terminal: a small program that shows the pictures and reads the mouse.
+- Emulators: the Blit in 9front, with mux on Research Unix v8 (SIMH).
+  For the DMD 5620: [Seth Morabito's emulator](https://loomcom.com/3b2/dmd5620_emulator.html),
+  made for the AT&T 3B2/400 in SIMH. It also works with mux on Research Unix V8, V9 and V10 (firmware 8;7;3).
+
+### QNX 2 with QNX Windows
+
+QNX 2 (Quantum Software Systems, 1987) is a small real-time system for the PC (8088, 286).
+QNX Windows is its window system, before Photon.
+[QNX Windows, first look](https://virtuallyfun.com/2013/03/22/the-shape-of-things-to-come/)
+(virtuallyfun, 2013): QNX 2.2 in QEMU, 800 x 600 (`-vga cirrus`, `qw.vga_bios video7,1`).
+The mouse did not work in QEMU.
+
+- Plan: a display file for QNX Windows.
+- QNX 2 is 16-bit: see the memory note in Porting.
+- To find: the QNX Windows library, and TCP/IP for QNX 2.
+
+### SunWindows and SunView: Sun-1 to Sun-4
+
+Sun's window system before X11. **SunWindows** came with SunOS 1.0 (1983), on the Sun-1 and Sun-2.
+**[SunView](https://en.wikipedia.org/wiki/SunView)**, its toolkit, came with SunOS 3.0,
+and stayed up to SunOS 4.1: Sun-2, Sun-3, Sun-4.
+OpenWindows (X11) took its place, and still showed SunView programs.
+
+- Plan: a display file for SunView (pixrect and pixwin).
+- Network: BSD sockets, as `nsock.c`.
+
+### VAX before X11: VWS and EWS
+
+DEC's window systems before DECwindows (X11):
+**VWS** (VAX Workstation Software) on VMS, with its library **UIS**,
+and **EWS** on VAXELN, DEC's real-time system.
+
+- Computers: VAXstation I and II (QVSS, black and white), II/GPX (QDSS, color), 2000, 3100.
+- Emulator: SIMH. `microvax2` with `SET CPU MODEL=VAXstation` is a VAXstation II.
+  [MicroVMS 4.7 and VWS 3.3 work there](https://gunkies.org/wiki/Installing_MicroVMS_V4.7_and_VAX_Workstation_Software_V3.3_on_SIMH).
+- Plan: a display file for UIS.
+- Network on VMS: TCP/IP from Wollongong (`ntwg.c` is for their 3B1 TCP/IP), CMU-Tek,
+  TGV (MultiNet) or DEC (UCX).
+
+### PostScript displays: NeWS and Display PostScript
+
+A program sends PostScript to the display, and the display draws it.
+So one display file can work on many systems:
+the picture as a PostScript `image`, the text with `show`.
+
+- [NeWS](https://en.wikipedia.org/wiki/NeWS) (Sun, 1986, James Gosling and David Rosenthal): SunOS.
+  Ports: SGI's 4Sight, NeWS/2 (OS/2), MacNeWS, TGV's X11/NeWS (VMS on a VAXstation 2000),
+  the Amiga 2000, Apollo and others. Sun's OpenWindows 3.3 (1993) dropped it.
+- [Display PostScript](https://en.wikipedia.org/wiki/Display_PostScript) (Adobe and NeXT, 1987):
+  NeXTSTEP, DEC's DECwindows, IBM and SGI workstations, Sun's OpenWindows 3.3.
+  On most of them, it works in X11.
+
+---
+
 ## Known limits
 
 - One page at a time. No history of its own: use WRP's back button (← arrow).
