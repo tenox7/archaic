@@ -32,6 +32,14 @@
  * clear button (x) at its right end. While Archaic loads what the user
  * asked for, a spinner turns at the left end of the status line.
  *
+ * WRP's errors: WRP answers with a page that has its form. An answer
+ * from it with no form is an error, like "Unable to find map" (WRP made
+ * a new picture since, and forgot the map of the old one). WRP's page
+ * then stays, with the error on the status line, so its buttons (back)
+ * still work. After a click on an old picture, Archaic gets WRP's new
+ * one at once (St). While WRP's next page comes, a click on the old
+ * picture does nothing: its map is about to go.
+ *
  * WRP's form: Archaic sets WRP's settings itself and does not show them.
  * W and H: the picture fills the window. M, T: ISMAP, GIF (with -a, the
  * menus for M, T and C are shown and used). C, the colors: on a display
@@ -151,6 +159,9 @@ static int copt;		/* -c's colors, or 0 */
 static int cmenu;		/* WRP's C menu is shown */
 static int idepth = 1;		/* the pictures' pixels: 1 or 8 bits */
 static int wrpf[MAXFORM];	/* the form is WRP's */
+static int oldpic;		/* WRP's next page comes: the picture shown is old */
+static int pclick;		/* the pending load is a click on WRP's picture */
+static char *note;		/* the next load's last status line, or 0 */
 static char num[16];
 static char pendurl[MAXURL], pendbody[MAXURL];
 static char lurl[MAXURL], lbody[MAXURL];
@@ -1299,6 +1310,7 @@ static void go(url, post)
 char *url, *post;
 {
 	url_join(base, url, pendurl);
+	pclick = 0;
 	pendpost = post != 0;
 	if (post)
 		scopy(pendbody, post, MAXURL);
@@ -1619,7 +1631,9 @@ int k;
 		return;
 	}
 	if (focus < 0) {
-		if (k == ' ' || k == 'F' - 64)
+		if ((k == '\r' || k == '\n') && nitems == 0)
+			go(lurl, (char *)0);	/* no page yet: try again */
+		else if (k == ' ' || k == 'F' - 64)
 			scroll(pagestep());
 		else if (k == 'b' || k == 'B' - 64)
 			scroll(-pagestep());
@@ -1644,24 +1658,43 @@ int k;
 	drawone(focus);
 }
 
-/* a new choice in WRP's C menu: send the form now, with St (stop), so
- * that WRP takes the picture again in those colors */
-static void newcol(it)
-Item *it;
+/* WRP's form on this page, or -1 */
+static int wrpform()
+{
+	int f;
+
+	for (f = 0; f < nforms && f < MAXFORM; ++f)
+		if (wrpf[f])
+			return f;
+	return -1;
+}
+
+/* WRP's St (stop) button in form f, or -1. WRP takes a new picture of
+ * the page as it is for St, and does not load the page again. */
+static int stbutton(f)
+int f;
 {
 	Item *b;
 	int i;
 
+	for (i = 0; i < nitems; ++i) {
+		b = &items[i];
+		if (b->type == I_BUTTON && b->form == f && b->name &&
+			strieq(b->name, "Fn") && b->text && strieq(b->text, "St"))
+			return i;
+	}
+	return -1;
+}
+
+/* a new choice in WRP's C menu: send the form now, with St, so that WRP
+ * takes the picture again in those colors */
+static void newcol(it)
+Item *it;
+{
 	ncol = atoin(opts[it->opt + it->sel].val);
 	if (ncol < 2 || ncol > 256)
 		ncol = ncol < 2 ? 2 : 256;
-	for (i = 0; i < nitems; ++i) {
-		b = &items[i];
-		if (b->type == I_BUTTON && b->form == it->form && b->name &&
-			strieq(b->name, "Fn") && b->text && strieq(b->text, "St"))
-			break;
-	}
-	submit(it->form, i < nitems ? i : -1);
+	submit(it->form, stbutton(it->form));
 }
 
 static void click(x, y, b)
@@ -1720,9 +1753,12 @@ int x, y, b;
 		if (!it->href)
 			break;
 		if (it->ismap) {	/* the tall picture: rows of the whole page */
+			if (oldpic)
+				break;	/* WRP's next page comes: this map goes */
 			sprintf(u, "%.1500s?%d,%ld", it->href, x - it->x,
 				y + top - it->y + (i == tall ? oy : 0L));
 			go(u, (char *)0);
+			pclick = 1;
 		} else
 			go(it->href, (char *)0);
 		break;
@@ -2098,9 +2134,8 @@ static void findtall()
 	int f, i;
 
 	tall = -1;
-	for (f = 0; f < nforms && f < MAXFORM && !wrpf[f]; ++f)
-		;
-	if (f >= nforms || f >= MAXFORM)
+	f = wrpform();
+	if (f < 0)
 		return;
 	for (i = 0; i < nitems; ++i) {
 		it = &items[i];
@@ -2112,27 +2147,86 @@ static void findtall()
 	}
 }
 
+/* Has the page (n bytes at p) a form? */
+static int hasform(p, n)
+char *p;
+int n;
+{
+	int i;
+
+	for (i = 0; i + 5 <= n; ++i)
+		if (p[i] == '<' && strnieq(p + i, "<form", 5))
+			return 1;
+	return 0;
+}
+
+/* the first line of the page that has text, less its tags: the status
+ * line for an error from WRP */
+static void errline(p, n)
+char *p;
+int n;
+{
+	int i, c, k, tag = 0;
+
+	scopy(msg, "WRP: ", (int)sizeof msg);
+	k = len(msg);
+	for (i = 0; i < n && k < 130; ++i) {
+		c = p[i] & 0377;
+		if (c == '<')
+			tag = 1;
+		else if (tag) {
+			if (c == '>')
+				tag = 0;
+		} else if (c == '\n' || c == '\r') {
+			if (k > 5)
+				break;
+		} else if (c == ' ' || c == '\t') {
+			if (k > 5 && msg[k - 1] != ' ')
+				msg[k++] = ' ';
+		} else if (c > ' ' && c < 0177)
+			msg[k++] = c;
+	}
+	while (k > 5 && msg[k - 1] == ' ')
+		--k;
+	msg[k] = 0;
+	if (k == 5)
+		scopy(msg + 5, "an answer with no page", (int)sizeof msg - 5);
+}
+
 static void load(url, post)
 char *url, *post;
 {
 	Item *it;
 	static char fname[40];
-	int i, n, c, k, nk;
+	int i, n, c, k, nk, fromwrp = wrpform() >= 0, byclick = pclick;
+	char *done = note;	/* the last status line, if not the usual one */
 
+	pclick = 0;
+	note = 0;
 	scopy(lurl, url, MAXURL);
 	if (post)
 		scopy(lbody, post, MAXURL);
 	loading = 1;
+	oldpic = fromwrp;
 	spinto(1);
 	stop = 0;
 	t0 = now();
 	lbytes = 0;
 	scopy(what, "Page", (int)sizeof what);
 	if (http_open(lurl, post ? lbody : (char *)0) < 0) {
-		say(http_err);
+		if (nitems == 0) {	/* no page: nothing to click */
+			sprintf(msg, "%.150s. Return: try again", http_err);
+			say(msg);
+		} else
+			say(http_err);
 		goto out;
 	}
-	if (strnieq(http_type, "image/", 6)) {
+	if (strnieq(http_type, "image/", 6) && fromwrp) {
+		sprintf(msg, "Not shown: a picture (%.60s)", http_type);
+		say(msg);		/* WRP's page stays */
+		http_close();
+		goto out;
+	} else if (strnieq(http_type, "image/", 6)) {
 		/* a picture alone: a page with just that picture */
 		http_close();
 		sprintf(page, "<TITLE>%.150s</TITLE><IMG SRC=\"%.1500s\">", http_url, http_url);
@@ -2159,6 +2253,17 @@ char *url, *post;
 			goto out;
 		}
 		page[n] = 0;
+		/* WRP's error: its page stays. After a click on an old
+		 * picture, WRP's new picture comes (St). */
+		if (fromwrp && !hasform(page, n)) {
+			errline(page, n);
+			say(msg);
+			if (byclick && wrpform() >= 0) {
+				submit(wrpform(), stbutton(wrpform()));
+				note = "The picture was old: here is WRP's new one. Click again.";
+			}
+			goto out;
+		}
 	}
 	/* the new page */
 	fname[0] = 0;
@@ -2173,6 +2278,7 @@ char *url, *post;
 	freeslices();
 	if (html_parse(page, n) < 0)
 		say("The page is too big: only its start is shown");
+	oldpic = 0;
 	for (i = 0; i < nitems; ++i)
 		if (items[i].type == I_IMAGE && nimgs < MAXIMG)
 			items[i].img = nimgs++;
@@ -2211,10 +2317,15 @@ char *url, *post;
 			say("Stopped");
 		goto out;
 	}
-	sprintf(msg, "%ld s, %s  %.150s", now() - t0, bytes(lbytes), base);
-	say(msg);
+	if (done)
+		say(done);
+	else {
+		sprintf(msg, "%ld s, %s  %.150s", now() - t0, bytes(lbytes), base);
+		say(msg);
+	}
 out:
 	loading = 0;
+	oldpic = 0;
 	spinto(0);
 	if (pressed >= 0) {
 		i = pressed;

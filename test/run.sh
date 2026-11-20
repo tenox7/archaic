@@ -246,6 +246,47 @@ else
 	grep -E 'GET /wrp\?url=[a-z]*qq' "$tmp/http.log"
 fi
 
+# 5b. WRP's errors: from WRP's page, an answer with no form (like WRP's
+# "Unable to find map" after a click on an old picture) keeps WRP's page,
+# puts the error on the status line, and gets WRP's new picture at once
+# (St). With no page at all (no server), Return tries again.
+cat >"$here/data/wrp2.html" <<'EOF'
+<HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
+<FORM ACTION="/wrp2.html" METHOD="GET">
+<INPUT TYPE="TEXT" NAME="url" VALUE="http://x.org/" SIZE="20">
+<INPUT TYPE="SUBMIT" VALUE="Go">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Bk">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="St">
+W <INPUT TYPE="TEXT" NAME="w" VALUE="1152" SIZE="4">
+</FORM>
+<A HREF="/err.txt"><IMG SRC="/hn2.gif" ISMAP></A>
+</BODY></HTML>
+EOF
+printf 'Unable to find map /map/old.map\n' >"$here/data/err.txt"
+"$bin" -t "http://127.0.0.1:$port/wrp2.html" >"$tmp/e0.out" 2>&1
+ix=$(awk '$2 == "image" { print $3 + 5; exit }' "$tmp/e0.out")
+iy=$(awk '$2 == "image" { print $4 + 7; exit }' "$tmp/e0.out")
+"$bin" -t -v -s "@$ix,$iy;" "http://127.0.0.1:$port/wrp2.html" >"$tmp/e.out" 2>&1
+"$bin" -t -v -s "~" "http://127.0.0.1:1/" >"$tmp/e1.out" 2>&1
+rm -f "$here/data/wrp2.html" "$here/data/err.txt"
+if grep -q '^status: WRP: Unable to find map /map/old.map$' "$tmp/e.out" &&
+	[ "$(grep -c 'field .* url =' "$tmp/e.out")" = 3 ] &&
+	grep -Eq 'GET /err\.txt\?5,7 ' "$tmp/http.log" &&
+	grep -Eq 'GET /wrp2\.html\?url=http%3A%2F%2Fx\.org%2F&Fn=St&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log" &&
+	grep -q "^status: The picture was old: here is WRP's new one. Click again.$" "$tmp/e.out"; then
+	ok "wrp error: WRP's page stays, the error on the status line, then WRP's new picture (St)"
+else
+	bad "wrp error: wrong:"
+	grep -E '^status|field .* url' "$tmp/e.out"
+	grep -E 'GET /(err|wrp2)' "$tmp/http.log"
+fi
+if [ "$(grep -c "^status: can't connect to 127.0.0.1 port 1. Return: try again$" "$tmp/e1.out")" = 2 ]; then
+	ok "no page: Return tries again"
+else
+	bad "no page: Return did not try again:"
+	grep '^status' "$tmp/e1.out"
+fi
+
 # 6. WRP, when it runs: the start page, then a page with its picture,
 #    as wide as the window (640 - 2 x 4).
 if curl -s -m 3 -o /dev/null "http://$wrp/"; then

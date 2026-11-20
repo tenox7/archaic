@@ -234,6 +234,21 @@ The 3B1 and Idris displays have no clock: there it steps each time the network w
 (1/10 s on the 3B1, up to 1 s on Idris).
 With `-v`, each status line also goes to standard error (`status:` lines to standard output with `-t`).
 
+**When WRP has an error**
+
+WRP answers with a page that has its form. When WRP answers with no form, it is an error:
+Archaic keeps WRP's page and shows the error on the status line, like
+`WRP: Unable to find map /map/....map`. WRP's buttons (← back, ↻ reload) still work.
+
+- "Unable to find map": WRP made a new picture since this one, and forgot the old one's map.
+  Archaic then gets WRP's new picture at once (St, which does not load the page again)
+  and says `The picture was old: here is WRP's new one. Click again.`
+- While WRP makes the next page, a click on the picture does nothing: the picture is old,
+  and its map is about to go. Wait for the spinner to stop, or press Esc (or click St) to stop.
+- A picture or a file from WRP is not shown: the status line says what it was.
+- No page at all (WRP did not answer at the start): the status line says
+  `can't connect to ... Return: try again`. Start WRP, then press Return.
+
 **Scrolling: the whole page in slices**
 
 With a WRP that knows slices (`sl=1`), WRP makes a picture of the whole page once, and keeps it.
@@ -378,6 +393,8 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    the start page request has WRP's settings.
    Text in K, then ↵ or ⌫: the text and the key go as keys (`k=ab%0D`), with no button.
    The address box's clear button empties it.
+   WRP's error (an answer with no form, after a click on the picture): WRP's page stays, the error
+   is on the status line, and St goes at once. With no page (no server), Return tries again.
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
    A color picture on the screen is exactly the GIF's, and the PNG is in colors.
