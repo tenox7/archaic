@@ -1,4 +1,6 @@
 : lka - link Archaic, after sh mk compiled the .c files
+: -b0x30000 gives the program 192 KB for its heap and stack. With the
+: default, malloc gets about 26 KB: too little for the slices of a page.
 echo linking archaic
-/etc/bin/link -o archaic -max 0xffffffff +text -b0 -o0 -m0xffffffff +data -r17 -m0xffffffff +bss -b0 -m0xffffffff /lib/Crts.68k main.o html.o http.o gif.o x10.o nidris.o /usr/X/lib/Xlib.o /usr/lib/libgem.o /lib/libi.68k /lib/libposix.68k /lib/libc.68k /lib/liba.68k /lib/libb.68k /lib/libm.68k /lib/libtpad.68k
+/etc/bin/link -o archaic -b0x30000 -max 0xffffffff +text -b0 -o0 -m0xffffffff +data -r17 -m0xffffffff +bss -b0 -m0xffffffff /lib/Crts.68k main.o html.o http.o gif.o x10.o nidris.o /usr/X/lib/Xlib.o /usr/lib/libgem.o /lib/libi.68k /lib/libposix.68k /lib/libc.68k /lib/liba.68k /lib/libb.68k /lib/libm.68k /lib/libtpad.68k
 ls -l archaic

@@ -547,6 +547,10 @@ Test on a copy of your Idris disk.
   `<sys/param.h>` that Idris does not have. `sh mkinc` fixes both,
   in the build folder.
 - The default link line allows only a small BSS. `lka` adds `-m0xffffffff` to `+bss`.
+- The default link also gives a program only about 26 KB for `malloc`
+  (one slice of a long page). `lka` adds `-b0x30000`: 192 KB for the heap
+  and the stack. The 4-byte field at offset 16 of the program file holds
+  this size.
 - `XCloseDisplay` pulls in `sigsetmask`, which no library has. Archaic does not call it.
 
 ### The shell
