@@ -25,6 +25,13 @@
  * system's scroll bar (g_sbar). Where the system has none, Archaic draws
  * its own (drawbar). Ctrl-Q quits.
  *
+ * WRP's K field: its text goes to the web page as keys when the form is
+ * sent. WRP's Bs and Rt buttons (Backspace, Return) send that key to the
+ * page; with text in K, Archaic sends the text and then the key, as keys
+ * (WRP alone would send only the button's key). WRP's url field has a
+ * clear button (x) at its right end. While Archaic loads what the user
+ * asked for, a spinner turns at the left end of the status line.
+ *
  * WRP's form: Archaic sets WRP's settings itself and does not show them.
  * W and H: the picture fills the window. M, T: ISMAP, GIF (with -a, the
  * menus for M, T and C are shown and used). C, the colors: on a display
@@ -126,6 +133,11 @@ static int px, py, pw, ph, prow;	/* the open list */
 static char sline[200];		/* status line */
 static long pgot, plen;		/* its progress bar: pgot of plen bytes, 0 none */
 static int pdone;		/* the bar's black part, as drawn */
+#define SPW 13			/* the spinner: SPW x SPW, left of the status */
+static int spx[] = { 6, 9, 10, 9, 6, 3, 2, 3 };	/* its 8 dots, clockwise */
+static int spy[] = { 2, 3, 6, 9, 10, 9, 6, 3 };
+static int spinon;		/* it turns: a load the user asked for runs */
+static int spinf;		/* its step, 0 to 7: the dot that leads */
 static char what[60];		/* what is coming: "Page", "Picture 1 of 2" ... */
 static int phase;		/* what http_open() does with it (H_), 0 none */
 static long tphase, tshown;	/* when the phase began; the second shown */
@@ -272,14 +284,76 @@ int all;
 	pdone = b;
 }
 
+static void dot(b, x, y)
+unsigned char *b;
+int x, y;
+{
+	b[y * 2 + x / 8] |= 0x80 >> (x & 7);
+}
+
+/* the spinner at the left end of the status line: 8 dots in a circle,
+ * the one that leads big, the 2 behind it smaller */
+static void drawspin()
+{
+	static unsigned char b[SPW * 2];
+	int j, a, x, y;
+
+	if (headless)
+		return;
+	for (j = 0; j < SPW * 2; ++j)
+		b[j] = 0;
+	for (j = 0; spinon && j < 8; ++j) {
+		a = (spinf - j + 8) & 7;	/* 0 leads */
+		x = spx[j];
+		y = spy[j];
+		dot(b, x, y);
+		if (a <= 2) {
+			dot(b, x - 1, y);
+			dot(b, x + 1, y);
+			dot(b, x, y - 1);
+			dot(b, x, y + 1);
+		}
+		if (a == 0) {
+			dot(b, x - 1, y - 1);
+			dot(b, x + 1, y - 1);
+			dot(b, x - 1, y + 1);
+			dot(b, x + 1, y + 1);
+		}
+	}
+	g_bits(M, viewh + 2 + (fh - SPW) / 2, SPW, SPW, b, 2);
+}
+
+/* the spinner a step on: 8 steps a second by the display's clock, or,
+ * if it has none, a step each time the network waits */
+static void spin()
+{
+	long t;
+	int f;
+
+	if (!spinon || headless)
+		return;
+	t = g_ms();
+	f = t < 0 ? (spinf + 1) & 7 : (int)((t / 125) & 7);
+	if (f == spinf)
+		return;
+	spinf = f;
+	drawspin();
+	g_flush();
+}
+
 static void drawstatus()
 {
-	int n, w = winw - 2 * M;
+	int n, x = M, w = winw - 2 * M;
 
 	if (headless)
 		return;
 	g_fill(0, viewh, winw, winh - viewh, 0);
 	g_fill(0, viewh, winw, 1, 1);
+	if (spinon) {		/* the text goes right of it */
+		drawspin();
+		x += SPW + M;
+		w -= SPW + M;
+	}
 	if (plen > 0) {
 		drawprog(1);
 		w -= pbarw() + M;
@@ -288,7 +362,20 @@ static void drawstatus()
 	while (n > 0 && tw(sline, n) > w)
 		--n;
 	if (n > 0)
-		g_text(M, viewh + 2, sline, n, 0);
+		g_text(x, viewh + 2, sline, n, 0);
+}
+
+/* the spinner starts (on 1) or stops */
+static void spinto(on)
+int on;
+{
+	if (on == spinon)
+		return;
+	spinon = on;
+	if (!headless) {
+		drawstatus();
+		g_flush();
+	}
 }
 
 /* the status line to the screen, and with -v to the log */
@@ -396,22 +483,74 @@ int p;
 	say(msg);
 }
 
+/* WRP's url field gets a clear button at its right end, while it has
+ * text: a white x in a black circle. A click on it empties the field. */
+#define XW 11
+static char *xicon[] = {
+	"....###....",
+	"..#######..",
+	".#.#####.#.",
+	".##.###.##.",
+	"####.#.####",
+	"#####.#####",
+	"####.#.####",
+	".##.###.##.",
+	".#.#####.#.",
+	"..#######..",
+	"....###...."
+};
+
+/* picture p, w x h (16 x 16 at most), at x, y; upside down if flip */
+static void pict(x, y, p, w, h, flip)
+int x, y, w, h, flip;
+char **p;
+{
+	static unsigned char b[16 * 2];
+	int bpl = (w + 7) / 8, r, c;
+	char *s;
+
+	for (r = 0; r < h * bpl; ++r)
+		b[r] = 0;
+	for (r = 0; r < h; ++r) {
+		s = p[flip ? h - 1 - r : r];
+		for (c = 0; c < w && s[c]; ++c)
+			if (s[c] == '#')
+				b[r * bpl + c / 8] |= 0x80 >> (c & 7);
+	}
+	g_bits(x, y, w, h, b, bpl);
+}
+
+/* Is it WRP's url field? */
+static int isurl(it)
+Item *it;
+{
+	return it->type == I_FIELD && it->name && strieq(it->name, "url") &&
+		it->form >= 0 && it->form < MAXFORM && wrpf[it->form];
+}
+
 static void drawfield(i)
 int i;
 {
 	Item *it = &items[i];
-	int x = it->x, y = it->y - top, n, k;
+	int x = it->x, y = it->y - top, room = it->w - 2 * PAD - 4, n, k;
 	char *s = it->val;
 
 	fill(x + 1, y + 1, it->w - 2, it->h - 2, 0);
 	box(x, y, it->w, it->h);
 	n = len(s);
+	if (isurl(it)) {
+		room -= XW + PAD;
+		k = y + (it->h - XW) / 2;
+		if (n > 0 && k >= 0 && k + XW <= viewh &&
+			x + it->w - 1 - PAD <= vieww)
+			pict(x + it->w - 1 - PAD - XW, k, xicon, XW, XW, 0);
+	}
 	if (it->pass) {
 		for (k = 0; k < n; ++k)
 			stars[k] = '*';
 		s = stars;
 	}
-	for (k = n; k > 0 && tw(s + n - k, k) > it->w - 2 * PAD - 4; --k)
+	for (k = n; k > 0 && tw(s + n - k, k) > room; --k)
 		;
 	text(x + 1 + PAD, y + 1 + PAD, s + n - k, k);
 	if (i == focus)
@@ -526,26 +665,6 @@ Item *it;
 		if (strieq(icons[i], it->text))
 			return &icons[i + 1];
 	return (char **)0;
-}
-
-/* picture p, w x h (16 x 16 at most), at x, y; upside down if flip */
-static void pict(x, y, p, w, h, flip)
-int x, y, w, h, flip;
-char **p;
-{
-	static unsigned char b[16 * 2];
-	int bpl = (w + 7) / 8, r, c;
-	char *s;
-
-	for (r = 0; r < h * bpl; ++r)
-		b[r] = 0;
-	for (r = 0; r < h; ++r) {
-		s = p[flip ? h - 1 - r : r];
-		for (c = 0; c < w && s[c]; ++c)
-			if (s[c] == '#')
-				b[r * bpl + c / 8] |= 0x80 >> (c & 7);
-	}
-	g_bits(x, y, w, h, b, bpl);
 }
 
 /* a button's picture p at x, y: only when all of it is on the page part */
@@ -927,6 +1046,8 @@ Item *it;
 		break;
 	case I_FIELD:
 		it->w = it->size * cw + 2 * PAD + 4;
+		if (isurl(it))		/* and its clear button */
+			it->w += XW + PAD;
 		it->h = fh + 2 * PAD + 2;
 		break;
 	case I_BUTTON:
@@ -1203,25 +1324,63 @@ char *name, *val;
 	url_enc(q, val ? val : empty);
 }
 
+/* the key that WRP's button b sends to the page (Bs, Rt), else 0 */
+static int fnkey(f, b)
+int f, b;
+{
+	Item *it;
+
+	if (b < 0 || f < 0 || f >= MAXFORM || !wrpf[f])
+		return 0;
+	it = &items[b];
+	if (it->type != I_BUTTON || !it->name || !strieq(it->name, "Fn") ||
+		!it->text)
+		return 0;
+	return strieq(it->text, "Bs") ? '\b' : strieq(it->text, "Rt") ? '\r' : 0;
+}
+
+/* WRP's K field in form f, if it has text */
+static int iskeys(it, f)
+Item *it;
+int f;
+{
+	return it->type == I_FIELD && it->form == f && it->name &&
+		strieq(it->name, "k") && it->val && it->val[0];
+}
+
 /* send form f, with button b (-1: Return in a field) */
 static void submit(f, b)
 int f, b;
 {
+	static char kv[MAXVAL + 2];
 	Item *it;
-	int i, n, w, h;
+	int i, n, w, h, kb;
 
 	if (f < 0 || f >= nforms)
 		return;
+	/* WRP's Bs or Rt with text in K: WRP would send only the button's
+	 * key, so send the text and then that key, as keys */
+	kb = fnkey(f, b);
+	for (i = 0; kb && i < nitems && !iskeys(&items[i], f); ++i)
+		;
+	if (i == nitems)
+		kb = 0;
 	q[0] = 0;
 	for (i = 0; i < nitems; ++i) {
 		it = &items[i];
 		if (it->form != f || !it->name || !it->name[0] || ours(it))
 			continue;
-		if (it->type == I_FIELD || it->type == I_HIDDEN)
+		if (kb && iskeys(it, f)) {
+			scopy(kv, it->val, MAXVAL);
+			n = len(kv);
+			kv[n] = kb;
+			kv[n + 1] = 0;
+			addq(it->name, kv);
+		} else if (it->type == I_FIELD || it->type == I_HIDDEN)
 			addq(it->name, it->val);
 		else if (it->type == I_SELECT && it->sel >= 0)
 			addq(it->name, opts[it->opt + it->sel].val);
-		else if (it->type == I_BUTTON && i == b)
+		else if (it->type == I_BUTTON && i == b && !kb)
 			addq(it->name, it->text);
 	}
 	if (f < MAXFORM && wrpf[f]) {
@@ -1545,6 +1704,8 @@ int x, y, b;
 	it = &items[i];
 	switch (it->type) {
 	case I_FIELD:
+		if (isurl(it) && it->val[0] && x >= it->x + it->w - 2 - PAD - XW)
+			it->val[0] = 0;		/* its clear button */
 		setfocus(i);
 		break;
 	case I_BUTTON:
@@ -1635,6 +1796,7 @@ int ui_poll()
 	static Event e;
 	long t;
 
+	spin();
 	if (phase == H_WAIT && what[0]) {	/* WRP makes the page */
 		t = now() - tphase;
 		if (t != tshown) {
@@ -1805,9 +1967,11 @@ int i;
 long a, b;
 {
 	Slice *s = &slices[i];
-	int n, c, ok = 0;
+	int n, c, ok = 0, was = spinon;
 	long k, m;
 
+	if (!quiet)
+		spinto(1);
 	imfree(&s->im);
 	s->im.depth = idepth;
 	s->y0 = a;
@@ -1847,6 +2011,7 @@ long a, b;
 		}
 	}
 	loading = 0;
+	spinto(was);
 	if (ok && !stop) {
 		s->state = 2;
 		say(ssave);
@@ -1919,9 +2084,7 @@ static char *wrpurl()
 
 	for (i = 0; i < nitems; ++i) {
 		it = &items[i];
-		if (it->type == I_FIELD && it->form >= 0 && it->form < MAXFORM &&
-			wrpf[it->form] && it->name && strieq(it->name, "url") &&
-			it->val)
+		if (isurl(it) && it->val)
 			return it->val;
 	}
 	return empty;
@@ -1960,6 +2123,7 @@ char *url, *post;
 	if (post)
 		scopy(lbody, post, MAXURL);
 	loading = 1;
+	spinto(1);
 	stop = 0;
 	t0 = now();
 	lbytes = 0;
@@ -2051,6 +2215,7 @@ char *url, *post;
 	say(msg);
 out:
 	loading = 0;
+	spinto(0);
 	if (pressed >= 0) {
 		i = pressed;
 		pressed = -1;

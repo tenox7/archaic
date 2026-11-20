@@ -186,6 +186,9 @@ typedef struct event {
  * pictures' colors with g_pix: rows of 8-bit color numbers, and pal,
  * the red, green and blue (0 to 255) of each of the 256. Archaic calls
  * g_pix only if g_colors is more than 2.
+ * g_ms: a clock in milliseconds, from any start (for the spinner); -1
+ * if the system has none: the spinner then steps each time the network
+ * waits (n_read).
  * g_event: wait 0 = don't wait, 1 = wait for an event, 2 = wait at most
  * about 1/10 s (the repeat of Archaic's scroll bar); a display that
  * can't wait for a time waits as for 1.
@@ -209,6 +212,7 @@ int g_textw P((char *s, int n));
 void g_font P((int *height, int *base));
 void g_bits P((int x, int y, int w, int h, unsigned char *bits, int bpl));
 long g_colors P((void));
+long g_ms P((void));
 void g_pix P((int x, int y, int w, int h, unsigned char *pix, int bpl,
 	unsigned char *pal));
 void g_flush P((void));
@@ -216,8 +220,9 @@ int g_event P((Event *e, int wait));
 int g_fd P((void));
 
 /* the network: one of nidris.c (Idris netd), nsock.c (BSD sockets), ...
- * n_read: up to n bytes. wait 1: wait at most about a second, and less
- * when the display has input; wait 0: don't wait. Returns the number of
+ * n_read: up to n bytes. wait 1: wait a short time (nsock.c 1/20 s,
+ * ntwg.c 1/10 s, nidris.c 1 s), and less when the display has input;
+ * wait 0: don't wait. Returns the number of
  * bytes, -2 = nothing yet, 0 = the end, -1 = error. n_open may call
  * ui_poll() while it waits, and gives up when that returns 1. */
 int n_open P((char *host, int port, char *err));

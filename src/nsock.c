@@ -45,9 +45,9 @@ int port;
 	return s;
 }
 
-/* wait at most a second (or not at all), also for the display. A
- * display with no file to wait on (sdl.c, cocoa.m) gets its turn every
- * 50 ms. */
+/* wait at most 1/20 s (or not at all), also for the display: so a
+ * display with no file to wait on (sdl.c, cocoa.m) gets its turn, and
+ * the spinner turns (main.c). */
 int n_read(h, buf, n, wait)
 int h, n, wait;
 char *buf;
@@ -60,8 +60,8 @@ char *buf;
 	FD_SET(h, &r);
 	if (d >= 0 && wait)
 		FD_SET(d, &r);
-	tv.tv_sec = wait && d >= 0 ? 1 : 0;
-	tv.tv_usec = wait && d < 0 ? 50000L : 0;
+	tv.tv_sec = 0;
+	tv.tv_usec = wait ? 50000L : 0;
 	m = select((h > d ? h : d) + 1, &r, (fd_set *)0, (fd_set *)0, &tv);
 	if (m <= 0 || !FD_ISSET(h, &r))
 		return -2;

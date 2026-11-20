@@ -191,6 +191,17 @@ oy=$(awk '$2 == "select" && $8 == "c" { print $4 + $6 + 1 + 5 * 15 + 7; exit }' 
 "$bin" -t -c 256 -s "@$x,$y;z~" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
 "$bin" -t -c 256 -s "@$cx,$cy;@$cx,$oy;" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
 "$bin" -t -c 256 "http://127.0.0.1:$port/" >/dev/null 2>&1
+# K: its text, then the key of Rt or Bs, as keys (k), and no Fn. The url
+# field's clear button (at its right end) empties it.
+kx=$(awk '$2 == "field" && $8 == "k" { print $3 + 5; exit }' "$tmp/f.out")
+ky=$(awk '$2 == "field" && $8 == "k" { print $4 + 5; exit }' "$tmp/f.out")
+rt=$(awk '$2 == "button" && $9 == "\"Rt\"" { print $3 + 5 "," $4 + 5; exit }' "$tmp/f.out")
+bs=$(awk '$2 == "button" && $9 == "\"Bs\"" { print $3 + 5 "," $4 + 5; exit }' "$tmp/f.out")
+xx=$(awk '$2 == "field" && $8 == "url" { print $3 + $5 - 8; exit }' "$tmp/f.out")
+"$bin" -t -s "@$kx,$ky;ab@$rt;" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
+"$bin" -t -s "@$kx,$ky;cd@$bs;" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
+"$bin" -t -s "@$rt;" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
+"$bin" -t -s "@$x,$y;abc@$xx,$y;qq~" "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
 rm -f "$here/data/wrp.html"
 if grep -Eq 'GET /wrp\?url=x&z=1\.0&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log"; then
 	ok "wrp form: sends $(grep -Eo 'w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2' "$tmp/http.log")"
@@ -219,6 +230,20 @@ if grep -Eq 'GET /wrp\?url=z&z=1\.0&c=256&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif '
 else
 	bad "wrp form, colors: the queries are wrong:"
 	grep -E 'GET /(wrp\?url=[z&]|\?)' "$tmp/http.log"
+fi
+if grep -Eq 'GET /wrp\?url=&z=1\.0&k=ab%0D&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log" &&
+	grep -Eq 'GET /wrp\?url=&z=1\.0&k=cd%08&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log" &&
+	grep -Eq 'GET /wrp\?url=&z=1\.0&k=&Fn=Rt&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log"; then
+	ok "wrp form, keys: K's text then Return (Rt) or Backspace (Bs) as keys; Rt alone with K empty"
+else
+	bad "wrp form, keys: the queries are wrong:"
+	grep -E 'GET /wrp\?url=&z=1\.0&k=' "$tmp/http.log"
+fi
+if grep -Eq 'GET /wrp\?url=qq&z=1\.0&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log"; then
+	ok "wrp form: the url field's clear button empties it"
+else
+	bad "wrp form: the clear button did not empty the url field:"
+	grep -E 'GET /wrp\?url=[a-z]*qq' "$tmp/http.log"
 fi
 
 # 6. WRP, when it runs: the start page, then a page with its picture,

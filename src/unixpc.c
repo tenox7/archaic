@@ -440,6 +440,12 @@ int g_fd()
 	return -1;
 }
 
+/* no clock: the spinner steps each time the network waits */
+long g_ms()
+{
+	return -1L;
+}
+
 /* VTIME 1 (a read waits at most 0.1 s) or 0 (it does not wait) */
 static void setwait(on)
 int on;

@@ -157,6 +157,12 @@ int g_fd()
 	return -1;
 }
 
+/* a clock in milliseconds (for the spinner) */
+long g_ms()
+{
+	return (long)(SDL_GetTicks() & 0x3fffffffL);
+}
+
 /* scroll y units (S_PIXEL, S_STEP, S_PAGE), down if y > 0 */
 static int scrl(e, y, unit)
 Event *e;

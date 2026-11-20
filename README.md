@@ -124,6 +124,9 @@ archaic [=WxH+X+Y] [-a] [-c n] [-t] [-v] [-o file] [-s script] [url]
 So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom),
 **C** (colors, only on a display with colors) and **K** (keys).
 
+The address box has a clear button (a white × in a black circle) at its right end,
+while it has text. Click it: the box is empty, and ready for a new address.
+
 **WRP's buttons are pictures**, like in a modern browser.
 (WRP names them with 2 letters, because old browsers can only put text on a button.)
 
@@ -133,8 +136,8 @@ So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom),
 | stop sign | St | stop loading |
 | ↻ circle arrow | Re | reload |
 | ↑ and ↓ arrows | Up, Dn | scroll the web page one screen up or down. Only an older WRP shows them: see Scrolling |
-| ⌫ | Bs | Backspace, for the web page |
-| ↵ | Rt | Return (Enter), for the web page |
+| ⌫ | Bs | Backspace, for the web page. With text in K: the text, then Backspace |
+| ↵ | Rt | Return (Enter), for the web page. With text in K: the text, then Return |
 
 ### Colors
 
@@ -166,8 +169,13 @@ On a black and white display, the C menu is hidden. Archaic asks WRP for 2 color
 Archaic's own start page request asks WRP for the same settings as the next ones
 (`/?m=ismap&t=gif&c=256&sl=1`), so that WRP's form does not change after the first page.
 
-To type into a box on the web page: click the box in the picture, type in **K**,
-press Return (WRP types it into the page), then click ↵ if the page needs Enter.
+To type into a box on the web page: click the box in the picture, then type in **K**.
+
+- Click ↵: WRP types the text into the page, then presses Return (to search, for example).
+- Or press Return: WRP types only the text. Use this to fill in more boxes before you send the page's form.
+
+(WRP alone does only the button's key when it gets both a button and keys, so Archaic sends
+the text and the button's key together as keys: `k=text%0D`. This works with every WRP.)
 
 **Mouse**
 
@@ -205,7 +213,10 @@ Cocoa has the Mac's own scroll bar; SDL has Archaic's (see Scrolling).
 
 On the 3B1, the help line at the bottom of the screen lists the main keys.
 
-**The status line** at the bottom of the window says what Archaic does, as it does it:
+**The status line** at the bottom of the window says what Archaic does, as it does it.
+While Archaic loads what you asked for, a **spinner** turns at its left end: 8 dots in a circle.
+It stops when the page is done (or stopped). It does not turn for the slices that Archaic gets
+ahead, while you read.
 
 | Status line | Means |
 |---|---|
@@ -218,6 +229,9 @@ On the 3B1, the help line at the bottom of the screen lists the main keys.
 | `2 s, 45 KB  http://...` | the page is done: the time it took, and how much came |
 
 The bar shows when the server sends the size (WRP does for its pictures).
+The spinner turns 8 steps a second by the display's clock (`g_ms`).
+The 3B1 and Idris displays have no clock: there it steps each time the network waits
+(1/10 s on the 3B1, up to 1 s on Idris).
 With `-v`, each status line also goes to standard error (`status:` lines to standard output with `-t`).
 
 **Scrolling: the whole page in slices**
@@ -362,6 +376,8 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons are pictures, Go stays text.
    With colors: C shows, set to the colors (for 100 colors: 64); another choice sends St at once;
    the start page request has WRP's settings.
+   Text in K, then ↵ or ⌫: the text and the key go as keys (`k=ab%0D`), with no button.
+   The address box's clear button empties it.
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
    A color picture on the screen is exactly the GIF's, and the PNG is in colors.
@@ -653,6 +669,7 @@ A port is **one display file** and **one network file**.
 | `g_pix(x, y, w, h, pix, bpl, pal)` | 8-bit rows, a color number for each pixel; pal: 256 colors, 3 bytes each (red, green, blue). Archaic calls it only if `g_colors()` is more than 2: a black and white port leaves it empty |
 | `g_event(&e, wait)` | next key, click (`E_DOWN`, `E_UP`, and `E_MOVE` with a button down), expose, resize, quit, scroll (`E_SCROLL`: pixels, quarter windows, windows, or to a place). wait 0: don't wait; 1: wait for an event; 2: wait at most 1/10 s (or as 1) |
 | `g_fd()` | the display's file descriptor, or -1 |
+| `g_ms()` | a clock in milliseconds, from any start (for the spinner); -1 if the system has none |
 | `g_bar` | a variable: 0 if the system has scroll bars (Archaic then calls `g_sbar`), 1 if Archaic must draw its own |
 | `g_sbar(pos, max, vis)` | show the page's place in the system's scroll bar: pos, 0 up to max; vis pixels show. Empty where `g_bar` is 1. The scroll bar sends `E_SCROLL` (`S_TO` for its knob) |
 
@@ -661,7 +678,7 @@ A port is **one display file** and **one network file**.
 | Function | Does |
 |---|---|
 | `n_open(host, port, err)` | connect; on error, the reason in `err` |
-| `n_read(h, buf, n, wait)` | bytes read; -2 nothing yet, 0 end, -1 error. wait 1: up to 1 s |
+| `n_read(h, buf, n, wait)` | bytes read; -2 nothing yet, 0 end, -1 error. wait 1: a short time (`nsock.c` 1/20 s), less when the display has input |
 | `n_write(h, buf, n)`, `n_close(h)` | |
 
 **C rules** (they are in `archaic.h` too):

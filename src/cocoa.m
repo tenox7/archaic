@@ -530,6 +530,12 @@ int g_fd()
 	return -1;
 }
 
+/* a clock in milliseconds (for the spinner) */
+long g_ms()
+{
+	return (long)([[NSProcessInfo processInfo] systemUptime] * 1000.0);
+}
+
 /* the page is at pos, 0 up to max; vis pixels of it show */
 void g_sbar(pos, max, vis)
 long pos, max, vis;

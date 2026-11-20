@@ -137,6 +137,15 @@ int g_fd()
 	return -1;
 }
 
+/* a clock in milliseconds (for the spinner) */
+long g_ms()
+{
+	struct timeval tv;
+
+	gettimeofday(&tv, (struct timezone *)0);
+	return (tv.tv_sec % 1000000L) * 1000L + tv.tv_usec / 1000;
+}
+
 /* a key by its name */
 static int keyname(e, s)
 Event *e;

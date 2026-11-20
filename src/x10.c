@@ -266,6 +266,12 @@ int g_fd()
 	return dpy ? dpyno() : -1;
 }
 
+/* no clock: the spinner steps each time the network waits */
+long g_ms()
+{
+	return -1L;
+}
+
 /* $ARCHAICDBG set: each X event to stderr */
 static void trace(ev, s, n)
 XEvent *ev;
