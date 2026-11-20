@@ -46,7 +46,8 @@ Then:
 
 1. On your computer, start WRP: `wrp`. It listens on port 8080.
 2. In Idris, log in as `root` and start X: `/usr/X/bin/xstart`.
-3. In an xterm, type `archaic`. It opens on the whole screen.
+3. In an xterm, type `archaic`. It opens a little smaller than the screen,
+   in the middle (576 x 360), so you see the desktop around it.
    (xstart puts `/usr/X/bin` on the search path. From a telnet login,
    type `/usr/X/bin/archaic`.)
 4. Click the address box, type an address, press Return.
@@ -103,7 +104,7 @@ archaic [=WxH+X+Y] [-a] [-c n] [-t] [-v] [-o file] [-s script] [url]
 | Option | Meaning |
 |---|---|
 | `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris and the 3B1: `10.0.2.2`, Unix: `127.0.0.1`) |
-| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default: the whole screen. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
+| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris: 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
 | `-t` | test mode: no window. Prints the page items and a checksum of each picture |

@@ -106,7 +106,7 @@ int g_open(geom, w, h)
 char *geom;
 int *w, *h;
 {
-	int sw, sh, x = 0, y = 0, gw, gh, m, i, j, b;
+	int sw, sh, x = 0, y = 0, gw, gh, m = 0, i, j, b;
 
 	dpy = XOpenDisplay((char *)0);
 	if (!dpy)
@@ -119,8 +119,8 @@ int *w, *h;
 		sw = 640;
 		sh = 400;
 	}
-	gw = sw - 2;			/* the whole screen, with the border */
-	gh = sh - 2;
+	gw = sw * 9 / 10;		/* a bit smaller than the screen, */
+	gh = sh * 9 / 10;		/* so the desktop shows around it */
 	if (geom) {
 		gbuf[0] = '=';
 		scopy(gbuf + 1, geom[0] == '=' ? geom + 1 : geom, (int)sizeof gbuf - 1);
@@ -134,6 +134,10 @@ int *w, *h;
 		gw = 200;
 	if (gh < 100)
 		gh = 100;
+	if (!(m & XValue))		/* no place given: the middle */
+		x = (sw - gw - 2) / 2;
+	if (!(m & YValue))
+		y = (sh - gh - 2) / 2;
 	if (x > sw - gw - 2)
 		x = sw - gw - 2;
 	if (y > sh - gh - 2)
