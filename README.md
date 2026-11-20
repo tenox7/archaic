@@ -738,6 +738,7 @@ Each port is a display file, plus a network file if the system has no BSD socket
 | SunWindows, SunView | Sun's window system before X11 | SunOS 1 to 4, on Sun-1 to Sun-4 |
 | VWS, EWS | DEC's window systems before X11 | VAX/VMS (VWS), VAXELN (EWS) |
 | NeWS, Display PostScript | PostScript displays | SunOS, SGI, OS/2, VMS, NeXTSTEP, AIX ... |
+| Windows 1 and 2, OS/2 1.x | early PC window systems: TCP/IP over SLIP | Windows 1.0 and 2.x, OS/2 1.1 to 1.3 |
 
 ### MGR
 
@@ -822,6 +823,19 @@ the picture as a PostScript `image`, the text with `show`.
 - [Display PostScript](https://en.wikipedia.org/wiki/Display_PostScript) (Adobe and NeXT, 1987):
   NeXTSTEP, DEC's DECwindows, IBM and SGI workstations, Sun's OpenWindows 3.3.
   On most of them, it works in X11.
+
+### Windows 1 and 2, OS/2 1.x: TCP/IP over SLIP
+
+Early window systems on the PC. They are 16-bit, and have no TCP/IP of their own:
+**Windows 1.0** (1985) and **Windows 2.x** (1987),
+and **OS/2 1.1 to 1.3**, with Presentation Manager (from 1988). OS/2 1.0 had text mode only.
+
+- Plan: a display file for Windows (GDI), and one for Presentation Manager.
+- Network: SLIP on the serial port, with a small TCP/IP in Archaic, as netd does in Idris.
+  The same code for both systems: only the serial port calls change.
+  Archaic opens one connection at a time (`http.c`), so the TCP part can stay small.
+- On the host: a SLIP bridge to libslirp, as `slirpbridge` in the Idris kit. The host is then 10.0.2.2.
+- 16-bit: see the memory note in Porting.
 
 ---
 
