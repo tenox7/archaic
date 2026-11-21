@@ -4,6 +4,7 @@
 # make headless: no window, for tests and automation: archaic-headless.
 # The Idris (Atari ST) build is src/mk, run inside Idris.
 # The AT&T UNIX PC (3B1) build is src/mkunixpc, run on the 3B1.
+# The SunOS 4 build (SunView) is src/mksunview, run on SunOS 4.
 
 CC = cc
 X11 = /opt/X11

@@ -12,10 +12,13 @@ WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
 
 ![Archaic in FreeBee: the AT&T UNIX PC (3B1), showing Wikipedia](screenshots/freebee.png)
 
+![Archaic in LEMU (QEMU): SunOS 4.1.4 with SunView on a SPARCstation 5, showing Wikipedia in color](screenshots/lemu.png)
+
 First port: **Whitesmiths Idris** (a 1988 Unix clone) on the **Atari ST**,
 with **X10** (X Version 10 Release 4) and TCP/IP over **SLIP**.
 Second port: the **AT&T UNIX PC** (3B1, PC 7300, 1985), with its own
 window system and **WIN/TCP** (The Wollongong Group's TCP/IP) on its Ethernet board.
+Third port: **SunOS 4** with **SunView**, Sun's window system before X11, in color.
 Also, for development and tests: **macOS** (Cocoa), anything with **SDL 2**,
 any Unix with **X11**, and **no window at all** (commands in, screenshots out).
 The code is plain old C, written to port to DOS, OS/2, Win16 and others.
@@ -38,7 +41,7 @@ You need:
   `atarist-idris314-hatari` (on osarchive, in `os/idris/virt/`).
   Newer kits have Archaic in `/usr/X/bin`.
 - Or **this repo's [release](https://github.com/tenox7/archaic/releases)**:
-  the `archaic` binary for Idris. Copy it into Idris's `/usr/X/bin`
+  the `archaic-idris` binary. Copy it into Idris's `/usr/X/bin` as `archaic`
   (kermit works), then `chmod /usr/X/bin/archaic`.
   With no mode, Idris's chmod makes a file executable.
 
@@ -95,6 +98,38 @@ Wikipedia's AT&T UNIX PC article, after one click on the ↓ button:
 
 ---
 
+## Quick start: SunOS 4 with SunView
+
+You need:
+
+- **WRP** on your computer, as above.
+- **SunOS 4.1** with SunView, on a Sun-4 (SPARC), or in QEMU: the kit `sunos414-lemu`
+  (on osarchive, in `os/sunos/Virtual/qemu/SunOS414/`). It has Sun's C compiler.
+- The `archaic-sun4` binary from this repo's **[release](https://github.com/tenox7/archaic/releases)**.
+  Copy it to SunOS as `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
+  Or build it there: see Building on SunOS 4. It takes about 6 s.
+
+Then:
+
+1. On your computer, start WRP: `wrp`. It listens on port 8080.
+2. In SunOS, log in as `root` at the console and type `sunview`.
+3. In the shelltool, type `archaic` (in the folder where you built it: `./archaic`).
+   It opens a frame a little smaller than the screen, in the middle.
+4. Click the address box, type an address, press Return.
+5. **Ctrl-Q** quits, or Quit in the frame's menu.
+
+In the kit, your computer is `192.168.1.10` for SunOS (SunOS is `192.168.1.123`).
+So Archaic on SunOS looks for WRP at `http://192.168.1.10:8080/`.
+SunOS has no name server there: give addresses as numbers.
+
+On a color screen (8 bits, as the cg3) the pictures have up to 128 colors (see Colors).
+
+The SPARCstation's screen (cg3), 1152 x 900: Wikipedia's SunView article in 128 colors, in 1 s:
+
+![Archaic in SunView on SunOS 4.1.4: Wikipedia's SunView article in 128 colors](screenshots/sunview.png)
+
+---
+
 ## Using it
 
 ```
@@ -103,8 +138,8 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris and the 3B1: `10.0.2.2`, Unix: `127.0.0.1`) |
-| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris: 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris and the 3B1: `10.0.2.2`, SunView: `192.168.1.10`, Unix: `127.0.0.1`) |
+| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
 | `-f fmt` | `gif`: ask WRP for GIFs only. `abm` (as without `-f`): WRP may send its black and white pictures as ABM (see Pictures: GIF and ABM) |
@@ -159,6 +194,7 @@ The first status line says what it found, like `Archaic 0.4, millions of colors`
 | Display | Colors |
 |---|---|
 | 3B1, Idris (X10) | black and white (they are) |
+| SunView | a color screen (8 bits, as the cg3): 128, in a colormap segment of Archaic's own. A black and white screen (bw2): black and white (not tested yet: QEMU's SPARCstation has no bw2) |
 | X11 | the default visual. Depth 1: black and white. TrueColor: millions. A colormap (8-bit PseudoColor, as on old workstations): its size, like 256 |
 | Cocoa, SDL | the screen's depth: millions |
 | `archaic-headless` | millions, like SDL (`-c 2` for black and white) |
@@ -171,6 +207,11 @@ On a display with colors:
   WRP takes the picture again in those colors, and does not load the page again.
   The frame stays where it was.
 - The pictures keep their colors: a byte for each pixel, and the GIF's colors.
+- SunView: Archaic's colormap segment has 128 places: white, black and 126 for the picture.
+  A segment of 256 would take all of the screen's colors, and the other windows would lose theirs.
+  When a picture has more colors than places (C at 256, or 128 with no pure black),
+  the color nearest to another one gives up its place, until they fit:
+  so a small red line keeps its red. The others take the nearest color.
 - X11 with a colormap: Archaic gets the picture's colors in the default colormap,
   shared with the other programs. When the colormap is full, it takes the nearest color
   the colormap has. A new picture's colors free the last ones.
@@ -267,6 +308,19 @@ the text and the button's key together as keys: `k=text%0D`. This works with eve
 | ↓ / ↑, the scroll arrows (also FreeBee's mouse wheel) | scroll a quarter of the window down / up. The frame's scroll arrows are the window's own scroll bar: Archaic draws none on the 3B1 |
 | Rfrsh, Clear | draw the window again |
 | the resize box | a new window size. A new width: WRP makes the picture again, as wide (see A new window size) |
+
+**In SunView**, the Sun keyboard's keys and SunView's frame work too:
+
+| Key or frame part | Does |
+|---|---|
+| PgDn (R15), PgUp (R9) | scroll a window down / up |
+| ↓ / ↑ | scroll a quarter of the window down / up |
+| Home (R7), End (R13) | go to the top / the end of the page |
+| the scroll bar at the left | SunView's own: left button down, right button up, middle button to that place. Archaic draws none in SunView |
+| the frame's menu (right button on the frame): Quit | quit |
+| the frame's menu: Resize (Zoom, FullScreen ...) | a new window size (see A new window size) |
+
+The Stop key (L1) does nothing: SunView sends no event for it. Esc stops a load.
 
 **On macOS (Cocoa) and with SDL:** Page Up and Page Down scroll a window.
 The up and down arrows and each step of the mouse wheel scroll a quarter of it.
@@ -393,6 +447,8 @@ X10 has no events for the mouse moving with a button down, and can't wait for a 
 | `src/unixpc.c` | display for the AT&T UNIX PC (3B1) window system |
 | `src/ntwg.c` | network for the 3B1: the BSD sockets of WIN/TCP (TWG) |
 | `src/mkunixpc` | 3B1 script: compile and link with gcc |
+| `src/sunview.c` | display for SunView (SunOS 4) |
+| `src/mksunview` | SunOS 4 script: compile and link with Sun's cc |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
@@ -752,6 +808,94 @@ Test on a copy of your 3B1 disk.
 
 ---
 
+## Building on SunOS 4 (SunView)
+
+Needs Sun's C compiler, `cc` (the kit has it), and SunView's libraries in `/usr/lib`:
+`libsuntool`, `libsunwindow`, `libpixrect` (SunOS has them with SunView).
+
+1. Copy these 9 files (131 KB) into a folder on SunOS, with ftp, rcp or a CD
+   (the kit: `CD=file.iso ./run.sh`, then `mount -rt hsfs /dev/sr0 /cdrom`):
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `nsock.c`, `sunview.c` and `mksunview`.
+   The kit lets root in with rsh, on port 41414 of your computer.
+2. Build:
+
+   ```
+   sh mksunview    # compile and link: archaic, about 96 KB
+   ```
+
+   It takes about 6 s in the kit.
+3. Test. **Test mode, no window needed** (serve this folder from your computer:
+   `python3 -m http.server 8077`):
+
+   ```
+   ./archaic -t http://192.168.1.10:8077/test/data/hn2.gif
+   ```
+
+   The last line ends with `sum ae2b58f3`: the same as on Unix, Idris and the 3B1.
+
+   **With the window:** `./archaic` in a shelltool.
+
+**Measured in the kit** (QEMU, SPARCstation 5), from Return until the picture is complete:
+
+| What | Time |
+|---|---|
+| decode check (`-t`, `hn2.gif`, 11 KB, 256 colors) | less than 0.1 s |
+| Wikipedia's SunView article in the window, 128 colors (91 KB) | 1 s |
+| Wikipedia's Sun-4 article in the window, 128 colors (50 KB) | 1 s |
+| Wikipedia's SunView article, black and white (`-c 2`: ABM, 21 KB) | 2 s |
+
+---
+
+## SunOS 4 and SunView: what to know
+
+Test on a copy of your SunOS disk.
+
+### The system
+
+| Thing | SunOS 4.1.4 kit |
+|---|---|
+| Computer | a SPARCstation 5 in QEMU: microSPARC II, 256 MB (SunOS gets 240) |
+| Screen | cg3, 8 bits: 256 colors in one colormap. 1280 x 1024 (`RES=1152x900 ./run.sh` for another size) |
+| Window system | SunView: `sunview` at the console |
+| Network | Lance Ethernet, BSD sockets. QEMU user networking: SunOS 192.168.1.123, **your computer 192.168.1.10** (its 127.0.0.1) |
+| Names | no name server: give addresses as numbers |
+
+### The C compiler
+
+- Sun's `cc` is K&R C: `mksunview` gives it `-DNOPROTO`. (gcc 3.0.4 is in `/usr/local/bin` in the kit;
+  Archaic does not need it.)
+- Link with `-lsuntool -lsunwindow -lpixrect`: the toolkit, the windows and the notifier, the drawing.
+- SunView's headers have an `Event` and an `Image`, as `archaic.h` has, and a `max` macro.
+  `sunview.c` renames SunView's two while it includes them.
+- `gethostbyname()` knows only names. `nsock.c` tries `inet_addr()` first.
+
+### SunView
+
+- A SunView program started from rsh or telnet needs to know the screen:
+  `WINDOW_PARENT=/dev/win0` and `WMGR_ENV_PLACEHOLDER=/dev/win1` (a shelltool has them).
+- Archaic has its own loop: `notify_dispatch()` runs SunView's handlers, and `select()` waits on the
+  frame's and the canvas's files. Each `notify_dispatch()` reads about one event.
+- The window: a frame with a canvas, drawn through the canvas's pixwin.
+  Rectangles with `pw_writebackground()`, text with `pw_text()` in the default font
+  (`$DEFAULT_FONT` chooses another one), pictures with `pw_rop()` from a pixrect in memory
+  (its rows are a whole number of 16-bit words).
+- The canvas is not retained. A retained canvas (SunView keeps a copy) lost its copy after a resize,
+  and drew those parts white. So SunView calls Archaic's repaint function, and Archaic draws those parts again.
+- The scroll bar is SunView's. An interposed function takes its scroll requests from the canvas.
+  The bar has already set its new view start: that is the new place on the page.
+- Colors: `pw_setcmsname()` and `pw_putcolormap()` make a colormap segment of 128: 0 white, 127 black.
+  The segments of all windows share the screen's 256 colors: SunView loads the colors of the window
+  under the pointer. So with two Archaic windows (or another program with many colors),
+  the other window can show wrong colors until the pointer is in it.
+- Keys: the arrows come as `ESC [ A` to `ESC [ D`, one character for each `notify_dispatch()`.
+  So after an ESC, Archaic waits 1/20 s for each next character. A lone ESC is the Esc key.
+  R7, R9, R13 and R15 come as function keys: Home, PgUp, End, PgDn.
+  The Stop key (L1) sends nothing: it is the shift key of Stop-A.
+- The frame menu's Quit: an interposed destroy function says no to it (`notify_veto_destroy()`).
+  Archaic quits, then closes the frame.
+
+---
+
 ## Porting to DOS, OS/2, Win16 and others
 
 The core (`main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`) does not change.
@@ -809,7 +953,7 @@ Each port is a display file, plus a network file if the system has no BSD socket
 | MGR | a window system on a terminal line | SunOS, Coherent, Xenix, Minix, OS-9, VSTa |
 | Blit, DMD 5620 | a graphics terminal on a serial line | Research Unix, System V (AT&T 3B2) |
 | QNX Windows | QNX's window system before Photon | QNX 2 |
-| SunWindows, SunView | Sun's window system before X11 | SunOS 1 to 4, on Sun-1 to Sun-4 |
+| SunWindows, SunView | Sun's window system before X11 | SunOS 1 to 4, on Sun-1 to Sun-3 (SunOS 4 on a Sun-4: done) |
 | VWS, EWS | DEC's window systems before X11 | VAX/VMS (VWS), VAXELN (EWS) |
 | NeWS, Display PostScript | PostScript displays | SunOS, SGI, OS/2, VMS, NeXTSTEP, AIX ... |
 | Windows 1 and 2, OS/2 1.x | early PC window systems: TCP/IP over SLIP | Windows 1.0 and 2.x, OS/2 1.1 to 1.3 |
@@ -869,8 +1013,9 @@ Sun's window system before X11. **SunWindows** came with SunOS 1.0 (1983), on th
 and stayed up to SunOS 4.1: Sun-2, Sun-3, Sun-4.
 OpenWindows (X11) took its place, and still showed SunView programs.
 
-- Plan: a display file for SunView (pixrect and pixwin).
-- Network: BSD sockets, as `nsock.c`.
+- Done: SunView on SunOS 4.1.4, on a Sun-4 (`sunview.c`, see Quick start). Network: `nsock.c`.
+- Next: the Sun-3 and the Sun-2 (68020, 68010), with the same `sunview.c`.
+  Then SunWindows on SunOS 1 (Sun-1, Sun-2), with no SunView toolkit.
 
 ### VAX before X11: VWS and EWS
 
@@ -918,6 +1063,8 @@ and **OS/2 1.1 to 1.3**, with Presentation Manager (from 1988). OS/2 1.0 had tex
 - One page at a time. No history of its own: use WRP's back button (← arrow).
 - A page over 30 KB of HTML is cut (WRP's pages are about 3 KB).
 - On the 3B1, the font has only ASCII: other letters in WRP's form show as `?`.
+- In SunView, a second window with many colors (another Archaic) can change the colors of the first one,
+  until the pointer is in it (see SunOS 4 and SunView: what to know).
 - WRP before commit 3126bc0 (November 2026) could hang for good on back (← arrow),
   when Chrome took the page from its back-forward cache. Use a newer WRP.
 - With slices, a link to a place on the same page (`#name`) does not scroll the frame there.

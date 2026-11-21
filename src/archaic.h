@@ -39,13 +39,18 @@
 
 /* WRP's address when none is given: WRP's default port. In the emulator
  * kits the host is 10.0.2.2: Whitesmiths C (_WSLAS) means Idris, and
- * gcc's unixpc the AT&T UNIX PC (3B1). */
+ * gcc's unixpc the AT&T UNIX PC (3B1). The SunOS 4 kit (sunos414-lemu;
+ * SUNVIEW is mksunview's build) has the network 192.168.1.0, and the
+ * host is 192.168.1.10. */
 #ifndef DEFURL
 #ifdef _WSLAS
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifdef unixpc
 #define DEFURL "http://10.0.2.2:8080/"
+#endif
+#ifdef SUNVIEW
+#define DEFURL "http://192.168.1.10:8080/"
 #endif
 #ifndef DEFURL
 #define DEFURL "http://127.0.0.1:8080/"
@@ -191,7 +196,7 @@ typedef struct event {
 	int key;
 } Event;
 
-/* the display: one of x10.c, x11.c, unixpc.c, sdl.c, cocoa.m ...
+/* the display: one of x10.c, x11.c, unixpc.c, sunview.c, sdl.c, cocoa.m ...
  * Colors: 0 white, 1 black. x, y are the top left corner, also for
  * text. sdl.c and cocoa.m draw with fb.c (a screen in memory). g_fd:
  * the display's file, for the network's select(); -1 if it has none.
@@ -207,8 +212,8 @@ typedef struct event {
  * about 1/10 s (the repeat of Archaic's scroll bar); a display that
  * can't wait for a time waits as for 1.
  *
- * The scroll bar: a system that has scroll bars (Cocoa, Win32, the 3B1's
- * window frame) uses its own, and sets g_bar to 0. Archaic then calls
+ * The scroll bar: a system that has scroll bars (Cocoa, SunView, Win32,
+ * the 3B1's window frame) uses its own, and sets g_bar to 0. Archaic then calls
  * g_sbar when the page moves: the page is at place pos, 0 up to max, and
  * vis pixels of it show. The display sends E_SCROLL for its scroll bar.
  * A system with none (SDL, X11 with no toolkit, X10) sets g_bar to 1:

@@ -1,4 +1,6 @@
-/* nsock.c - Archaic's network for BSD sockets (Unix, macOS, Linux) */
+/* nsock.c - Archaic's network for BSD sockets (Unix, macOS, Linux,
+ * SunOS 4). An address such as 192.168.1.10 goes through inet_addr()
+ * first: SunOS 4's gethostbyname() knows only names. */
 #include "archaic.h"
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -7,6 +9,11 @@
 #include <netdb.h>
 #ifndef NOUNISTD
 #include <unistd.h>
+#endif
+#ifdef NOPROTO
+unsigned long inet_addr();
+#else
+#include <arpa/inet.h>
 #endif
 
 int n_open(host, port, err)
@@ -23,15 +30,18 @@ int port;
 		d[i] = 0;
 	sa.sin_family = AF_INET;
 	sa.sin_port = htons((unsigned short)port);
-	he = gethostbyname(host);
-	if (!he) {
-		sprintf(err, "%.60s: unknown host", host);
-		return -1;
+	sa.sin_addr.s_addr = inet_addr(host);
+	if (sa.sin_addr.s_addr == 0xffffffffL) {
+		he = gethostbyname(host);
+		if (!he) {
+			sprintf(err, "%.60s: unknown host", host);
+			return -1;
+		}
+		p = (char *)he->h_addr;
+		d = (char *)&sa.sin_addr;
+		for (i = 0; i < he->h_length && i < (int)sizeof sa.sin_addr; ++i)
+			d[i] = p[i];
 	}
-	p = (char *)he->h_addr;
-	d = (char *)&sa.sin_addr;
-	for (i = 0; i < he->h_length && i < (int)sizeof sa.sin_addr; ++i)
-		d[i] = p[i];
 	s = socket(AF_INET, SOCK_STREAM, 0);
 	if (s < 0) {
 		sprintf(err, "no socket");
