@@ -21,7 +21,7 @@
  *
  * One port = one display file (g_ functions) and one network file
  * (n_ functions) next to the portable core (main.c, html.c, http.c,
- * gif.c, pic.c). See README.md. The displays for modern systems (SDL, Cocoa)
+ * gif.c, pic.c). See AGENTS.md. The displays for modern systems (SDL, Cocoa)
  * may use newer C.
  */
 #ifndef ARCHAIC_H
