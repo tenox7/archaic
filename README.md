@@ -154,7 +154,7 @@ while it has text. Click it: the box is empty, and ready for a new address.
 ### Colors
 
 Archaic asks the display how many colors it shows.
-The first status line says what it found, like `Archaic 0.3, millions of colors`.
+The first status line says what it found, like `Archaic 0.4, millions of colors`.
 
 | Display | Colors |
 |---|---|

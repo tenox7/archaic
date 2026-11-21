@@ -35,7 +35,7 @@
 #define P(a) a
 #endif
 
-#define VERSION "0.3"
+#define VERSION "0.4"
 
 /* WRP's address when none is given: WRP's default port. In the emulator
  * kits the host is 10.0.2.2: Whitesmiths C (_WSLAS) means Idris, and
