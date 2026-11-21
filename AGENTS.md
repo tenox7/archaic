@@ -82,6 +82,8 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 
 So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom),
 **C** (colors, only on a display with colors), **D** (dither, only for black and white) and **K** (keys).
+The labels Z, C, D and K are pictures: a magnifying glass, a palette, a dither pattern (a checkerboard)
+and a keyboard.
 
 **D** says what WRP dithers in a black and white picture (a WRP of November 2026 or newer has it):
 
@@ -407,7 +409,7 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    With colors (`-c 256`), the colors are **exactly** ImageMagick's.
 3. HTML: title, entities, fields, menus, hidden fields, buttons, links, comments.
 4. A button click sends the form with the right query.
-5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons are pictures, Go stays text. A new choice in WRP's D menu sends the form at once.
+5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons and the labels Z, C, D and K are pictures, Go stays text. A new choice in WRP's D menu sends the form at once.
    With colors: C shows, set to the colors (for 100 colors: 64); another choice sends St at once;
    the start page request has WRP's settings.
    Text in K, then ↵ or ⌫: the text and the key go as keys (`k=ab%0D`), with no button.
@@ -698,6 +700,12 @@ Test on a copy of your 3B1 disk.
 - `wrastop()` draws. **1 is a lit pixel**, and the **low** bit of each 16-bit word is the **left** pixel.
   Archaic makes white lit, so pictures are not negatives.
 - Text: the font file `/usr/lib/wfont/system.8.ft` (9 x 12, ASCII only), drawn with `wrastop()`.
+  Every letter is 9 pixels wide.
+- With this font, WRP's form (WRP 4.11.0) only just fits on one line: it ends at x 680, and 682 is the limit
+  (686 less the margin). One more letter or item puts the last button on a second line.
+  So the Z and D pictures are narrower than the others (11 and 9 pixels), and the D menu's words have 4 letters.
+  To check a change: in a copy of `main.c`, make `tw()` return `n * 9` and the `-t` window 686 wide,
+  then run `archaic -t -c 2` with WRP. This gives the same places as the real 3B1.
 - `keypad(wn, 1)`: the 3B1's keys come as one code each (`kcodes.h`): Exit 0350, Cancl 0370, Page 0371.
   The window is a tty: with VMIN 0 and VTIME 1, a read waits at most 0.1 s.
 - Mouse: `wsetmouse()` with MSDOWN. A click comes as the Mouse key (0375),

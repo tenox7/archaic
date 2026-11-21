@@ -280,6 +280,15 @@ else
 	bad "wrp form, colors: the C menu is wrong:"
 	grep -E 'select|"C"' "$tmp/fc.out" "$tmp/fc100.out"
 fi
+# WRP's one-letter labels are pictures too: Z a magnifying glass, C a
+# palette, K a keyboard (D: see 5a).
+if grep -q 'text .* "Z" icon$' "$tmp/f.out" && grep -q 'text .* "K" icon$' "$tmp/f.out" &&
+	grep -q 'text .* "C" icon$' "$tmp/fc.out"; then
+	ok "wrp form: the labels Z, C and K are pictures"
+else
+	bad "wrp form: the labels Z, C and K are not pictures:"
+	grep 'text' "$tmp/f.out" "$tmp/fc.out"
+fi
 if grep -Eq 'GET /wrp\?url=z&z=1\.0&c=256&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log" &&
 	grep -Eq 'GET /wrp\?url=&Fn=St&z=1\.0&c=16&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log" &&
 	grep -q 'GET /?m=ismap&t=gif&c=256&sl=1 ' "$tmp/http.log"; then
@@ -329,10 +338,10 @@ py=$(awk '$2 == "select" && $8 == "d" { print $4 + $6 + 1 + 2 * 15 + 7; exit }' 
 "$bin" -t -s "@$dx,$dy;@$dx,$py;" "http://127.0.0.1:$port/wrpd.html" >/dev/null 2>&1
 "$bin" -t -a -s "@$dx,$dy;@$dx,$py;" "http://127.0.0.1:$port/wrpd.html" >/dev/null 2>&1
 rm -f "$here/data/wrpd.html"
-if grep -q 'select .* d sel 1: ' "$tmp/d.out" &&
+if grep -q 'select .* d sel 1: ' "$tmp/d.out" && grep -q 'text .* "D" icon$' "$tmp/d.out" &&
 	[ "$(grep -c 'GET /wrpd?' "$tmp/http.log")" = 1 ] &&
 	grep -Eq 'GET /wrpd\?url=&Fn=St&d=pics&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log"; then
-	ok "wrp form, dither: D shown; a new choice sends St at once (not with -a)"
+	ok "wrp form, dither: D shown, its label a picture; a new choice sends St at once (not with -a)"
 else
 	bad "wrp form, dither: the D menu is wrong:"
 	grep 'select' "$tmp/d.out"

@@ -695,17 +695,23 @@ Item *it;
 	return (char **)0;
 }
 
-/* a button's picture p at x, y: only when all of it is on the page part */
+/* a picture p at x, y: only when all of it is on the page part. It is IH
+ * rows high, and as wide as its rows. */
 static void drawicon(x, y, p)
 int x, y;
 char **p;
 {
-	if (y >= 0 && y + IH <= viewh && x + IW <= vieww)
-		pict(x, y, p, IW, IH, 0);
+	int w;
+
+	w = len(p[0]);
+	if (y >= 0 && y + IH <= viewh && x + w <= vieww)
+		pict(x, y, p, w, IH, 0);
 }
 
-/* WRP's one-letter labels K and C get pictures too: a keyboard for the
- * keys to send, a palette for the colors. */
+/* WRP's one-letter labels get pictures too: Z a magnifying glass for the
+ * zoom, C a palette for the colors, D a dither pattern, K a keyboard for
+ * the keys to send. Z and D are narrower than the others: with the 3B1's
+ * 9-pixel font, WRP's form then still fits on one line (680 of 682). */
 static char *kicon[] = {
 	".............",
 	".###########.",
@@ -734,8 +740,37 @@ static char *cicon[] = {
 	"...#######..."
 };
 
-/* the picture of word it, or 0: only the label of WRP's K field or C
- * menu has one. A label is the word just before them, their NAME. */
+static char *zicon[] = {
+	"..####.....",
+	".##..##....",
+	"##....##...",
+	"#......#...",
+	"#......#...",
+	"##....##...",
+	".##..###...",
+	"..#######..",
+	".......###.",
+	"........###",
+	".........##"
+};
+
+static char *dicon[] = {
+	".........",
+	"#.#.#.#.#",
+	".#.#.#.#.",
+	"#.#.#.#.#",
+	".#.#.#.#.",
+	"#.#.#.#.#",
+	".#.#.#.#.",
+	"#.#.#.#.#",
+	".#.#.#.#.",
+	"#.#.#.#.#",
+	"........."
+};
+
+/* the picture of word it, or 0: only the label of WRP's K field and of
+ * its C, Z and D menus has one. A label is the word just before them,
+ * their NAME. */
 static char **lpict(it)
 Item *it;
 {
@@ -748,8 +783,14 @@ Item *it;
 		return (char **)0;
 	if (f->type == I_FIELD && strieq(f->name, "k"))
 		return kicon;
-	if (f->type == I_SELECT && strieq(f->name, "c"))
+	if (f->type != I_SELECT)
+		return (char **)0;
+	if (strieq(f->name, "c"))
 		return cicon;
+	if (strieq(f->name, "z"))
+		return zicon;
+	if (strieq(f->name, "d"))
+		return dicon;
 	return (char **)0;
 }
 
@@ -1119,12 +1160,13 @@ Item *it;
 {
 	Image *im;
 	int j, k, w;
+	char **p;
 
 	it->w = it->h = 0;
 	switch (it->type) {
 	case I_TEXT:
-		if (lpict(it)) {
-			it->w = IW;
+		if ((p = lpict(it)) != 0) {
+			it->w = len(p[0]);
 			it->h = IH;
 			break;
 		}
