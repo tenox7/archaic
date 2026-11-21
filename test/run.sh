@@ -15,14 +15,30 @@ here=$(cd "$(dirname "$0")" && pwd)
 # The web server for the tests: python's, and GIFs cut into slices for
 # ?y=Y&h=H, as WRP does for the tall picture (with ImageMagick). ?wait=S:
 # the answer comes after S seconds, as when WRP makes a page.
+# NAME.pic is NAME.abm for a request whose Accept has image/x-abm, as WRP
+# does for a black and white picture, else NAME.gif; the log gets an
+# "accept" line.
 cat >"$tmp/srv.py" <<'EOF'
 import functools, http.server, subprocess, sys, time, urllib.parse
 class H(http.server.SimpleHTTPRequestHandler):
+    extensions_map = dict(http.server.SimpleHTTPRequestHandler.extensions_map,
+        **{'.abm': 'image/x-abm'})
     def do_GET(self):
         u = urllib.parse.urlsplit(self.path)
         q = urllib.parse.parse_qs(u.query)
         if 'wait' in q:
             time.sleep(float(q['wait'][0]))
+        if u.path.endswith('.pic'):
+            acc = [t.strip() for t in self.headers.get('Accept', '').split(',')]
+            ext = '.abm' if 'image/x-abm' in acc else '.gif'
+            sys.stderr.write('accept %s %s: %s\n' % (u.path, ext, ' '.join(acc)))
+            b = open(self.translate_path(u.path)[:-4] + ext, 'rb').read()
+            self.send_response(200)
+            self.send_header('Content-Type', self.extensions_map.get(ext, 'image/gif'))
+            self.send_header('Content-Length', str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+            return
         if u.path.endswith('.gif') and 'y' in q and 'h' in q:
             crop = 'x%d+0+%d' % (int(q['h'][0]), int(q['y'][0]))
             b = subprocess.run(['magick', self.translate_path(u.path), '-crop',
@@ -57,6 +73,47 @@ for f in hn2 wiki2; do
 	fi
 done
 
+# 1b. ABM, WRP's black and white picture for the 1-bit displays: exactly
+#     the pixels of the GIF.
+for f in hn2 wiki2; do
+	"$bin" -t -o "$tmp/$f-abm.pbm" "http://127.0.0.1:$port/$f.abm" >"$tmp/$f-abm.out" 2>&1
+	if cmp -s "$tmp/$f-abm.pbm" "$tmp/$f-ref.pbm" &&
+		grep -q ' got [0-9]*x[0-9]* abm sum [0-9a-f]*$' "$tmp/$f-abm.out"; then
+		ok "$f.abm decodes exactly as the GIF"
+	else
+		bad "$f.abm differs from the GIF:"
+		tail -2 "$tmp/$f-abm.out"
+	fi
+done
+# a broken ABM (bytes from before the picture's start) is refused
+printf 'ABM1\000\020\000\020\001\000\377\377\377' >"$here/data/bad.abm"
+"$bin" -t -v "http://127.0.0.1:$port/bad.abm" >"$tmp/bad.out" 2>&1
+if grep -q "^status: Picture: can't show image/x-abm" "$tmp/bad.out"; then
+	ok "a broken ABM is refused"
+else
+	bad "a broken ABM:"
+	tail -3 "$tmp/bad.out"
+fi
+rm -f "$here/data/bad.abm"
+
+# 1c. What Archaic asks for: ABM and GIF; with -f gif, only GIF. ABM is
+#     1 bit a pixel also on a display with colors.
+want() {	# $1: Archaic's options, $2: what must come, $3: the Accept
+	"$bin" -t $1 "http://127.0.0.1:$port/hn2.pic" >"$tmp/want.out" 2>&1
+	acc=$(grep '^accept /hn2.pic' "$tmp/http.log" | tail -1)
+	grep -q " got 632x330 $2\$" "$tmp/want.out" && [ "${acc#*: }" = "$3" ]
+}
+if want "" "abm sum ae2b58f3" "text/html image/x-abm image/gif" &&
+	want "-c 256" "abm sum ae2b58f3" "text/html image/x-abm image/gif" &&
+	want "-f abm" "abm sum ae2b58f3" "text/html image/x-abm image/gif" &&
+	want "-f gif" "gif sum ae2b58f3" "text/html image/gif" &&
+	want "-f gif -c 256" "gif sum [0-9a-f]* colors" "text/html image/gif"; then
+	ok "asks for ABM and GIF; -f gif: only for GIF; ABM is 1 bit also with colors"
+else
+	bad "what Archaic asks for: $acc"
+	tail -2 "$tmp/want.out"
+fi
+
 # 2. Gray and color GIFs (dithered): the size must be right.
 for f in hn216 ex16; do
 	"$bin" -t -o "$tmp/$f.pbm" "http://127.0.0.1:$port/$f.gif" >"$tmp/$f.out" 2>&1
@@ -74,7 +131,7 @@ done
 for f in hn216 ex16 hn2; do
 	"$bin" -t -c 256 -o "$tmp/$f.ppm" "http://127.0.0.1:$port/$f.gif" >"$tmp/$f.cout" 2>&1
 	magick "$here/data/$f.gif[0]" -depth 8 "$tmp/$f-ref.ppm"
-	if grep -q ' got [0-9]*x[0-9]* sum [0-9a-f]* colors$' "$tmp/$f.cout" &&
+	if grep -q ' got [0-9]*x[0-9]* gif sum [0-9a-f]* colors$' "$tmp/$f.cout" &&
 		[ "$(head -c 2 "$tmp/$f.ppm")" = P6 ] &&
 		magick compare -metric AE "$tmp/$f.ppm" "$tmp/$f-ref.ppm" null: 2>/dev/null; then
 		ok "$f.gif decodes in its colors exactly"
@@ -420,7 +477,7 @@ EOF
 	fx=$(awk '$2 == "image" { print $3; exit }' "$tmp/tall.out")
 	fy=$(awk '$2 == "image" { print $4; exit }' "$tmp/tall.out")
 	fh=$(awk '$2 == "image" { print $6; exit }' "$tmp/tall.out")
-	if grep -q "image .* ismap got 600x$fh sum [0-9a-f]* tall 600x1500 at 0" "$tmp/tall.out" &&
+	if grep -q "image .* ismap got 600x$fh gif sum [0-9a-f]* tall 600x1500 at 0" "$tmp/tall.out" &&
 		grep -q "GET /tall.gif?y=0&h=$fh " "$tmp/http.log"; then
 		ok "tall: a frame ${fh} high, its first slice"
 	else

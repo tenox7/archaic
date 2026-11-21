@@ -21,7 +21,7 @@
  *
  * One port = one display file (g_ functions) and one network file
  * (n_ functions) next to the portable core (main.c, html.c, http.c,
- * gif.c). See README.md. The displays for modern systems (SDL, Cocoa)
+ * gif.c, pic.c). See README.md. The displays for modern systems (SDL, Cocoa)
  * may use newer C.
  */
 #ifndef ARCHAIC_H
@@ -105,11 +105,12 @@ typedef struct form {
 typedef struct image {
 	int w, h;		/* 0 until the GIF header has come */
 	int bpl;		/* bytes in a row */
-	int depth;		/* the pixels: 1 or 8 bits (set before gif_load) */
+	int depth;		/* the pixels: 1 or 8 bits (set before pic_load) */
 	unsigned char *bits;	/* rows of pixels. 1 bit: 1 = black, high bit
 				 * left. 8 bits: a color number each */
 	unsigned char *pal;	/* 8 bits: 256 colors, 3 bytes each (red,
 				 * green, blue 0 to 255); 1 bit: 0 */
+	int kind;		/* what it came as: P_GIF or P_ABM (pic_load) */
 } Image;
 
 /* html.c: the page */
@@ -131,8 +132,14 @@ extern long http_got;		/* body bytes read so far */
 extern int http_status;
 extern char http_host[];	/* the server of the last http_open() */
 extern int http_port;
+extern char *http_accept;	/* the request's Accept: what Archaic takes */
 int http_open P((char *url, char *post));
 int http_getc P((void));
+/* the body's bytes with no call for each: see http.c */
+extern unsigned char *http_p, *http_e;
+int http_more P((void));
+void http_sync P((void));
+#define HGETC() (http_p < http_e ? *http_p++ : http_more())
 void http_close P((void));
 void http_pump P((void));	/* take what the network has, without waiting */
 long now P((void));		/* seconds */
@@ -143,7 +150,14 @@ int strieq P((char *a, char *b));
 int strnieq P((char *a, char *b, int n));
 void scopy P((char *d, char *s, int max));
 
-/* gif.c: the pixels as im->depth says */
+/* pic.c: a picture from the body. A GIF: the pixels as im->depth says
+ * (set it before). WRP's ABM: 1 bit. 0 ok, -1 not a picture or broken */
+int pic_load P((Image *im));
+#define P_GIF 1			/* Image's kind: a GIF, */
+#define P_ABM 2			/*  WRP's ABM; 0: not a picture */
+void pic_rows P((Image *im, int y, int n));	/* http_sync(), then img_rows() */
+void pic_wipe P((unsigned char *p, long n));	/* n bytes to 0 */
+/* gif.c: a GIF, after its first 2 bytes "GI" */
 int gif_load P((Image *im));
 
 /* main.c: called from the other files */

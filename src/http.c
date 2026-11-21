@@ -23,6 +23,8 @@ int http_status;
 
 static int conn = -1;
 static int beof;		/* the network has no more */
+unsigned char *http_p, *http_e;	/* body bytes at hand: http_p up to http_e */
+static unsigned char *wbase;	/* where http_p was at the last http_sync() */
 /* what came from the network and is not used yet: a ring */
 #define RING 16384		/* a power of 2 */
 static char ring[RING];
@@ -31,6 +33,9 @@ static char req[2 * MAXURL + 300];
 static char line[MAXURL + 40];
 static char loc[MAXURL];
 char http_host[128];		/* the server of the last http_open() */
+/* what Archaic takes, for the server: pages, GIFs, and WRP's black and
+ * white picture (ABM: see pic.c). With -f gif, main.c leaves ABM out. */
+char *http_accept = "text/html, image/x-abm, image/gif";
 int http_port;
 static char path[MAXURL];
 
@@ -338,16 +343,17 @@ char *url, *post;
 		}
 		rin = rout = 0;
 		beof = 0;
+		http_p = http_e = wbase = (unsigned char *)ring;
 		if (http_port == 80)
 			sprintf(line, "%s", http_host);
 		else
 			sprintf(line, "%s:%d", http_host, http_port);
 		if (post)
-			sprintf(req, "POST %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: text/html, image/gif\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s",
-				path, line, VERSION, slen(post), post);
+			sprintf(req, "POST %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s",
+				path, line, VERSION, http_accept, slen(post), post);
 		else
-			sprintf(req, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: text/html, image/gif\r\n\r\n",
-				path, line, VERSION);
+			sprintf(req, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: %s\r\n\r\n",
+				path, line, VERSION, http_accept);
 		if (n_write(conn, req, slen(req)) < 0) {
 			sprintf(http_err, "can't send to %s", http_host);
 			http_close();
@@ -404,16 +410,50 @@ char *url, *post;
 	}
 }
 
+/* The body comes through a window on the buffer: the bytes from http_p
+ * up to http_e are at hand, and HGETC() (archaic.h) takes the next one
+ * with no call. http_sync() counts the bytes taken so far (http_got) and
+ * gives their room back to the buffer; call it before img_rows(), which
+ * reads the network. */
+void http_sync()
+{
+	int n = (int)(http_p - wbase);
+
+	rout += n;
+	http_got += n;
+	wbase = http_p;
+}
+
+/* the window is used up: the next byte, -1 at the end of the body. The
+ * window is then all the bytes that lie together in the buffer. */
+int http_more()
+{
+	long n;
+	int at;
+
+	http_sync();
+	http_p = http_e = wbase = (unsigned char *)ring;
+	if (conn < 0 || (http_len >= 0 && http_got >= http_len))
+		return -1;
+	if (rout >= rin && fill() < 0)
+		return -1;
+	at = (int)(rout & (RING - 1));
+	n = rin - rout;
+	if (n > RING - at)
+		n = RING - at;
+	if (http_len >= 0 && n > http_len - http_got)
+		n = http_len - http_got;
+	wbase = http_p = (unsigned char *)ring + at;
+	http_e = http_p + (int)n;
+	return *http_p++;
+}
+
 /* the next byte of the body, -1 at its end */
 int http_getc()
 {
-	int c;
+	int c = HGETC();
 
-	if (conn < 0 || (http_len >= 0 && http_got >= http_len))
-		return -1;
-	c = rawc();
-	if (c >= 0)
-		++http_got;
+	http_sync();
 	return c;
 }
 
@@ -424,4 +464,5 @@ void http_close()
 		ui_note(0);
 	}
 	conn = -1;
+	http_p = http_e = wbase = (unsigned char *)ring;
 }

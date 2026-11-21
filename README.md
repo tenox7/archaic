@@ -25,7 +25,7 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 | text fields, password fields | JavaScript, CSS, HTTPS (WRP does all that) |
 | buttons, drop-down menus (SELECT) | check boxes, radio buttons, TEXTAREA |
 | links, page title, line breaks | tables, fonts, colors |
-| GIF pictures, clickable (ISMAP) | PNG, JPEG (Archaic asks WRP for GIF) |
+| GIF and ABM pictures, clickable (ISMAP) | PNG, JPEG (Archaic asks WRP for GIF or ABM) |
 
 ---
 
@@ -98,7 +98,7 @@ Wikipedia's AT&T UNIX PC article, after one click on the ↓ button:
 ## Using it
 
 ```
-archaic [=WxH+X+Y] [-a] [-c n] [-t] [-v] [-o file] [-s script] [url]
+archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 ```
 
 | Option | Meaning |
@@ -107,7 +107,8 @@ archaic [=WxH+X+Y] [-a] [-c n] [-t] [-v] [-o file] [-s script] [url]
 | `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris: 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
-| `-t` | test mode: no window. Prints the page items and a checksum of each picture |
+| `-f fmt` | `gif`: ask WRP for GIFs only. `abm` (as without `-f`): WRP may send its black and white pictures as ABM (see Pictures: GIF and ABM) |
+| `-t` | test mode: no window. Prints the page items, and for each picture what it came as (`gif`, `abm`) and a checksum |
 | `-v` | status messages also go to stderr |
 | `-o file` | at the end, save the first picture: PBM, or PPM if it has colors |
 | `-s script` | play a script, then quit (see Testing) |
@@ -118,7 +119,7 @@ archaic [=WxH+X+Y] [-a] [-c n] [-t] [-v] [-o file] [-s script] [url]
 |---|---|
 | W, H | the window's size: the picture fills the window. Always, also with `-a` |
 | M (mode) | ISMAP |
-| T (picture type) | GIF |
+| T (picture type) | GIF. WRP sends its black and white pictures (2 colors) as ABM in its place (see Pictures: GIF and ABM) |
 | C (colors) | black and white display: 2 (or `-c n`), not shown. A display with colors: the menu shows (see Colors) |
 | SL (slices) | 1: the whole page, in slices (see Scrolling). An older WRP ignores it |
 
@@ -169,6 +170,57 @@ On a black and white display, the C menu is hidden. Archaic asks WRP for 2 color
 
 Archaic's own start page request asks WRP for the same settings as the next ones
 (`/?m=ismap&t=gif&c=256&sl=1`), so that WRP's form does not change after the first page.
+
+### Pictures: GIF and ABM
+
+A GIF has a code for every few pixels. An old CPU needs a long time for that:
+a 10 MHz 68010 needs about 8 seconds for one picture of 551 x 310 pixels.
+That was most of the time of a page, also on a slow line.
+
+**ABM** is WRP's black and white picture for 1-bit displays. It is the display's own bytes
+(1 bit a pixel), packed with a byte LZ. Archaic decodes it in whole bytes, with no work for each pixel.
+
+- Archaic's requests have `Accept: image/x-abm`.
+- A WRP that knows ABM (it has `abm.go`) then sends its black and white pictures (2 colors) as ABM,
+  and pictures with more colors as GIFs. An older WRP sends only GIFs.
+- On a display with colors, an ABM picture shows as it is: black and white (C set to 2).
+- `-f gif` makes Archaic ask for GIFs only. Use it to compare the two on your computer:
+  `archaic -t -f gif ...`, then `archaic -t ...`. The last status line has the time.
+- WRP's black and white GIF (2 colors in its color table) goes a fast way in the GIF decoder too:
+  about 5 times faster than before. Other GIFs are decoded a pixel at a time.
+
+Measured with `-t`: one page with 6 pictures of 551 x 310 pixels (42 KB as GIF, 37 KB as ABM):
+
+| Computer and line | Archaic 0.3 (GIF) | GIF, the fast way | ABM |
+|---|---|---|---|
+| 3B1 (10 MHz 68010), Ethernet | 49 s | 11 s | 4 s |
+| 3B1, a line of 4000 bytes a second | 50 s | 14 s | 12 s |
+| 3B1, a line of 1600 bytes a second | 52 s | 29 s | 26 s |
+| Atari ST (8 MHz 68000), SLIP | 100 s | 40 s | 25 s |
+
+With ABM, the line is the slow part, not the CPU.
+
+Other formats were measured too. The sizes are the mean of 171 pictures of 551 x 310 pixels
+from 12 web pages. The times are for one picture on the 3B1, with no network:
+
+| Format | Size | Time to decode |
+|---|---|---|
+| GIF, as Archaic 0.3 decoded it | 6.9 KB | 7.5 s |
+| GIF, the fast way | 6.9 KB | 1.3 s |
+| **ABM** | 6.2 KB | 0.15 s |
+| deflate (as in PNG) | 5.3 KB | 0.6 s |
+| PackBits | 7.5 KB | 0.15 s |
+| the bits as they are | 21 KB | 0.15 s |
+| XBM | 108 KB | 5 s |
+
+- Deflate is smaller than ABM, but slower to decode. On the 3B1 it was 12% faster on the line of
+  1600 bytes a second, and 60% slower on Ethernet. On the ST with SLIP it was 12% slower:
+  there netd uses the CPU too. So ABM has the simple packing.
+- The bits as they are, and XBM, are never faster: they are 3 and 15 times larger than ABM.
+- VNC (RFB) has no 1-bit pixels. Its simple encodings carry 8 bits or more a pixel
+  (Raw: 24 times the GIF, Hextile: 2.7 times). Its small ones (Zlib, ZRLE, Tight) are deflate: see above.
+
+The ABM file format is in `src/pic.c`.
 
 To type into a box on the web page: click the box in the picture, then type in **K**.
 
@@ -272,7 +324,7 @@ With a WRP that knows slices (`sl=1`), WRP makes a picture of the whole page onc
 - A click on the picture goes to WRP as a place on the whole page.
 - After a click or keys on the same page, the frame stays where it was. A new page starts at its top.
 - WRP leaves out its Up and Dn buttons.
-- A slice in 2 colors is about 5 to 9 KB for 632 x 351 pixels.
+- A slice in 2 colors is about 5 to 9 KB for 632 x 351 pixels as GIF, and about 10% less as ABM.
   In 256 colors it is bigger: about 20 to 100 KB.
 
 | Input | Scrolls the frame |
@@ -316,7 +368,8 @@ X10 has no events for the mouse moving with a button down, and can't wait for a 
 | `src/main.c` | the page on the screen: layout, drawing, mouse, keys, forms |
 | `src/html.c` | HTML reader: forms, menus, links, images, text |
 | `src/http.c` | URLs and HTTP/1.0, with a 16 KB read buffer |
-| `src/gif.c` | GIF decoder: the colors, or black and white with a 4x4 dither |
+| `src/gif.c` | GIF decoder: the colors, or black and white with a 4x4 dither. WRP's black and white GIFs go a fast way |
+| `src/pic.c` | pictures: looks at what came (GIF or ABM); the ABM decoder |
 | `src/x10.c` | display for X10 (Idris) |
 | `src/nidris.c` | network for Idris: TCP through netd |
 | `src/x11.c` | display for X11 (Unix, macOS with XQuartz) |
@@ -335,7 +388,7 @@ X10 has no events for the mouse moving with a button down, and can't wait for a 
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
 | `test/run.sh` | tests: GIF decoder, HTML, forms, WRP, the headless display |
 | `test/xshot.sh` | test: run the X11 build and take a screenshot |
-| `test/data/` | GIFs saved from WRP, for the tests |
+| `test/data/` | GIFs saved from WRP, for the tests; two of them also as ABM |
 | `test/cfacts.c`, `cfacts2.c` | probe for a new port: what its C compiler and linker do (name length, case, struct copies) |
 | `screenshots/` | the pictures in this README |
 
@@ -396,6 +449,8 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 `test/run.sh` checks:
 
 1. GIF decoding gives **exactly** the same pixels as ImageMagick.
+   ABM pictures give exactly the pixels of the GIF, and a broken ABM is refused.
+   Archaic asks for ABM and GIF, and with `-f gif` only for GIF.
 2. Gray and color GIFs decode at the right size.
    With colors (`-c 256`), the colors are **exactly** ImageMagick's.
 3. HTML: title, entities, fields, menus, hidden fields, buttons, links, comments.
@@ -465,16 +520,16 @@ hget 10.0.2.2 8077 /src/fetch fetch
 sh fetch
 ```
 
-All 10 files (65 KB) take about 70 seconds.
+All 11 files (124 KB) take about 2 minutes.
 
 ### 2. Build
 
 ```
 sh mkinc     # once per folder: the X10 headers
-sh mk        # compile and link: archaic, about 80 KB
+sh mk        # compile and link: archaic, about 118 KB
 ```
 
-With Hatari's fast-forward on, `sh mk` takes about 1.5 minutes.
+With Hatari's fast-forward on, `sh mk` takes about 2.5 minutes.
 To relink only: `sh lka`.
 
 > **Fast-forward**: turn it on only while waiting (compiles, X start).
@@ -490,6 +545,7 @@ To relink only: `sh lka`.
 
 The last line ends with `sum ae2b58f3`: the same as on Unix.
 That checks HTTP, netd and the GIF decoder in one go.
+With `hn2.abm` in the place of `hn2.gif`, it checks the ABM decoder: the same sum.
 
 **With X:** start X, then run `./archaic` in an xterm (or from a telnet login).
 
@@ -514,10 +570,10 @@ Example: load a page, then keep the window 40 s for a screenshot:
 
 | What | Time |
 |---|---|
-| WRP start page | 4 s |
-| Hacker News page with its 10.7 KB picture | 36 s from Return |
-| Wikipedia page with its 9 KB picture | 30 s from Return |
-| decode check (`-t`, two 11 KB downloads) | 25 s |
+| WRP start page | 3 s |
+| Wikipedia page with its picture (8 KB as ABM) | 10 s from Return (Archaic 0.3: 30 s) |
+| decode check (`-t`, `hn2.abm`, 9 KB) | 9 s |
+| decode check (`-t`, `hn2.gif`, 11 KB: a GIF with 256 colors in its table, so the slow way) | 27 s |
 
 ---
 
@@ -598,16 +654,16 @@ Test on a copy of your Idris disk.
 
 Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
 
-1. Copy these 8 files (74 KB) into a folder on the 3B1, with ftp, rcp or a floppy:
-   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `unixpc.c`, `ntwg.c` and `mkunixpc`.
+1. Copy these 9 files (126 KB) into a folder on the 3B1, with ftp, rcp or a floppy:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `unixpc.c`, `ntwg.c` and `mkunixpc`.
    The FreeBee kit forwards the 3B1's ftp to port 35121 on your computer, and rsh to 35514.
 2. Build:
 
    ```
-   sh mkunixpc     # compile and link: archaic, about 43 KB
+   sh mkunixpc     # compile and link: archaic, about 62 KB
    ```
 
-   It takes about 40 s in FreeBee at turbo 10.
+   It takes about 1 minute in FreeBee at turbo 10.
 3. Test. **Test mode, no window needed** (serve this folder from your computer:
    `python3 -m http.server 8077`):
 
@@ -616,17 +672,20 @@ Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
    ```
 
    The last line ends with `sum ae2b58f3`: the same as on Unix and on Idris.
+   With `hn2.abm` in the place of `hn2.gif`, it checks the ABM decoder: the same sum.
 
    **With the window:** `./archaic` in a shell window.
 
-**Measured in FreeBee** (from Return until the picture is complete):
+**Measured in FreeBee** at 10 MHz, as a real 3B1 (from Return until the picture is complete).
+At turbo 10, as in the kit, the CPU's part is 10 times shorter.
 
-| What | 10 MHz, as a real 3B1 | turbo 10, as in the kit |
-|---|---|---|
-| WRP start page (`-t`) | 1 s | 0.1 s |
-| decode check (`-t`, an 11 KB GIF) | 10 s | 1 s |
-| Wikipedia page with its picture | 12 s | 2 s |
-| ↓ on it (a dithered photo) | 18 s | 7 s |
+| What | Time |
+|---|---|
+| WRP start page (`-t`) | 1 s |
+| decode check (`-t`, `hn2.abm`, 9 KB) | 1 s |
+| decode check (`-t`, `hn2.gif`, 11 KB: a GIF with 256 colors in its table, so the slow way) | 9 s |
+| Wikipedia page with its picture (`-t`) | 4 s (Archaic 0.3: 13 s) |
+| the same in the window, with the address typed by a script | 14 s (Archaic 0.3: 25 s) |
 
 ---
 
@@ -685,7 +744,7 @@ Test on a copy of your 3B1 disk.
 
 ## Porting to DOS, OS/2, Win16 and others
 
-The core (`main.c`, `html.c`, `http.c`, `gif.c`) does not change.
+The core (`main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`) does not change.
 A port is **one display file** and **one network file**.
 
 **Display (`g_` functions)**
@@ -724,8 +783,8 @@ A port is **one display file** and **one network file**.
 - `unsigned char` for bytes. `long` for byte counts and pixel offsets (int may be 16 bits).
 - Few library calls: malloc, free, sprintf, printf, fprintf, getenv, time.
 
-**Memory note for 16-bit systems:** the static data is about 130 KB
-(page 30 KB, items 50 KB, read buffer 16 KB, GIF tables 18 KB).
+**Memory note for 16-bit systems:** the static data is about 145 KB
+(page 30 KB, items 50 KB, read buffer 16 KB, GIF tables 32 KB).
 On DOS or Win16, use the large memory model, or make these smaller in `archaic.h`.
 
 ---
@@ -852,6 +911,8 @@ and **OS/2 1.1 to 1.3**, with Presentation Manager (from 1988). OS/2 1.0 had tex
 - WRP before commit 3126bc0 (November 2026) could hang for good on back (← arrow),
   when Chrome took the page from its back-forward cache. Use a newer WRP.
 - With slices, a link to a place on the same page (`#name`) does not scroll the frame there.
+- Only WRP's black and white pictures come as ABM. Pictures with colors are GIFs, and the GIF decoder
+  does them a pixel at a time: slow on an old CPU (see Pictures: GIF and ABM).
 
 ---
 

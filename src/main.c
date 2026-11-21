@@ -1,6 +1,7 @@
 /* main.c - Archaic: the page on the screen, the mouse and the keys.
  *
- *	archaic [=WxH+X+Y] [-a] [-c n] [-t] [-v] [-o file] [-s script] [url]
+ *	archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file]
+ *		[-s script] [url]
  *
  * url		WRP's address: host:port or http://host:port/
  *		(default $WRP, else DEFURL)
@@ -9,6 +10,9 @@
  * -c n		start with pictures of n colors (2 to 256), not as many
  *		as the display shows (g_colors). With -t: as if the
  *		display showed n
+ * -f fmt	gif: ask WRP for GIFs only. abm (as without -f): WRP may
+ *		send its black and white pictures as ABM (see pic.c). To
+ *		compare the two on a computer
  * -t		test: no window; print the page and its pictures
  * -v		status messages to stderr too
  * -o file	at the end, write the first picture: PBM, or PPM if it
@@ -1906,6 +1910,7 @@ Image *im;
 		free((char *)im->pal);
 	im->bits = im->pal = 0;
 	im->w = im->h = 0;
+	im->kind = 0;
 }
 
 static void freeimgs()
@@ -1950,7 +1955,7 @@ int i, k, n;
 		return;
 	}
 	im->depth = idepth;
-	if (gif_load(im) == 0)
+	if (pic_load(im) == 0)
 		progress();
 	else if (!stop) {
 		sprintf(msg, "Picture: can't show %s", http_type[0] ? http_type : "it");
@@ -2045,7 +2050,7 @@ long a, b;
 			if (http_status != 200) {
 				sprintf(msg, "Picture: HTTP %d", http_status);
 				say(msg);
-			} else if (gif_load(&s->im) < 0) {
+			} else if (pic_load(&s->im) < 0) {
 				if (!stop)
 					say("Picture: can't show the slice");
 			} else if (s->im.h != b - a)	/* the server ignored y and h */
@@ -2427,6 +2432,7 @@ static void dump()
 {
 	static char *tn[] = { "?", "text", "br", "para", "field", "button",
 		"hidden", "select", "image" };
+	static char *kn[] = { "none", "gif", "abm", "?" };
 	Item *it;
 	Image *im;
 	Slice *s;
@@ -2468,13 +2474,15 @@ static void dump()
 			for (j = 0; j < NSLICE; ++j) {
 				s = &slices[j];
 				if (s->state == 2 && s->y0 <= oy && oy < s->y0 + s->im.h)
-					printf(" got %dx%d sum %08lx%s", s->im.w, s->im.h,
-						sum(&s->im), s->im.depth == 8 ? " colors" : "");
+					printf(" got %dx%d %s sum %08lx%s", s->im.w, s->im.h,
+						kn[s->im.kind & 3], sum(&s->im),
+						s->im.depth == 8 ? " colors" : "");
 			}
 			printf(" tall %dx%d at %ld", it->iw, it->ih, oy);
 		} else if (it->type == I_IMAGE && it->img >= 0) {
 			im = &imgs[it->img];
-			printf(" got %dx%d sum %08lx%s", im->w, im->h, sum(im),
+			printf(" got %dx%d %s sum %08lx%s", im->w, im->h,
+				kn[im->kind & 3], sum(im),
 				im->depth == 8 ? " colors" : "");
 		}
 		printf("\n");
@@ -2595,8 +2603,17 @@ char **argv;
 			else
 				verbose = 1;
 		} else if (a[0] == '-' && a[1] && !a[2] && i + 1 < argc &&
-			(a[1] == 'o' || a[1] == 's' || a[1] == 'g' || a[1] == 'c')) {
-			if (a[1] == 'o')
+			(a[1] == 'o' || a[1] == 's' || a[1] == 'g' || a[1] == 'c' ||
+			a[1] == 'f')) {
+			if (a[1] == 'f') {
+				a = argv[++i];
+				if (strieq(a, "gif"))
+					http_accept = "text/html, image/gif";
+				else if (!strieq(a, "abm")) {
+					fprintf(stderr, "archaic: -f takes gif or abm\n");
+					return 2;
+				}
+			} else if (a[1] == 'o')
 				pbm = argv[++i];
 			else if (a[1] == 's')
 				script = argv[++i];
@@ -2609,7 +2626,7 @@ char **argv;
 			} else
 				geom = argv[++i];
 		} else if (a[0] == '-') {
-			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-t] [-v] [-o file] [-s script] [url]\n");
+			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-f gif|abm] [-t] [-v] [-o file] [-s script] [url]\n");
 			return 2;
 		} else
 			url = a;

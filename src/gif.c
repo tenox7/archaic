@@ -1,12 +1,19 @@
 /* gif.c - GIF decoder for Archaic: GIF87a and GIF89a, the first image,
- * interlaced or not. The bytes come from http_getc() as they arrive,
- * and finished rows go to the screen at once (img_rows), so the page
- * shows from the top down while it loads.
+ * interlaced or not. The bytes come from the body as they arrive, and
+ * finished rows go to the screen at once (pic_rows), so the page shows
+ * from the top down while it loads.
  *
  * im->depth says what the pixels become. 1: 1 bit, each color's
  * brightness against a 4x4 ordered dither; WRP's 2-color GIFs (black
  * and white only) come out exact. 8: the color numbers themselves, a
  * byte each, and the colors in im->pal, for a display that shows them.
+ *
+ * WRP's black and white GIF on a 1-bit display takes the fast way (lzw1):
+ * no pixel is handled alone. It is a GIF whose colors are all black or
+ * white, that fills its screen and is not interlaced. For 551 x 310
+ * pixels a 10 MHz 68010 needs 7.5 seconds the slow way (44 microseconds
+ * a pixel), and 1.3 seconds the fast way. (WRP's ABM is faster still:
+ * see pic.c.)
  */
 #include "archaic.h"
 
@@ -23,6 +30,12 @@ static short prefix[4096];		/* LZW: code = prefix code + suffix */
 static unsigned char suffix[4096];
 static unsigned char stk[4097];
 static unsigned char row[MAXW];		/* color numbers of one row */
+/* lzw1: a code's pixels as bits, 16 at a time. tail has its last ntail
+ * pixels (1 to 16; the first one is the high bit), prefix the code with
+ * the pixels before them (-1: none), suffix its first pixel. */
+static unsigned short tail[4096];
+static unsigned char ntail[4096];
+static short chain[260];		/* a long string's codes, last first */
 static int dither[4][4] = {		/* 4x4 Bayer thresholds, 8..248 */
 	{ 8, 136, 40, 168 },
 	{ 200, 72, 232, 104 },
@@ -42,8 +55,8 @@ static int get2()
 {
 	int a, b;
 
-	a = http_getc();
-	b = http_getc();
+	a = HGETC();
+	b = HGETC();
 	return b < 0 ? -1 : a | b << 8;
 }
 
@@ -54,9 +67,9 @@ int n;
 	int i, r, g, b;
 
 	for (i = 0; i < n; ++i) {
-		r = http_getc();
-		g = http_getc();
-		b = http_getc();
+		r = HGETC();
+		g = HGETC();
+		b = HGETC();
 		if (b < 0)
 			return -1;
 		rgb[3 * i] = r;
@@ -89,54 +102,90 @@ static int skip()
 {
 	int n;
 
-	while ((n = http_getc()) > 0)
+	while ((n = HGETC()) > 0)
 		while (n-- > 0)
-			if (http_getc() < 0)
+			if (HGETC() < 0)
 				return -1;
 	return n;
 }
 
-/* the next byte of the image data, -1 at its end */
-static int dbyte()
+/* the next byte of the image data, at the start of a data block; -1 at
+ * the end of the data */
+static int dblock()
 {
 	if (dend)
 		return -1;
+	blk = HGETC();
+	if (blk <= 0) {
+		blk = 0;
+		dend = 1;
+		return -1;
+	}
+	--blk;
+	return HGETC();
+}
+
+/* the next byte of the image data, -1 at its end */
+#define DBYTE() (blk > 0 ? (--blk, HGETC()) : dblock())
+
+/* The fast way keeps the body's bytes in registers: the image data's
+ * bytes at hand are ip up to lim (the end of the data block, or of what
+ * has come). dmore() gives the next byte when they are used up, and
+ * sets http_p and dlim for the ones after it; -1 at the end of the data. */
+static unsigned char *dlim;
+
+static int dmore()
+{
+	long n;
+	int c;
+
+	dlim = http_p;
+	if (dend)
+		return -1;
 	if (blk == 0) {
-		blk = http_getc();
+		blk = HGETC();
 		if (blk <= 0) {
 			blk = 0;
 			dend = 1;
+			dlim = http_p;
 			return -1;
 		}
 	}
-	--blk;
-	return http_getc();
-}
-
-/* the next code of size bits, -1 at the end */
-static int code(size)
-int size;
-{
-	int c;
-
-	while (nacc < size) {
-		c = dbyte();
-		if (c < 0)
-			return -1;
-		acc |= (unsigned long)c << nacc;
-		nacc += 8;
+	c = HGETC();
+	if (c < 0) {
+		dend = 1;
+		dlim = http_p;
+		return -1;
 	}
-	c = (int)(acc & ((1L << size) - 1));
-	acc >>= size;
-	nacc -= size;
+	--blk;
+	n = http_e - http_p;
+	if (n > blk)
+		n = blk;
+	blk -= (int)n;
+	dlim = http_p + n;
 	return c;
 }
 
 static void flush()
 {
 	if (npend > 0)
-		img_rows(im, pend0, npend);
+		pic_rows(im, pend0, npend);
 	npend = 0;
+}
+
+/* image row y is done: show the rows in eights */
+static void rowdone(y)
+int y;
+{
+	if (npend > 0 && y == pend0 + npend)
+		++npend;
+	else {
+		flush();
+		pend0 = y;
+		npend = 1;
+	}
+	if (npend >= 8)
+		flush();
 }
 
 /* row[] has all of image row ry: into the bitmap, then the next row */
@@ -164,15 +213,7 @@ static void putrow()
 				if (gray[row[x]] < t[(left + x) & 3])
 					b[(left + x) >> 3] |= bit[(left + x) & 7];
 		}
-		if (npend > 0 && y == pend0 + npend)
-			++npend;
-		else {
-			flush();
-			pend0 = y;
-			npend = 1;
-		}
-		if (npend >= 8)
-			flush();
+		rowdone(y);
 	}
 	if (!ilace)
 		++ry;
@@ -186,13 +227,11 @@ static void putrow()
 }
 
 /* LZW: the pixels of the image, row by row */
-static int lzw()
+static int lzw(mcs)
+int mcs;
 {
-	int mcs, clear, eoi, next, size, old, first, in, c, sp, x;
+	int clear, eoi, next, size, old, first, in, c, sp, x;
 
-	mcs = http_getc();
-	if (mcs < 2 || mcs > 8)
-		return -1;
 	clear = 1 << mcs;
 	eoi = clear + 1;
 	for (c = 0; c < clear; ++c) {
@@ -203,14 +242,19 @@ static int lzw()
 	next = clear + 2;
 	old = -1;
 	first = 0;
-	blk = dend = 0;
-	acc = 0;
-	nacc = 0;
 	x = 0;
-	ry = pass = 0;
 	while (ry < ih) {
-		c = code(size);
-		if (c < 0 || c == eoi)
+		while (nacc < size) {
+			c = DBYTE();
+			if (c < 0)
+				return 0;
+			acc |= (unsigned long)c << nacc;
+			nacc += 8;
+		}
+		c = (int)(acc & ((1L << size) - 1));
+		acc >>= size;
+		nacc -= size;
+		if (c == eoi)
 			break;
 		if (c == clear) {
 			size = mcs + 1;
@@ -266,12 +310,164 @@ static int lzw()
 	return 0;
 }
 
-/* read a GIF into img (bits and pal from malloc): 0 ok, -1 not a GIF or
- * broken */
+/* LZW, the fast way: black and white pixels straight to the 1-bit rows.
+ * Each code's string is kept as bits (see tail), so a code gives up to
+ * 16 pixels at a time. For a picture that fills its screen, and is not
+ * interlaced. */
+static int lzw1(mcs)
+int mcs;
+{
+	register unsigned long acc;	/* code bits not used yet, nacc of them */
+	register unsigned long oacc;	/* the row's bits not stored yet, */
+	register int on;		/*  on of them, from the high bit down */
+	register unsigned char *ip, *lim, *op;
+	register int c, k, nacc;
+	unsigned int v;
+	int clear, eoi, next, size, mask, top, old, n, m, f, rleft, y, w, h;
+
+	clear = 1 << mcs;
+	eoi = clear + 1;
+	for (c = 0; c < clear; ++c) {
+		f = gray[c] < 128;
+		prefix[c] = -1;
+		suffix[c] = f;
+		tail[c] = f ? 0x8000 : 0;
+		ntail[c] = 1;
+	}
+	size = mcs + 1;
+	mask = (1 << size) - 1;
+	top = 1 << size;
+	next = clear + 2;
+	old = -1;
+	acc = 0;
+	nacc = 0;
+	oacc = 0;
+	on = 0;
+	op = im->bits;
+	w = iw;
+	h = ih;
+	rleft = w;
+	y = 0;
+	ip = lim = http_p;
+	for (;;) {
+		while (nacc < size) {
+			if (ip < lim)
+				c = *ip++;
+			else {
+				http_p = ip;
+				c = dmore();
+				ip = http_p;
+				lim = dlim;
+				if (c < 0)
+					goto out;
+			}
+			acc |= (unsigned long)c << nacc;
+			nacc += 8;
+		}
+		c = (int)acc & mask;
+		acc >>= size;
+		nacc -= size;
+		if (c == eoi)
+			break;
+		if (c == clear) {
+			size = mcs + 1;
+			mask = (1 << size) - 1;
+			top = 1 << size;
+			next = clear + 2;
+			old = -1;
+			continue;
+		}
+		if (old < 0) {
+			if (c >= clear)
+				goto bad;
+		} else {
+			if (c > next || (c == next && next >= 4096))
+				goto bad;
+			if (next < 4096) {	/* the last string and one pixel */
+				f = suffix[c == next ? old : c];
+				k = ntail[old];
+				if (k < 16) {
+					tail[next] = tail[old] | (f ? 0x8000 >> k : 0);
+					ntail[next] = k + 1;
+					prefix[next] = prefix[old];
+				} else {
+					tail[next] = f ? 0x8000 : 0;
+					ntail[next] = 1;
+					prefix[next] = old;
+				}
+				suffix[next] = suffix[old];
+				if (++next >= top && size < 12) {
+					++size;
+					mask = (1 << size) - 1;
+					top = 1 << size;
+				}
+			}
+		}
+		old = c;
+		/* the string of c: its parts, the first one first */
+		n = 0;
+		for (k = c; prefix[k] >= 0; k = prefix[k]) {
+			if (n >= 258)
+				goto bad;
+			chain[n++] = k;
+		}
+		for (;;) {
+			v = tail[k];
+			m = ntail[k];
+			while (m >= rleft) {	/* the row ends in this part */
+				oacc |= (unsigned long)(v & (0xffff0000L >> rleft)) << (16 - on);
+				on += rleft;
+				while (on > 0) {
+					*op++ = (unsigned char)(oacc >> 24);
+					oacc <<= 8;
+					on -= 8;
+				}
+				oacc = 0;
+				on = 0;
+				v = (v << rleft) & 0xffff;
+				m -= rleft;
+				rleft = w;
+				http_p = ip;
+				rowdone(y);
+				if (++y >= h)
+					goto out;
+			}
+			if (m > 0) {
+				oacc |= (unsigned long)v << (16 - on);
+				on += m;
+				rleft -= m;
+				if (on >= 16) {
+					c = (int)(oacc >> 16);
+					*op++ = (unsigned char)(c >> 8);
+					*op++ = (unsigned char)c;
+					oacc <<= 16;
+					on -= 16;
+				}
+			}
+			if (n == 0)
+				break;
+			k = chain[--n];
+		}
+	}
+out:
+	http_p = ip;
+	ry = y;
+	/* the data bytes after lim are not taken yet: give them back to blk */
+	blk += (int)(lim - ip);
+	return 0;
+bad:
+	http_p = ip;
+	ry = y;
+	blk += (int)(lim - ip);
+	return -1;
+}
+
+/* read a GIF into img (bits and pal from malloc), after its first two
+ * bytes "GI": 0 ok, -1 not a GIF or broken */
 int gif_load(img)
 Image *img;
 {
-	int c, w, h, flags, i, r;
+	int c, w, h, flags, i, r, mcs, pure;
 	long n;
 
 	im = img;
@@ -279,15 +475,15 @@ Image *img;
 	if (im->depth != 8)
 		im->depth = 1;
 	im->pal = 0;
-	if (http_getc() != 'G' || http_getc() != 'I' || http_getc() != 'F')
+	if (HGETC() != 'F')
 		return -1;
 	for (i = 0; i < 3; ++i)
-		http_getc();
+		HGETC();
 	w = get2();
 	h = get2();
-	flags = http_getc();
-	http_getc();
-	if (http_getc() < 0 || w <= 0 || h <= 0 || w > MAXW || h > 8192)
+	flags = HGETC();
+	HGETC();
+	if (HGETC() < 0 || w <= 0 || h <= 0 || w > MAXW || h > 8192)
 		return -1;
 	for (i = 0; i < 256; ++i) {
 		gray[i] = i & 1 ? 0 : 255;
@@ -313,13 +509,12 @@ Image *img;
 		}
 		setpal();
 	} else
-		while (--n >= 0)
-			im->bits[n] = 0;
+		pic_wipe(im->bits, n);
 	r = -1;
 	for (;;) {
-		c = http_getc();
+		c = HGETC();
 		if (c == '!') {			/* extension: skip it */
-			http_getc();
+			HGETC();
 			if (skip() < 0)
 				break;
 			continue;
@@ -330,7 +525,7 @@ Image *img;
 		top = get2();
 		iw = get2();
 		ih = get2();
-		flags = http_getc();
+		flags = HGETC();
 		if (flags < 0 || iw <= 0 || ih <= 0 || iw > MAXW || left >= w ||
 			top >= h)
 			break;
@@ -341,13 +536,26 @@ Image *img;
 				setpal();
 		}
 		ilace = flags & 0100;
-		r = lzw();
+		mcs = HGETC();
+		if (mcs < 2 || mcs > 8)
+			break;
+		blk = dend = 0;
+		acc = 0;
+		nacc = 0;
+		ry = pass = 0;
+		/* pure black and white: the dither changes no pixel */
+		pure = im->depth == 1 && !ilace && left == 0 && top == 0 &&
+			iw == w && ih == h;
+		for (i = 0; pure && i < 1 << mcs; ++i)
+			if (gray[i] > 7 && gray[i] < 248)
+				pure = 0;
+		r = pure ? lzw1(mcs) : lzw(mcs);
 		if (r == 0) {			/* read to the end: all of it counts */
-			while (!dend && blk > 0 && http_getc() >= 0)
+			while (!dend && blk > 0 && HGETC() >= 0)
 				--blk;
 			if (!dend)
 				skip();
-			http_getc();		/* ';' */
+			HGETC();		/* ';' */
 		}
 		break;				/* only the first image */
 	}

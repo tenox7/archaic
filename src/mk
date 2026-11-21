@@ -5,6 +5,7 @@ c main.c
 c html.c
 c http.c
 c gif.c
+c pic.c
 c x10.c
 c nidris.c
 sh lka
