@@ -702,6 +702,55 @@ char **p;
 		pict(x, y, p, IW, IH, 0);
 }
 
+/* WRP's one-letter labels K and C get pictures too: a keyboard for the
+ * keys to send, a palette for the colors. */
+static char *kicon[] = {
+	".............",
+	".###########.",
+	"#############",
+	"##.#.#.#.#.##",
+	"#############",
+	"###.#.#.#.###",
+	"#############",
+	"##.#.....#.##",
+	"#############",
+	".###########.",
+	"............."
+};
+
+static char *cicon[] = {
+	"...#######...",
+	".###########.",
+	"##..##..#####",
+	"##..##..#####",
+	"#############",
+	"#..##########",
+	"#..######....",
+	"########.....",
+	"########.....",
+	".#########...",
+	"...#######..."
+};
+
+/* the picture of word it, or 0: only the label of WRP's K field or C
+ * menu has one. A label is the word just before them, their NAME. */
+static char **lpict(it)
+Item *it;
+{
+	Item *f = it + 1;
+
+	if (it->type != I_TEXT || it->href || it->form < 0 ||
+		it->form >= MAXFORM || !wrpf[it->form] ||
+		it - items + 1 >= nitems || f->form != it->form || !f->name ||
+		!strieq(it->text, f->name))
+		return (char **)0;
+	if (f->type == I_FIELD && strieq(f->name, "k"))
+		return kicon;
+	if (f->type == I_SELECT && strieq(f->name, "c"))
+		return cicon;
+	return (char **)0;
+}
+
 static void drawbutton(i)
 int i;
 {
@@ -960,6 +1009,7 @@ int rx, ry, rw, rh;
 {
 	Item *it;
 	int i, y, r1 = ry + rh, r = rx + rw;
+	char **p;
 
 	if (headless)
 		return;
@@ -975,6 +1025,10 @@ int rx, ry, rw, rh;
 				continue;
 			switch (it->type) {
 			case I_TEXT:
+				if ((p = lpict(it)) != 0) {
+					drawicon(it->x, y, p);
+					break;
+				}
 				text(it->x, y, it->text, len(it->text));
 				if (it->href)
 					fill(it->x, y + fb + 1, it->w, 1, 1);
@@ -1067,6 +1121,11 @@ Item *it;
 	it->w = it->h = 0;
 	switch (it->type) {
 	case I_TEXT:
+		if (lpict(it)) {
+			it->w = IW;
+			it->h = IH;
+			break;
+		}
 		it->w = tw(it->text, len(it->text));
 		it->h = fh;
 		break;
@@ -2470,7 +2529,7 @@ static void dump()
 			printf(" =\"%s\"", it->val);
 		if (it->type == I_TEXT || it->type == I_BUTTON || it->type == I_IMAGE)
 			printf(" \"%s\"", it->text);
-		if (icon(it))
+		if (icon(it) || lpict(it))
 			printf(" icon");
 		if (it->type == I_SELECT) {
 			printf(" sel %d:", it->sel);
