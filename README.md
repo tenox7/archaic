@@ -957,6 +957,7 @@ Each port is a display file, plus a network file if the system has no BSD socket
 | VWS, EWS | DEC's window systems before X11 | VAX/VMS (VWS), VAXELN (EWS) |
 | NeWS, Display PostScript | PostScript displays | SunOS, SGI, OS/2, VMS, NeXTSTEP, AIX ... |
 | Windows 1 and 2, OS/2 1.x | early PC window systems: TCP/IP over SLIP | Windows 1.0 and 2.x, OS/2 1.1 to 1.3 |
+| Tektronix 4010, 4014, 4105 | graphics terminals on a serial line: lines on a storage tube, or pixels (4105) | any host with a network: 2.11BSD, 4.3BSD, VMS ... |
 
 ### MGR
 
@@ -1055,6 +1056,32 @@ and **OS/2 1.1 to 1.3**, with Presentation Manager (from 1988). OS/2 1.0 had tex
   Archaic opens one connection at a time (`http.c`), so the TCP part can stay small.
 - On the host: a SLIP bridge to libslirp, as `slirpbridge` in the Idris kit. The host is then 10.0.2.2.
 - 16-bit: see the memory note in Porting.
+
+### Tektronix terminals: 4010, 4014 and 4105
+
+The [Tektronix 4010](https://en.wikipedia.org/wiki/Tektronix_4010) (1972) is a graphics terminal on a serial line.
+Its screen is a storage tube: a line stays on the screen after it is drawn, with no screen memory.
+It draws text and lines (vectors), green on dark, on 1024 x 780 points.
+It can erase only all of the screen.
+The 4014 has a larger screen, with 4 times more points in each direction.
+Many systems drew on them: Tektronix's PLOT 10 library, Unix's `plot -T4014`.
+The [4105](https://en.wikipedia.org/wiki/Tektronix_4105) is a color raster terminal (480 x 360 pixels).
+It also knows the 4010's commands.
+
+- Plan: one display file for the Tek commands. As with MGR, Archaic runs on the host
+  (one with a network), and sends the commands on the terminal line.
+- Pictures on the 4010 and 4014: each run of black pixels in a row is one line.
+  The page shows bright on dark.
+- Pictures on the 4105: its pixel operations, RASTER WRITE or RUNLENGTH WRITE
+  (see the [4105 Programmer's Reference](https://vtda.org/docs/computing/Tektronix/070-4526-03_4105ComputerDisplayTerminalProgammersRef_Feb86.pdf), 1986).
+- Clicks: GIN mode. The user moves the crosshair (with two thumbwheels on the 4010) and presses a key.
+  The terminal sends the key and the place.
+- Scrolling: erase the screen, then draw it again.
+- Emulators: xterm's Tek window (a 4014: `xterm -t`), and René Richarz's
+  [tek4010](https://github.com/rricharz/tek4010) (4010 and 4014), used with 2.11BSD and RSX-11 in SIMH.
+  Many emulators do not have the 4105's pixel operations.
+- To find: how long one picture takes on a 9600 baud line. A page of text has many runs of black pixels.
+- 2.11BSD (PDP-11) is 16-bit: see the memory note in Porting.
 
 ---
 
