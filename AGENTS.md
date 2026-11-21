@@ -119,7 +119,7 @@ the text and the button's key together as keys: `k=text%0D`. This works with eve
 ## Colors
 
 Archaic asks the display how many colors it shows.
-The first status line says what it found, like `Archaic 0.4, millions of colors`.
+The first status line says what it found, like `Archaic 0.5, millions of colors`.
 
 | Display | Colors |
 |---|---|
