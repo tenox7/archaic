@@ -16,6 +16,12 @@ unsigned long inet_addr();
 #include <arpa/inet.h>
 #endif
 
+#ifndef FD_SET		/* 4.2BSD (SunOS 3): an fd_set of one int, no macros */
+#define FD_ZERO(p) ((p)->fds_bits[0] = 0)
+#define FD_SET(n, p) ((p)->fds_bits[0] |= 1 << (n))
+#define FD_ISSET(n, p) ((p)->fds_bits[0] & 1 << (n))
+#endif
+
 int n_open(host, port, err)
 char *host, *err;
 int port;

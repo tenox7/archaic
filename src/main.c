@@ -412,8 +412,10 @@ static void showstatus()
 			printf("status: %s\n", sline);
 		return;
 	}
-	if (verbose)
+	if (verbose) {
 		fprintf(stderr, "archaic: %s\n", sline);
+		fflush(stderr);		/* SunOS 3 buffers it in a file */
+	}
 	drawstatus();
 	g_flush();
 }

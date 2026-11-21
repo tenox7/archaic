@@ -41,7 +41,7 @@
  * kits the host is 10.0.2.2: Whitesmiths C (_WSLAS) means Idris, and
  * gcc's unixpc the AT&T UNIX PC (3B1). The SunOS 4 kit (sunos414-lemu;
  * SUNVIEW is mksunview's build) has the network 192.168.1.0, and the
- * host is 192.168.1.10. */
+ * host is 192.168.1.10. A Sun-3 (mc68000) in TME with slirp: 10.0.2.2. */
 #ifndef DEFURL
 #ifdef _WSLAS
 #define DEFURL "http://10.0.2.2:8080/"
@@ -50,7 +50,11 @@
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifdef SUNVIEW
+#ifdef mc68000
+#define DEFURL "http://10.0.2.2:8080/"
+#else
 #define DEFURL "http://192.168.1.10:8080/"
+#endif
 #endif
 #ifndef DEFURL
 #define DEFURL "http://127.0.0.1:8080/"

@@ -39,8 +39,8 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/unixpc.c` | display for the AT&T UNIX PC (3B1) window system |
 | `src/ntwg.c` | network for the 3B1: the BSD sockets of WIN/TCP (TWG) |
 | `src/mkunixpc` | 3B1 script: compile and link with gcc |
-| `src/sunview.c` | display for SunView (SunOS 4) |
-| `src/mksunview` | SunOS 4 script: compile and link with Sun's cc |
+| `src/sunview.c` | display for SunView (SunOS 3 and 4) |
+| `src/mksunview` | SunOS 3 and 4 script: compile and link with Sun's cc |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
@@ -58,7 +58,7 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris and the 3B1: `10.0.2.2`, SunView: `192.168.1.10`, Unix: `127.0.0.1`) |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1 and the Sun-3: `10.0.2.2`, SunView on SPARC: `192.168.1.10`, Unix: `127.0.0.1`) |
 | `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
@@ -124,7 +124,7 @@ The first status line says what it found, like `Archaic 0.4, millions of colors`
 | Display | Colors |
 |---|---|
 | 3B1, Idris (X10) | black and white (they are) |
-| SunView | a color screen (8 bits, as the cg3): 128, in a colormap segment of Archaic's own. A black and white screen (bw2): black and white (not tested yet: QEMU's SPARCstation has no bw2) |
+| SunView | a color screen (8 bits, as the cg3): 128, in a colormap segment of Archaic's own. A black and white screen (bw2, as the Sun-3's bwtwo): black and white |
 | X11 | the default visual. Depth 1: black and white. TrueColor: millions. A colormap (8-bit PseudoColor, as on old workstations): its size, like 256 |
 | Cocoa, SDL | the screen's depth: millions |
 | `archaic-headless` | millions, like SDL (`-c 2` for black and white) |
@@ -816,6 +816,64 @@ Test on a copy of your SunOS disk.
 - The frame menu's Quit: an interposed destroy function says no to it (`notify_veto_destroy()`).
   Archaic quits, then closes the frame.
 
+## Running on SunOS 3.5 on a Sun-3
+
+- **SunOS 3.5** with SunView, on a Sun-3 (68020). Tested in TME (The Machine Emulator):
+  a Sun-3/160 with the bwtwo screen, and slirp for the network.
+- Release binary: `archaic-sun3`. Copy it to SunOS as `/usr/local/bin/archaic`,
+  then `chmod 755 /usr/local/bin/archaic`. Or build it there: see Building on SunOS 3.5.
+- Log in as `root` at the console and type `suntools` (SunOS 3's name for SunView).
+  In a shelltool, type `archaic`.
+- **Ctrl-Q** quits, or Quit in the frame's menu.
+- With TME's slirp, your computer is `10.0.2.2` for SunOS (SunOS is `10.0.2.15`).
+  So Archaic on a Sun-3 looks for WRP at `http://10.0.2.2:8080/`.
+- `screenshots/sun3.png`: the Sun-3's screen (bwtwo), 1152 x 900, black and white:
+  Wikipedia's Sun-3 article, in 2 s.
+
+## Building on SunOS 3.5
+
+The same 9 files and the same script as on SunOS 4 (see Building on SunOS 4), with Sun's `cc`:
+
+```
+sh mksunview    # compile and link: archaic, about 570 KB
+```
+
+It takes about 30 s in TME. The program is large: SunOS 3.5 has no shared libraries.
+Test mode: `./archaic -t http://10.0.2.2:8077/test/data/hn2.gif` ends with `sum ae2b58f3`.
+
+**Measured in TME** (on an Apple Silicon Mac), from Return until the picture is complete:
+
+| What | Time |
+|---|---|
+| decode check (`-t`, `hn2.gif`, 11 KB, 256 colors) | 0.6 s |
+| decode check (`-t`, `hn2.abm`, 9 KB) | less than 0.1 s |
+| Wikipedia's Sun-3 article in the window (ABM, 26 KB) | 2 s |
+
+## SunOS 3.5: what to know
+
+Test on a copy of your SunOS disk.
+
+| Thing | SunOS 3.5 in TME |
+|---|---|
+| Computer | Sun-3/160: 68020 and 68881, 32 MB |
+| Screen | bwtwo: 1152 x 900, black and white |
+| Window system | SunView 1: `suntools` at the console |
+| Network | Intel Ethernet (`ie0`), BSD sockets (4.2BSD). TME's slirp: SunOS 10.0.2.15, **your computer 10.0.2.2** (its 127.0.0.1) |
+
+- Sun's `cc` defines `sun`, `mc68000` and `mc68020`, but not `sun3`.
+  `archaic.h` uses `mc68000` for the default address.
+- gcc 1.42 (if `/usr/local/bin` has it) stops in `<sundev/vuid_event.h>`. Use Sun's `cc`.
+- `<suntool/sunview.h>` guards itself with the name `SUNVIEW` (`#ifndef SUNVIEW.H`).
+  The build's `-DSUNVIEW` made it empty, so `sunview.c` undefines `SUNVIEW` first.
+- `<pixrect/memvar.h>` declares `mem_ops` only in its `mpr_static` macro: `sunview.c` declares it.
+- `<sys/types.h>` has `fd_set` (one `int`), but no `FD_SET`, `FD_ZERO` or `FD_ISSET`:
+  `nsock.c` and `sunview.c` define them.
+- `time_t` is only in `<sys/types.h>`, not in `<time.h>`.
+- `stderr` is buffered when it goes to a file: Archaic flushes each `-v` line.
+- For Archaic, SunView is the same as on SunOS 4: the same toolkit calls, and the same
+  variables for a program started from rsh (`WINDOW_PARENT=/dev/win0`, `WMGR_ENV_PLACEHOLDER=/dev/win1`).
+- The shell's tools are old: no `uname` and no `printf`, and `grep` has no `\|` (use `egrep`).
+
 ## Porting to DOS, OS/2, Win16 and others
 
 The core (`main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`) does not change.
@@ -871,7 +929,7 @@ Each port is a display file, plus a network file if the system has no BSD socket
 | MGR | a window system on a terminal line | SunOS, Coherent, Xenix, Minix, OS-9, VSTa |
 | Blit, DMD 5620 | a graphics terminal on a serial line | Research Unix, System V (AT&T 3B2) |
 | QNX Windows | QNX's window system before Photon | QNX 2 |
-| SunWindows, SunView | Sun's window system before X11 | SunOS 1 to 4, on Sun-1 to Sun-3 (SunOS 4 on a Sun-4: done) |
+| SunWindows, SunView | Sun's window system before X11 | SunOS 1 to 4, on Sun-1 to Sun-3 (SunOS 4 on a Sun-4, SunOS 3.5 on a Sun-3: done) |
 | VWS, EWS | DEC's window systems before X11 | VAX/VMS (VWS), VAXELN (EWS) |
 | NeWS, Display PostScript | PostScript displays | SunOS, SGI, OS/2, VMS, NeXTSTEP, AIX ... |
 | Windows 1 and 2, OS/2 1.x | early PC window systems: TCP/IP over SLIP | Windows 1.0 and 2.x, OS/2 1.1 to 1.3 |
@@ -932,8 +990,9 @@ Sun's window system before X11. **SunWindows** came with SunOS 1.0 (1983), on th
 and stayed up to SunOS 4.1: Sun-2, Sun-3, Sun-4.
 OpenWindows (X11) took its place, and still showed SunView programs.
 
-- Done: SunView on SunOS 4.1.4, on a Sun-4 (`sunview.c`, see Running on SunOS 4 with SunView). Network: `nsock.c`.
-- Next: the Sun-3 and the Sun-2 (68020, 68010), with the same `sunview.c`.
+- Done: SunView on SunOS 4.1.4, on a Sun-4 (`sunview.c`, see Running on SunOS 4 with SunView),
+  and on SunOS 3.5, on a Sun-3 (see Running on SunOS 3.5 on a Sun-3). Network: `nsock.c`.
+- Next: the Sun-2 (68010), with the same `sunview.c`.
   Then SunWindows on SunOS 1 (Sun-1, Sun-2), with no SunView toolkit.
 
 ### VAX before X11: VWS and EWS

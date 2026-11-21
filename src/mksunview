@@ -1,4 +1,4 @@
-# mksunview - build Archaic on SunOS 4 for SunView: sh mksunview
+# mksunview - build Archaic on SunOS 3 or 4 for SunView: sh mksunview
 # cc is Sun's own C compiler (K&R: -DNOPROTO). SunView's libraries:
 # suntool (the toolkit), sunwindow (windows, the notifier), pixrect.
 # The network is BSD sockets (nsock.c).

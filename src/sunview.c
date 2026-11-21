@@ -1,7 +1,7 @@
 /* sunview.c - Archaic's display for SunView, Sun's window system before
- * X11 (SunOS 3 and 4). Built on SunOS 4.1.4 (sun4m). It uses the toolkit
- * (libsuntool): a frame with a canvas and a scroll bar, drawn through the
- * canvas's pixwin.
+ * X11 (SunOS 3 and 4). Built on SunOS 4.1.4 (Sun-4, sun4m) and SunOS 3.5
+ * (Sun-3). It uses the toolkit (libsuntool): a frame with a canvas and a
+ * scroll bar, drawn through the canvas's pixwin.
  *
  * What is special there:
  * - Archaic has its own loop. notify_dispatch() runs the toolkit's
@@ -32,6 +32,7 @@
  */
 #define Event Sv_event		/* SunView has an Event and an Image too */
 #define Image Sv_image
+#undef SUNVIEW		/* SunOS 3's sunview.h: the name of its guard */
 #include <suntool/sunview.h>
 #include <suntool/canvas.h>
 #include <suntool/scrollbar.h>
@@ -40,6 +41,12 @@
 #undef Event
 #undef Image
 #include "archaic.h"
+
+#ifndef FD_SET		/* SunOS 3 (4.2BSD): an fd_set of one int, no macros */
+#define FD_ZERO(p) ((p)->fds_bits[0] = 0)
+#define FD_SET(n, p) ((p)->fds_bits[0] |= 1 << (n))
+#define FD_ISSET(n, p) ((p)->fds_bits[0] & 1 << (n))
+#endif
 
 #define NCMS 128		/* the colormap segment: colors */
 #define QLEN 64			/* the event queue */
@@ -69,6 +76,7 @@ static char tbuf[512];
 static short band[32768];	/* memory pixrects: 64 KB at a time */
 static struct mpr_data md;
 static Pixrect mpr;
+extern struct pixrectops mem_ops;	/* SunOS 3's memvar.h: only in a macro */
 
 int g_bar = 0;
 

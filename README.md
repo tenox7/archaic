@@ -20,6 +20,7 @@ WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
 | Whitesmiths Idris 3.14 on the Atari ST | X10 | TCP/IP over SLIP | release: `archaic-idris` |
 | AT&T UNIX PC (3B1, PC 7300) | its own | WIN/TCP on its Ethernet board | release: `archaic-unixpc` |
 | SunOS 4.1 on a Sun-4 (SPARC) | SunView, in color | BSD sockets | release: `archaic-sun4` |
+| SunOS 3.5 on a Sun-3 (68020) | SunView | BSD sockets | release: `archaic-sun3` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
 | anything with SDL 2 | SDL 2 | BSD sockets | `make sdl` |
@@ -39,14 +40,14 @@ Emulator kits, on osarchive:
 ## Quick start
 
 1. On your computer, start [WRP](https://github.com/tenox7/wrp): `wrp`. It listens on port 8080.
-   Use a WRP of November 2026 or newer. An older WRP works, with fewer features.
+   Use WRP 4.11.0 or newer. An older WRP works, with fewer features.
 2. Copy the binary to the old computer as `archaic`, and make it executable:
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
    - 3B1 and SunOS: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
 3. Start the window system, then type `archaic` in a shell window:
    - Idris: log in as `root`, then `/usr/X/bin/xstart`.
    - 3B1: Office > UNIX System.
-   - SunOS: log in as `root` at the console, then `sunview`.
+   - SunOS: log in as `root` at the console, then `sunview` (SunOS 3: `suntools`).
 4. Click the address box, type an address, press Return.
 5. **Ctrl-Q** quits. On the 3B1: **Exit**.
 
@@ -54,8 +55,8 @@ Archaic looks for WRP at port 8080 of:
 
 | System | WRP's host |
 |---|---|
-| Idris, 3B1 | `10.0.2.2`: your computer, in the emulator kits |
-| SunOS | `192.168.1.10`: your computer, in the kit |
+| Idris, 3B1, Sun-3 | `10.0.2.2`: your computer, in the emulators (the Sun-3: TME with slirp) |
+| SunOS on SPARC | `192.168.1.10`: your computer, in the kit |
 | other systems | `127.0.0.1` |
 
 To use another WRP: `archaic HOST:PORT`, or set `WRP` to `HOST:PORT`.
@@ -123,7 +124,7 @@ On the old systems, copy the sources in, then:
 |---|---|---|
 | Idris | `sh mkinc`, then `sh mk` | Whitesmiths C 3.2 |
 | 3B1 | `sh mkunixpc` | gcc 2.5.8 |
-| SunOS 4 | `sh mksunview` | Sun's cc |
+| SunOS 3 and 4 | `sh mksunview` | Sun's cc |
 
 Which files to copy and how, the facts of each system, and how to port:
 see [AGENTS.md](AGENTS.md).
@@ -131,7 +132,7 @@ see [AGENTS.md](AGENTS.md).
 ## Next ports
 
 Old systems with no web browser: MGR, the Blit and DMD 5620, QNX Windows on QNX 2,
-SunView on the Sun-2 and Sun-3, SunWindows on SunOS 1, VWS and EWS on the VAX,
+SunView on the Sun-2, SunWindows on SunOS 1, VWS and EWS on the VAX,
 NeWS and Display PostScript, Windows 1 and 2, OS/2 1.x,
 Tektronix 4010, 4014 and 4105 terminals.
 
@@ -148,6 +149,10 @@ The 3B1's screen in FreeBee, 720 x 348:
 SunView on a SPARCstation (cg3), 1152 x 900, in 128 colors:
 
 ![Archaic in SunView on SunOS 4.1.4: Wikipedia's SunView article in 128 colors](screenshots/sunview.png)
+
+SunView on a Sun-3 (bwtwo) in TME, 1152 x 900, black and white:
+
+![Archaic in SunView on SunOS 3.5 on a Sun-3: Wikipedia's Sun-3 article](screenshots/sun3.png)
 
 Archaic's own scroll bar, in the style of the Atari ST's GEM:
 

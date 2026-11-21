@@ -12,6 +12,9 @@
 #ifdef unixpc
 #include <sys/types.h>		/* time_t: the 3B1's time.h does not have it */
 #endif
+#ifdef sun
+#include <sys/types.h>		/* nor SunOS 3's */
+#endif
 #include <time.h>
 
 char http_url[MAXURL];
