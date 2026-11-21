@@ -124,7 +124,17 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 | SL (slices) | 1: the whole page, in slices (see Scrolling). An older WRP ignores it |
 
 So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom),
-**C** (colors, only on a display with colors) and **K** (keys).
+**C** (colors, only on a display with colors), **D** (dither, only for black and white) and **K** (keys).
+
+**D** says what WRP dithers in a black and white picture (a WRP of November 2026 or newer has it):
+
+| D | The picture |
+|---|---|
+| All | all of the page is dithered. Good for photos. Text in a color, gray text and text on a color become dots |
+| Pics | WRP's default, for reading: only photos are dithered. Text and lines are sharp, and the pictures are about 20% smaller |
+| None | no dither at all. The smallest pictures |
+
+Choose another one, and Archaic sends WRP's form at once with St: WRP makes the picture again.
 
 The address box has a clear button (a white × in a black circle) at its right end,
 while it has text. Click it: the box is empty, and ready for a new address.
@@ -455,7 +465,7 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    With colors (`-c 256`), the colors are **exactly** ImageMagick's.
 3. HTML: title, entities, fields, menus, hidden fields, buttons, links, comments.
 4. A button click sends the form with the right query.
-5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons are pictures, Go stays text.
+5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons are pictures, Go stays text. A new choice in WRP's D menu sends the form at once.
    With colors: C shows, set to the colors (for 100 colors: 64); another choice sends St at once;
    the start page request has WRP's settings.
    Text in K, then ↵ or ⌫: the text and the key go as keys (`k=ab%0D`), with no button.

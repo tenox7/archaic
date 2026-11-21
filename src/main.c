@@ -55,9 +55,12 @@
  * that shows colors, WRP's C menu stays, set to the display's colors (or
  * the nearest it has, or to -c's); a new choice there sends the form at
  * once, with St, so that WRP takes the picture again in those colors.
- * On a black and white display, C is hidden: 2, or -c's. SL=1: a WRP that
- * knows it sends a picture of the whole page (the tall picture, below),
- * and leaves out its Up and Dn buttons. WRP's buttons (Bk, St, Re, Up,
+ * On a black and white display, C is hidden: 2, or -c's. D (what WRP
+ * dithers in a black and white picture: all, only photos, or nothing; a
+ * WRP of November 2026 has it) stays too, and a new choice there also
+ * sends the form at once. SL=1: a WRP that knows it sends a picture of
+ * the whole page (the tall picture, below), and leaves out its Up and Dn
+ * buttons. WRP's buttons (Bk, St, Re, Up,
  * Dn, Bs, Rt) are drawn as pictures: see icons[].
  */
 #include "archaic.h"
@@ -1203,6 +1206,14 @@ Item *it;
 		it->form >= 0 && it->form < MAXFORM && wrpf[it->form];
 }
 
+/* Is it WRP's D menu: what WRP dithers in a black and white picture? */
+static int isdmenu(it)
+Item *it;
+{
+	return it->type == I_SELECT && it->name && strieq(it->name, "d") &&
+		it->form >= 0 && it->form < MAXFORM && wrpf[it->form];
+}
+
 /* WRP's C menu: the choice nearest ncol, and not above it if it can */
 static void setcol(it)
 Item *it;
@@ -1728,6 +1739,8 @@ int x, y, b;
 		drawone(i);
 		if (it->sel != old && cmenu && !allset && iscmenu(it))
 			newcol(it);
+		else if (it->sel != old && !allset && isdmenu(it))
+			submit(it->form, stbutton(it->form));
 		return;
 	}
 	if (y >= viewh)

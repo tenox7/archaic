@@ -187,7 +187,7 @@ fi
 #    its own values: the window's size, ISMAP, GIF, 2 colors. With -a,
 #    M, T and C are shown and sent as set. WRP's buttons get pictures.
 #    With colors (-c), C is shown, set to them, and a new choice there
-#    sends the form at once with St.
+#    sends the form at once with St. (D, the dither menu: 5a.)
 cat >"$tmp/wrp.html" <<'EOF'
 <HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
 <FORM ACTION="/wrp" METHOD="GET">
@@ -301,6 +301,42 @@ if grep -Eq 'GET /wrp\?url=qq&z=1\.0&k=&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' 
 else
 	bad "wrp form: the clear button did not empty the url field:"
 	grep -E 'GET /wrp\?url=[a-z]*qq' "$tmp/http.log"
+fi
+
+# 5a. WRP's D menu (what it dithers in a black and white picture): shown,
+#     and a new choice sends the form at once with St. Not with -a.
+cat >"$here/data/wrpd.html" <<'EOF'
+<HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
+<FORM ACTION="/wrpd" METHOD="GET">
+<INPUT TYPE="TEXT" NAME="url" VALUE="" SIZE="20">
+<INPUT TYPE="SUBMIT" VALUE="Go">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="St">
+W <INPUT TYPE="TEXT" NAME="w" VALUE="1152" SIZE="4">
+H <INPUT TYPE="TEXT" NAME="h" VALUE="600" SIZE="4">
+D <SELECT NAME="d">
+<OPTION DISABLED>Dith</OPTION>
+<OPTION VALUE="all" SELECTED>All</OPTION>
+<OPTION VALUE="pics">Pics</OPTION>
+<OPTION VALUE="none">None</OPTION>
+</SELECT>
+</FORM>
+</BODY></HTML>
+EOF
+"$bin" -t "http://127.0.0.1:$port/wrpd.html" >"$tmp/d.out" 2>&1
+dx=$(awk '$2 == "select" && $8 == "d" { print $3 + 5; exit }' "$tmp/d.out")
+dy=$(awk '$2 == "select" && $8 == "d" { print $4 + 5; exit }' "$tmp/d.out")
+py=$(awk '$2 == "select" && $8 == "d" { print $4 + $6 + 1 + 2 * 15 + 7; exit }' "$tmp/d.out")
+"$bin" -t -s "@$dx,$dy;@$dx,$py;" "http://127.0.0.1:$port/wrpd.html" >/dev/null 2>&1
+"$bin" -t -a -s "@$dx,$dy;@$dx,$py;" "http://127.0.0.1:$port/wrpd.html" >/dev/null 2>&1
+rm -f "$here/data/wrpd.html"
+if grep -q 'select .* d sel 1: ' "$tmp/d.out" &&
+	[ "$(grep -c 'GET /wrpd?' "$tmp/http.log")" = 1 ] &&
+	grep -Eq 'GET /wrpd\?url=&Fn=St&d=pics&w=632&h=[0-9]+&sl=1&m=ismap&t=gif&c=2 ' "$tmp/http.log"; then
+	ok "wrp form, dither: D shown; a new choice sends St at once (not with -a)"
+else
+	bad "wrp form, dither: the D menu is wrong:"
+	grep 'select' "$tmp/d.out"
+	grep 'GET /wrpd' "$tmp/http.log"
 fi
 
 # 5b. WRP's errors: from WRP's page, an answer with no form (like WRP's
