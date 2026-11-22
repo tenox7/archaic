@@ -3,6 +3,7 @@
 The details: how Archaic works with WRP, the facts of each old system, building, tests, porting.
 
 README.md is for people. Keep it short: what Archaic is, screenshots, platforms, quick start, build.
+Show each system once in README.md: its emulator's window, at the top.
 Put new details here, not in README.md.
 
 Test on a copy of a system's disk, never on the user's own disk.
@@ -48,7 +49,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `test/xshot.sh` | test: run the X11 build and take a screenshot |
 | `test/data/` | GIFs saved from WRP, for the tests; two of them also as ABM |
 | `test/cfacts.c`, `cfacts2.c` | probe for a new port: what its C compiler and linker do (name length, case, struct copies) |
-| `screenshots/` | the pictures in README.md |
+| `screenshots/` | the pictures in README.md: the emulators' windows, the scroll bar. Also each system's own screen, for this file (see each Running section) |
 
 ## Options
 

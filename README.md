@@ -14,7 +14,6 @@ WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
   - **WRP** (big): the full page, as a picture. It sends only small parts.
   - **Archaic** (small): 4 parts in memory. While you read, it loads the next and the previous part.
 - Most scrolls do not wait for the network.
-- Mosaic and Netscape cannot do this.
 
 ![Archaic in Hatari: Idris on an Atari Mega ST, showing Wikipedia](screenshots/hatari.png)
 
@@ -103,6 +102,10 @@ To type into a box on the web page: click the box in the picture, type in **K**,
 
 The 3B1's own keys (Exit, Page, Prev) and the window frames of the 3B1 and SunView work too.
 
+Where the window system has no scroll bar, Archaic draws its own, in the style of the Atari ST's GEM:
+
+![Archaic's own scroll bar at the right, in GEM style: Wikipedia's Atari ST article](screenshots/scrollbar.png)
+
 ```
 archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [url]
 ```
@@ -146,28 +149,6 @@ Old systems with no web browser: MGR, the Blit and DMD 5620, QNX Windows on QNX 
 SunView on the Sun-2, SunWindows on SunOS 1, VWS and EWS on the VAX,
 NeWS and Display PostScript, Windows 1 and 2, OS/2 1.x,
 Tektronix 4010, 4014 and 4105 terminals.
-
-## Screenshots
-
-The Atari ST's own screen, 640 x 400, black and white:
-
-![Archaic on the Atari ST screen: Wikipedia's Idris article](screenshots/idris.png)
-
-The 3B1's screen in FreeBee, 720 x 348:
-
-![Archaic on the AT&T UNIX PC: Wikipedia's AT&T UNIX PC article](screenshots/unixpc.png)
-
-SunView on a SPARCstation (cg3), 1152 x 900, in 128 colors:
-
-![Archaic in SunView on SunOS 4.1.4: Wikipedia's SunView article in 128 colors](screenshots/sunview.png)
-
-SunView on a Sun-3 (bwtwo) in TME, 1152 x 900, black and white:
-
-![Archaic in SunView on SunOS 3.5 on a Sun-3: Wikipedia's Sun-3 article](screenshots/sun3.png)
-
-Archaic's own scroll bar, in the style of the Atari ST's GEM:
-
-![Archaic's own scroll bar at the right, in GEM style: Wikipedia's Atari ST article](screenshots/scrollbar.png)
 
 ## License
 
