@@ -719,8 +719,9 @@ Test on a copy of your Idris disk.
 - In the FreeBee kit, your computer is `10.0.2.2` for the 3B1, as for Idris.
   So Archaic on the 3B1 looks for WRP at `http://10.0.2.2:8080/`.
 - The 3B1 has no DNS: give WRP's address as numbers, or put the name in `/etc/hosts`.
-- `screenshots/unixpc.png`: the 3B1's screen in FreeBee (green on black), 720 x 348.
-  Wikipedia's AT&T UNIX PC article, after one click on the ↓ button.
+- `screenshots/unixpc.png`: the 3B1's screen in FreeBee (green on black), 720 x 348:
+  `uname -a` in the console, and Archaic in a smaller window (`-g 686x212+0+48`) with
+  Wikipedia's AT&T UNIX PC article.
 
 ## Building on the AT&T UNIX PC (3B1)
 
@@ -732,7 +733,7 @@ Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
 2. Build:
 
    ```
-   sh mkunixpc     # compile and link: archaic, about 62 KB
+   sh mkunixpc     # compile and link: archaic, about 66 KB
    ```
 
    It takes about 1 minute in FreeBee at turbo 10.
@@ -834,7 +835,7 @@ Test on a copy of your 3B1 disk.
   SunOS has no name server there: give addresses as numbers.
 - On a color screen (8 bits, as the cg3) the pictures have up to 128 colors (see Colors).
 - `screenshots/sunview.png`: the SPARCstation's screen (cg3), 1152 x 900:
-  Wikipedia's SunView article in 128 colors, in 1 s.
+  `uname -a` in the console, and Wikipedia's SunView article in 128 colors, in 1 s.
 
 ## Building on SunOS 4 (SunView)
 
@@ -848,7 +849,7 @@ Needs Sun's C compiler, `cc` (the kit has it), and SunView's libraries in `/usr/
 2. Build:
 
    ```
-   sh mksunview    # compile and link: archaic, about 96 KB
+   sh mksunview    # compile and link: archaic, about 104 KB
    ```
 
    It takes about 6 s in the kit.
@@ -932,7 +933,8 @@ Test on a copy of your SunOS disk.
 - With TME's slirp, your computer is `10.0.2.2` for SunOS (SunOS is `10.0.2.15`).
   So Archaic on a Sun-3 looks for WRP at `http://10.0.2.2:8080/`.
 - `screenshots/sun3.png`: the Sun-3's screen (bwtwo), 1152 x 900, black and white:
-  Wikipedia's Sun-3 article, in 2 s.
+  `/usr/5bin/uname -a` and the release line of `/etc/motd` in a shelltool,
+  and Wikipedia's Sun-3 article, in 2 s.
 
 ## Building on SunOS 3.5
 
@@ -975,7 +977,9 @@ Test on a copy of your SunOS disk.
 - `stderr` is buffered when it goes to a file: Archaic flushes each `-v` line.
 - For Archaic, SunView is the same as on SunOS 4: the same toolkit calls, and the same
   variables for a program started from rsh (`WINDOW_PARENT=/dev/win0`, `WMGR_ENV_PLACEHOLDER=/dev/win1`).
-- The shell's tools are old: no `uname` and no `printf`, and `grep` has no `\|` (use `egrep`).
+- The shell's tools are old: no `printf`, and `grep` has no `\|` (use `egrep`).
+  `uname` is only System V's, `/usr/5bin/uname`: it is not on root's path, and it does not
+  name the release. `head -1 /etc/motd` does.
 
 ## Running on HP-UX 9
 
@@ -991,7 +995,7 @@ Test on a copy of your SunOS disk.
   HP-UX has no name server in the kit: give addresses as numbers.
 - The screen has 8 bits, so the pictures have the 216 web colors (see 216 colors: GIP).
 - `screenshots/hpux.png`: the 715's screen, 1280 x 1024, in HP VUE:
-  Wikipedia's HP-UX article in 216 colors, in 7 s.
+  `uname -a` in an hpterm, and Wikipedia's HP-UX article in 216 colors, in 7 s.
 
 ## Building on HP-UX 9
 
@@ -1002,7 +1006,7 @@ Needs HP's C compiler, `cc` (the kit has HP C A.09.73), and X11R5 (HP-UX 9 has i
 2. Build:
 
    ```
-   sh mkhpux       # compile and link: archaic, about 110 KB
+   sh mkhpux       # compile and link: archaic, about 112 KB
    ```
 
    It takes about 3 s in the kit.

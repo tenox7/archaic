@@ -23,6 +23,8 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 
 ![Archaic in TME: SunOS 3.5 with SunView on a Sun-3/160, showing Wikipedia](screenshots/tme.png)
 
+![Archaic in LEMU (QEMU): HP-UX 9.05 with HP VUE on an HP 9000/715, showing Wikipedia in 216 colors](screenshots/lemu-hpux.png)
+
 ## Platforms
 
 | System | Window system | Network | Get it |
