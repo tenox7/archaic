@@ -737,7 +737,7 @@ Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
 
    It takes about 1 minute in FreeBee at turbo 10.
 3. Test. **Test mode, no window needed** (serve this folder from your computer:
-   `python3 -m http.server 8077`):
+   `python3 tools/idris.py 0 serve . 8077`):
 
    ```
    ./archaic -t http://10.0.2.2:8077/test/data/hn2.gif
@@ -745,6 +745,8 @@ Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
 
    The last line ends with `sum ae2b58f3`: the same as on Unix and on Idris.
    With `hn2.abm` in the place of `hn2.gif`, it checks the ABM decoder: the same sum.
+   The server must send it as `image/x-abm`, as WRP and `idris.py serve` do.
+   `python3 -m http.server` sends `application/octet-stream`, and Archaic does not show it.
 
    **With the window:** `./archaic` in a shell window.
 
