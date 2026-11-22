@@ -59,17 +59,17 @@ WRP's form is one line at the top of the window:
 
 | Part | Does |
 |---|---|
-| address box, Go | load a page. × clears the box |
-| ← | back |
-| stop sign | stop loading |
-| ↻ | reload |
-| ⌫, ↵ | Backspace, Return: for the web page |
-| Z | zoom |
-| C | colors (only on a display with colors) |
-| D | dither, only in black and white: All, Pics (sharp text, the default), None |
-| K | text to type into the web page |
+| address box, Go | load a page. ![clear](screenshots/icons/x.png) clears the box |
+| ![back](screenshots/icons/bk.png) | back |
+| ![stop](screenshots/icons/st.png) | stop loading |
+| ![reload](screenshots/icons/re.png) | reload |
+| ![Backspace](screenshots/icons/bs.png) ![Return](screenshots/icons/rt.png) | Backspace, Return: for the web page |
+| ![zoom](screenshots/icons/z.png) | zoom |
+| ![colors](screenshots/icons/c.png) | colors (only on a display with colors) |
+| ![dither](screenshots/icons/d.png) | dither, only in black and white: All, Pics (sharp text, the default), None |
+| ![keys](screenshots/icons/k.png) | text to type into the web page |
 
-To type into a box on the web page: click the box in the picture, type in **K**, then click ↵.
+To type into a box on the web page: click the box in the picture, type in ![keys](screenshots/icons/k.png), then click ![Return](screenshots/icons/rt.png).
 
 | Key | Does |
 |---|---|

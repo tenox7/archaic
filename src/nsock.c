@@ -1,5 +1,5 @@
 /* nsock.c - Archaic's network for BSD sockets (Unix, macOS, Linux,
- * SunOS 4). An address such as 192.168.1.10 goes through inet_addr()
+ * SunOS 4). An address such as 10.0.2.2 goes through inet_addr()
  * first: SunOS 4's gethostbyname() knows only names. */
 #include "archaic.h"
 #include <sys/types.h>

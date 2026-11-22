@@ -37,11 +37,10 @@
 
 #define VERSION "0.6"
 
-/* WRP's address when none is given: WRP's default port. In the emulator
- * kits the host is 10.0.2.2: Whitesmiths C (_WSLAS) means Idris, and
- * gcc's unixpc the AT&T UNIX PC (3B1). The SunOS 4 kit (sunos414-lemu;
- * SUNVIEW is mksunview's build) has the network 192.168.1.0, and the
- * host is 192.168.1.10. A Sun-3 (mc68000) in TME with slirp: 10.0.2.2. */
+/* WRP's address when none is given: WRP's default port. In the emulators
+ * the host is 10.0.2.2 (slirp, QEMU's user network): Whitesmiths C
+ * (_WSLAS) means Idris, gcc's unixpc the AT&T UNIX PC (3B1), and SUNVIEW
+ * (mksunview's build) SunOS 3 or 4 with SunView. */
 #ifndef DEFURL
 #ifdef _WSLAS
 #define DEFURL "http://10.0.2.2:8080/"
@@ -50,11 +49,7 @@
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifdef SUNVIEW
-#ifdef mc68000
 #define DEFURL "http://10.0.2.2:8080/"
-#else
-#define DEFURL "http://192.168.1.10:8080/"
-#endif
 #endif
 #ifndef DEFURL
 #define DEFURL "http://127.0.0.1:8080/"

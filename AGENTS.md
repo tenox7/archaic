@@ -49,7 +49,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `test/xshot.sh` | test: run the X11 build and take a screenshot |
 | `test/data/` | GIFs saved from WRP, for the tests; two of them also as ABM |
 | `test/cfacts.c`, `cfacts2.c` | probe for a new port: what its C compiler and linker do (name length, case, struct copies) |
-| `screenshots/` | the pictures in README.md: the emulators' windows, the scroll bar. Also each system's own screen, for this file (see each Running section) |
+| `screenshots/` | the pictures in README.md: the emulators' windows, the scroll bar, and WRP's buttons and labels in `icons/` (drawn from the pictures in `main.c`, as `drawbutton()` draws them, at 2x). Also each system's own screen, for this file (see each Running section) |
 
 ## Options
 
@@ -59,7 +59,7 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1 and the Sun-3: `10.0.2.2`, SunView on SPARC: `192.168.1.10`, Unix: `127.0.0.1`) |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1 and SunView: `10.0.2.2`, Unix: `127.0.0.1`) |
 | `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
@@ -734,8 +734,9 @@ Test on a copy of your 3B1 disk.
   In the shelltool, type `archaic` (in the folder where you built it: `./archaic`).
   It opens a frame a little smaller than the screen, in the middle.
 - **Ctrl-Q** quits, or Quit in the frame's menu.
-- In the kit, your computer is `192.168.1.10` for SunOS (SunOS is `192.168.1.123`).
-  So Archaic on SunOS looks for WRP at `http://192.168.1.10:8080/`.
+- Archaic looks for WRP at `http://10.0.2.2:8080/`: your computer, in QEMU's default user network.
+  The kit has another network: there, run `archaic HOST:8080`, or set `WRP` to `HOST:8080`.
+  HOST is your computer's address in the kit's network.
   SunOS has no name server there: give addresses as numbers.
 - On a color screen (8 bits, as the cg3) the pictures have up to 128 colors (see Colors).
 - `screenshots/sunview.png`: the SPARCstation's screen (cg3), 1152 x 900:
@@ -758,10 +759,10 @@ Needs Sun's C compiler, `cc` (the kit has it), and SunView's libraries in `/usr/
 
    It takes about 6 s in the kit.
 3. Test. **Test mode, no window needed** (serve this folder from your computer:
-   `python3 -m http.server 8077`):
+   `python3 -m http.server 8077`. HOST: see Running on SunOS 4 with SunView):
 
    ```
-   ./archaic -t http://192.168.1.10:8077/test/data/hn2.gif
+   ./archaic -t http://HOST:8077/test/data/hn2.gif
    ```
 
    The last line ends with `sum ae2b58f3`: the same as on Unix, Idris and the 3B1.
@@ -788,7 +789,7 @@ Test on a copy of your SunOS disk.
 | Computer | a SPARCstation 5 in QEMU: microSPARC II, 256 MB (SunOS gets 240) |
 | Screen | cg3, 8 bits: 256 colors in one colormap. 1280 x 1024 (`RES=1152x900 ./run.sh` for another size) |
 | Window system | SunView: `sunview` at the console |
-| Network | Lance Ethernet, BSD sockets. QEMU user networking: SunOS 192.168.1.123, **your computer 192.168.1.10** (its 127.0.0.1) |
+| Network | Lance Ethernet, BSD sockets. QEMU user networking: **your computer** (its 127.0.0.1) is the network's host address, `10.0.2.2` by default |
 | Names | no name server: give addresses as numbers |
 
 ### The C compiler
@@ -870,7 +871,6 @@ Test on a copy of your SunOS disk.
 | Network | Intel Ethernet (`ie0`), BSD sockets (4.2BSD). TME's slirp: SunOS 10.0.2.15, **your computer 10.0.2.2** (its 127.0.0.1) |
 
 - Sun's `cc` defines `sun`, `mc68000` and `mc68020`, but not `sun3`.
-  `archaic.h` uses `mc68000` for the default address.
 - gcc 1.42 (if `/usr/local/bin` has it) stops in `<sundev/vuid_event.h>`. Use Sun's `cc`.
 - `<suntool/sunview.h>` guards itself with the name `SUNVIEW` (`#ifndef SUNVIEW.H`).
   The build's `-DSUNVIEW` made it empty, so `sunview.c` undefines `SUNVIEW` first.
