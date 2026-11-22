@@ -1,6 +1,6 @@
 # Archaic
 
-A very small web browser for very old computers.
+A small and ultra fast web browser for very old computers.
 
 Archaic is a client of **[WRP, the Web Rendering Proxy](https://github.com/tenox7/wrp)**.
 WRP runs a modern browser on a modern computer. It sends each web page as a picture
