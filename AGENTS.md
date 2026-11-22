@@ -29,7 +29,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/pic.c` | pictures: looks at what came (GIF or ABM); the ABM decoder |
 | `src/x10.c` | display for X10 (Idris) |
 | `src/nidris.c` | network for Idris: TCP through netd |
-| `src/x11.c` | display for X11 (Unix, macOS with XQuartz) |
+| `src/x11.c` | display for X11 (Unix, HP-UX, macOS with XQuartz) |
 | `src/cocoa.m` | display for macOS: a Cocoa window |
 | `src/sdl.c` | display for SDL 2 (macOS, Linux, Windows ...) |
 | `src/headless.c` | display with no window, for tests and automation: commands on standard input, screenshots |
@@ -42,6 +42,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/mkunixpc` | 3B1 script: compile and link with gcc |
 | `src/sunview.c` | display for SunView (SunOS 3 and 4) |
 | `src/mksunview` | SunOS 3 and 4 script: compile and link with Sun's cc |
+| `src/mkhpux` | HP-UX 9 script: compile and link with HP's cc, for X11 (`x11.c`, `nsock.c`) |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
@@ -59,7 +60,7 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1 and SunView: `10.0.2.2`, Unix: `127.0.0.1`) |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, SunView and HP-UX: `10.0.2.2`, other Unix: `127.0.0.1`) |
 | `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
@@ -118,6 +119,10 @@ To type into a box on the web page: click the box in the picture, then type in *
 
 (WRP alone does only the button's key when it gets both a button and keys, so Archaic sends
 the text and the button's key together as keys: `k=text%0D`. This works with every WRP.)
+
+**The window's title** is the page's title. WRP's page title is `WRP` and the page's address:
+there the window says `Archaic - ` and the address, like `Archaic - https://en.wikipedia.org/`.
+With `-t`, the `title` line is still the page's own title.
 
 ## Colors
 
@@ -311,6 +316,10 @@ A trackpad scrolls smoothly, by pixels. Ctrl+click is the right button.
 Cmd-Q and the window's close button quit.
 Cocoa has the Mac's own scroll bar; SDL has Archaic's (see Scrolling).
 
+**With X11** (HP-UX, Linux, XQuartz ...): Page Up and Page Down scroll a window
+(on an HP keyboard: Prev and Next). The up and down arrows and each step of the mouse wheel
+scroll a quarter of it. Close in the window manager's menu quits. The scroll bar is Archaic's.
+
 On the 3B1, the help line at the bottom of the screen lists the main keys.
 
 ## The status line
@@ -348,8 +357,24 @@ Archaic keeps WRP's page and shows the error on the status line, like
 - While WRP makes the next page, a click on the picture does nothing: the picture is old,
   and its map is about to go. Wait for the spinner to stop, or press Esc (or click St) to stop.
 - A picture or a file from WRP is not shown: the status line says what it was.
-- No page at all (WRP did not answer at the start): the status line says
-  `can't connect to ... Return: try again`. Start WRP, then press Return.
+- No page at all (WRP did not answer at the start): a box in the middle of the window says
+  `Unable to connect to WRP`, with WRP's address and the error, like `connection refused` or
+  `no answer`. The status line says it too, and so does the terminal (standard error):
+
+  ```
+  archaic: unable to connect to WRP at 10.0.2.2:8080: no answer
+  archaic: ensure WRP is up and running. To use another address: archaic HOST:PORT
+  ```
+
+  Start WRP, then press Return: Archaic tries again. Or start Archaic with WRP's address.
+- While Archaic connects to WRP with no page yet, the box says `Connecting to WRP` and the address
+  (then `Waiting for WRP`, while WRP makes the page). Esc stops.
+- With BSD sockets (`nsock.c`: Unix, macOS, SunOS, HP-UX) the connect does not hold up the window:
+  it is drawn, Esc stops, and after 20 s with no answer Archaic gives up (an address that
+  does not exist on this network, like 10.0.2.2 outside an emulator kit).
+  On the 3B1 (`ntwg.c`) the connect waits as long as the system does.
+- With a page, a failed connect is on the status line:
+  `Unable to connect to WRP at 10.0.2.2:8080: connection refused. Ensure WRP is up and running.`
 
 ## A new window size
 
@@ -381,6 +406,12 @@ With a WRP that knows slices (`sl=1`), WRP makes a picture of the whole page onc
 | a step of the wheel, ↑ ↓, the 3B1's scroll arrows and Roll keys | a quarter of the frame |
 | Page Up, Page Down, Space, b, the right button, the 3B1's Page, Next, Prev | the frame, less 2 text lines |
 | a trackpad (Cocoa, SDL) | by pixels |
+
+A scroll does not flicker: no pixel is made white first. Where the display can (`g_copy`:
+X11, and the screen in memory of Cocoa, SDL and headless), the pixels on the screen move,
+and Archaic draws only the rows that come in. X11 moves them with XCopyArea; when a part of the
+window is covered (the server then sends GraphicsExpose), Archaic draws all of the frame again.
+The 3B1, Idris (X10) and SunView draw all of the frame again for each scroll.
 
 An older WRP ignores `sl=1`: then the picture fills the window, and WRP's Up and Dn buttons scroll the page.
 
@@ -474,12 +505,14 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    Text in K, then ↵ or ⌫: the text and the key go as keys (`k=ab%0D`), with no button.
    The address box's clear button empties it.
    WRP's error (an answer with no form, after a click on the picture): WRP's page stays, the error
-   is on the status line, and St goes at once. With no page (no server), Return tries again.
+   is on the status line, and St goes at once. With no page (no server), Return tries again,
+   and the terminal says that WRP is not there.
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
    A color picture on the screen is exactly the GIF's, and the PNG is in colors.
    A display of 256 colors (`ARCHAIC_COLORS=256`) asks WRP for 216.
    A new width: one St with the new width, once the size stays (none for a new height); typed text stays.
+   No WRP: the box in the middle of the window. On WRP's page, the window's title says Archaic - and the address, not WRP.
 8. The tall picture, with no WRP: the test server cuts a random 600 x 1500 GIF into slices.
    After a wheel step, a window and a scroll to the end, the frame must show exactly the right rows.
    Also: the next slice comes before it is needed, and a click sends the place on the whole page.
@@ -942,6 +975,87 @@ Test on a copy of your SunOS disk.
   variables for a program started from rsh (`WINDOW_PARENT=/dev/win0`, `WMGR_ENV_PLACEHOLDER=/dev/win1`).
 - The shell's tools are old: no `uname` and no `printf`, and `grep` has no `\|` (use `egrep`).
 
+## Running on HP-UX 9
+
+- **HP-UX 9.05** with X11 and HP VUE, on an HP 9000/715 (PA-RISC). Kit: `hpux905-715-lemu` (QEMU),
+  on osarchive in `os/hpux/Qemu/`. It has HP's C compiler.
+- Build it there (see Building on HP-UX 9). Copy `archaic` to `/usr/local/bin/archaic`,
+  then `chmod 755 /usr/local/bin/archaic`.
+- Log in as `root` at the VUE login (the kit has no password). In a terminal (hpterm), type `archaic`.
+  The window is 640 x 400: `archaic -g 860x660+360+120` gives a larger one.
+- **Ctrl-Q** quits, or Close in the window's menu.
+- Archaic looks for WRP at `http://10.0.2.2:8080/`: your computer, in the kit's network (QEMU NAT).
+  On another network (a bridged VM, a real HP): `archaic HOST:8080`, or set `WRP` to `HOST:8080`.
+  HP-UX has no name server in the kit: give addresses as numbers.
+- The screen has 8 bits, so the pictures have the 216 web colors (see 216 colors: GIP).
+- `screenshots/hpux.png`: the 715's screen, 1280 x 1024, in HP VUE:
+  Wikipedia's HP-UX article in 216 colors, in 7 s.
+
+## Building on HP-UX 9
+
+Needs HP's C compiler, `cc` (the kit has HP C A.09.73), and X11R5 (HP-UX 9 has it).
+
+1. Copy these 9 files (133 KB) into a folder on HP-UX, with ftp, rcp or NFS:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `nsock.c`, `x11.c` and `mkhpux`.
+2. Build:
+
+   ```
+   sh mkhpux       # compile and link: archaic, about 110 KB
+   ```
+
+   It takes about 3 s in the kit.
+3. Test. **Test mode, no window needed** (serve this folder from your computer:
+   `python3 -m http.server 8077`):
+
+   ```
+   ./archaic -t http://10.0.2.2:8077/test/data/hn2.gif
+   ```
+
+   The last line ends with `sum ae2b58f3`: the same as on the other systems.
+   All the test pictures of `test/run.sh` (1, 1b, 2 and 2b) give exactly the bytes they give on the Mac.
+
+   **With the window:** `./archaic` in an hpterm.
+
+**Measured in the kit** (QEMU on an Apple Silicon Mac), from Return until the picture is complete.
+Archaic decodes a slice in less than 0.1 s here: the rest of the time is WRP's.
+
+| What | Time |
+|---|---|
+| decode check (`-t`, `hn2.gif`, 11 KB, 256 colors) | less than 0.1 s |
+| Wikipedia's HP-UX article in the window, 216 colors (37 KB) | 7 s |
+| Wikipedia's PA-RISC article, after a click on its link (33 KB) | 6 s |
+| the same page, C set to 256 (44 KB) | 6 s |
+
+## HP-UX 9: what to know
+
+Test on a copy of your HP-UX disk.
+
+| Thing | HP-UX 9.05 kit |
+|---|---|
+| Computer | an HP 9000/715 in QEMU (LEMU): one PA-7100LC, 128 MB |
+| Screen | Artist graphics: 1280 x 1024, 8 bits: 256 colors in one colormap (PseudoColor) |
+| Window system | X11R5 with HP VUE 3.0 (window manager: vuewm) |
+| Network | LASI Ethernet (82596), BSD sockets. QEMU NAT: HP-UX 10.0.2.15, **your computer 10.0.2.2** (its 127.0.0.1) |
+| Names | no name server: give addresses as numbers |
+
+- HP's `cc` (HP C A.09.73 in the kit) is K&R C by default, and ANSI C with `-Aa -D_HPUX_SOURCE`.
+  `mkhpux` uses K&R (`-DNOPROTO`), as on SunOS: in ANSI C, HP-UX's `select()` takes `int *`,
+  not `fd_set *`, and each call gets warnings. The `cc` that comes with HP-UX alone (K&R only) is not tested.
+- `+DA1.0`: PA-RISC 1.0 code, for every PA-RISC computer (on a 715 the default is 1.1).
+  `file archaic` then says `s800 shared executable`.
+- X11R5 is not on the default paths: `-I/usr/include/X11R5`, `-L/usr/lib/X11R5`.
+  Archaic uses the shared `/usr/lib/X11R5/libX11.sl` (`chatr archaic` lists it).
+- gcc 3.3.6 is in `/usr/local/bin` in the kit. Archaic does not need it.
+- Two builds of the same source differ in 15 time stamps (45 bytes): `cmp` alone does not show that they are the same.
+- From an rsh or telnet login, `DISPLAY=:0` reaches the screen (as root, with root logged in to VUE).
+- Page Up and Page Down come as the keys Prior and Next (Prev and Next on an HP keyboard).
+- The colormap: VUE takes most of it. In the kit, 160 to 180 cells were free.
+  A page of text took 30 to 55 cells (C at 216), and 63 with C at 256.
+  When Archaic quits, the X server frees them all.
+- `mount`, `shutdown` and other system programs are in `/etc`: rsh's PATH does not have it.
+  `/etc/mount HOST:/dir /mnt` mounts an NFS folder.
+- `tr` does not know `\n`: write `\012`.
+
 ## Porting to DOS, OS/2, Win16 and others
 
 The core (`main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`) does not change.
@@ -960,6 +1074,7 @@ A port is **one display file** and **one network file**.
 | `g_bits(x, y, w, h, bits, bpl)` | 1-bit rows, 1 = black, high bit left |
 | `g_colors()` | how many colors the display shows (a long): 2 for black and white, up to `1L << 24` |
 | `g_pix(x, y, w, h, pix, bpl, pal)` | 8-bit rows, a color number for each pixel; pal: 256 colors, 3 bytes each (red, green, blue). Archaic calls it only if `g_colors()` is more than 2: a black and white port leaves it empty |
+| `g_copy(x, y, w, h, dy)` | move x, y, w, h of the window dy rows down (up if dy < 0), for a scroll: Archaic then draws only the new rows. Returns 0 if it did not (a part was covered, or the port can't): then Archaic draws all of it. A port can always return 0 |
 | `g_event(&e, wait)` | next key, click (`E_DOWN`, `E_UP`, and `E_MOVE` with a button down), expose, resize, quit, scroll (`E_SCROLL`: pixels, quarter windows, windows, or to a place). wait 0: don't wait; 1: wait for an event; 2: wait at most 1/10 s (or as 1) |
 | `g_fd()` | the display's file descriptor, or -1 |
 | `g_ms()` | a clock in milliseconds, from any start (for the spinner); -1 if the system has none |
@@ -970,7 +1085,7 @@ A port is **one display file** and **one network file**.
 
 | Function | Does |
 |---|---|
-| `n_open(host, port, err)` | connect; on error, the reason in `err` |
+| `n_open(host, port, err)` | connect; on error, the reason in `err` (`connection refused`, `no answer` ...: Archaic adds the address). It may call `ui_poll()` while it waits, and stop when that returns 1 (Esc) |
 | `n_read(h, buf, n, wait)` | bytes read; -2 nothing yet, 0 end, -1 error. wait 1: a short time (`nsock.c` 1/20 s), less when the display has input |
 | `n_write(h, buf, n)`, `n_close(h)` | |
 

@@ -39,8 +39,9 @@
 
 /* WRP's address when none is given: WRP's default port. In the emulators
  * the host is 10.0.2.2 (slirp, QEMU's user network): Whitesmiths C
- * (_WSLAS) means Idris, gcc's unixpc the AT&T UNIX PC (3B1), and SUNVIEW
- * (mksunview's build) SunOS 3 or 4 with SunView. */
+ * (_WSLAS) means Idris, gcc's unixpc the AT&T UNIX PC (3B1), SUNVIEW
+ * (mksunview's build) SunOS 3 or 4 with SunView, and __hpux HP-UX (WRP
+ * does not run there). */
 #ifndef DEFURL
 #ifdef _WSLAS
 #define DEFURL "http://10.0.2.2:8080/"
@@ -49,6 +50,9 @@
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifdef SUNVIEW
+#define DEFURL "http://10.0.2.2:8080/"
+#endif
+#ifdef __hpux
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifndef DEFURL
@@ -136,6 +140,7 @@ extern long http_got;		/* body bytes read so far */
 extern int http_status;
 extern char http_host[];	/* the server of the last http_open() */
 extern int http_port;
+extern int http_noconn;		/* 1: http_open could not connect (http_err: why) */
 extern char *http_accept;	/* the request's Accept: what Archaic takes */
 int http_open P((char *url, char *post));
 int http_getc P((void));
@@ -211,6 +216,10 @@ typedef struct event {
  * g_event: wait 0 = don't wait, 1 = wait for an event, 2 = wait at most
  * about 1/10 s (the repeat of Archaic's scroll bar); a display that
  * can't wait for a time waits as for 1.
+ * g_copy: move the part x, y, w, h of the window dy rows down (up if
+ * dy < 0), for a scroll: Archaic then draws only the rows that come in.
+ * 0 if it did not (a part of the window was covered, or the display
+ * can't): Archaic then draws all of it again.
  *
  * The scroll bar: a system that has scroll bars (Cocoa, SunView, Win32,
  * the 3B1's window frame) uses its own, and sets g_bar to 0. Archaic then calls
@@ -234,6 +243,7 @@ long g_colors P((void));
 long g_ms P((void));
 void g_pix P((int x, int y, int w, int h, unsigned char *pix, int bpl,
 	unsigned char *pal));
+int g_copy P((int x, int y, int w, int h, int dy));
 void g_flush P((void));
 int g_event P((Event *e, int wait));
 int g_fd P((void));

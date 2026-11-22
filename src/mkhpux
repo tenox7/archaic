@@ -1,0 +1,10 @@
+# mkhpux - build Archaic on HP-UX 9 (PA-RISC) for X11: sh mkhpux
+# cc is HP's C compiler, in its K&R mode (-DNOPROTO). HP C A.09.73
+# builds it; the cc that comes with HP-UX alone is not tested.
+# +DA1.0: code for every PA-RISC computer. X11R5 is in
+# /usr/include/X11R5 and /usr/lib/X11R5.
+# The network is BSD sockets (nsock.c).
+CC=cc
+$CC -O +DA1.0 -DNOPROTO -I/usr/include/X11R5 -c main.c html.c http.c gif.c pic.c nsock.c x11.c &&
+$CC -o archaic main.o html.o http.o gif.o pic.o nsock.o x11.o -L/usr/lib/X11R5 -lX11 &&
+ls -l archaic

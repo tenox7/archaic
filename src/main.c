@@ -164,6 +164,15 @@ static long tphase, tshown;	/* when the phase began; the second shown */
 static long lbytes;		/* the bytes of this page so far */
 static char nb[24];
 static char msg[200];
+static char emsg[200];		/* openerr()'s */
+/* the box in the middle of an empty window: Archaic has no page yet, and
+ * says what it does with WRP, or why it has no page */
+#define NB_CONNECT 1		/* connecting to WRP */
+#define NB_WAIT 2		/* WRP makes the page */
+#define NB_FAIL 3		/* no page: nbwhy says why */
+static int nbox;
+static char nbat[80];		/* WRP's address, host:port */
+static char nbwhy[100];
 static int loading, quit, pending, pendpost, headless, verbose, allset;
 static long dcolors;		/* the colors the display shows (g_colors) */
 static int ncol;		/* the colors asked of WRP, 2 to 256 */
@@ -487,28 +496,6 @@ static void progress()
 	else
 		sprintf(msg, "%.50s: %s", what, bytes(g));
 	sayp(msg, g, n);
-}
-
-/* http.c: what http_open() does now (H_CONNECT, H_WAIT, H_BODY; 0 at
- * the end). ui_poll() counts the seconds of the wait. */
-void ui_note(p)
-int p;
-{
-	phase = p;
-	tphase = now();
-	tshown = 0;
-	if (!p || !what[0])
-		return;
-	if (p == H_CONNECT)
-		sprintf(msg, "%.50s: connecting to %.60s port %d", what,
-			http_host, http_port);
-	else if (p == H_WAIT)
-		sprintf(msg, "%.50s: waiting for %.60s", what, http_host);
-	else {
-		progress();
-		return;
-	}
-	say(msg);
 }
 
 /* WRP's url field gets a clear button at its right end, while it has
@@ -849,14 +836,15 @@ long r;
 }
 
 /* screen rows r0 up to r1 of the tall picture's frame: the slices that
- * are here (rows still on their way are white) */
+ * are here, white where none is (rows still on their way). Each pixel
+ * is drawn once, so a scroll shows no white first (redraw, blank). */
 static void drawtall(r0, r1)
 int r0, r1;
 {
 	Item *it = &items[tall];
-	Slice *s;
-	int y = it->y - top, a, b, i, sa, sb, w;
-	long p;
+	Slice *s = slices;
+	int y = it->y - top, a, b, i, sb, w, fw;
+	long p = 0, q;
 
 	a = y > r0 ? y : r0;
 	if (a < 0)
@@ -866,18 +854,34 @@ int r0, r1;
 		b = r1;
 	if (b > viewh)
 		b = viewh;
-	for (i = 0; i < NSLICE && b > a; ++i) {
-		s = &slices[i];
-		if (!s->state || !s->im.bits)
+	fw = it->x + it->w > vieww ? vieww - it->x : it->w;
+	if (fw <= 0)
+		return;
+	while (a < b) {
+		/* the slice at row a; or else, where the next one starts */
+		q = b;
+		for (i = 0; i < NSLICE; ++i) {
+			s = &slices[i];
+			if (!s->state || !s->im.bits)
+				continue;
+			p = y + s->y0 - oy;	/* the screen row of its first row */
+			if (p <= a && p + s->im.h > a)
+				break;
+			if (p > a && p < q)
+				q = p;
+		}
+		if (i == NSLICE) {
+			fill(it->x, a, fw, (int)q - a, 0);
+			a = (int)q;
 			continue;
-		p = y + s->y0 - oy;	/* the screen row of its first row */
-		if (p >= b || p + s->im.h <= a)
-			continue;
-		sa = p > a ? (int)p : a;
+		}
 		sb = p + s->im.h < b ? (int)(p + s->im.h) : b;
 		w = it->x + s->im.w > vieww ? vieww - it->x : s->im.w;
 		if (w > 0)
-			drawpic(it->x, sa, w, sb - sa, &s->im, sa - p);
+			drawpic(it->x, a, w, sb - a, &s->im, a - p);
+		if (w < fw)
+			fill(it->x + w, a, fw - w, sb - a, 0);
+		a = sb;
 	}
 }
 
@@ -990,11 +994,51 @@ int *a, *b, *ey, *eh;
 	return 1;
 }
 
+/* the dots of the shaft: 1 in 8, as GEM's */
+static unsigned char pat[68 * 2];
+
+/* the shaft at x, w wide, rows y0 up to y1 */
+static void shaft(x, w, y0, y1)
+int x, w, y0, y1;
+{
+	int y, n;
+
+	for (y = y0; y < y1; y += n) {
+		n = y1 - y < 64 ? y1 - y : 64;
+		g_bits(x, y, w, n, pat + 2 * (y & 3), 2);
+	}
+}
+
+/* an arrow box of the bar at x, y (w is 16): the arrow up, or down if
+ * flip; black while it is held down. One g_bits, so it does not
+ * flicker when it repeats. */
+static void arrowbox(x, y, w, flip, held)
+int x, y, w, flip, held;
+{
+	static unsigned char b[SBH * 2];
+	int r, c, k, ax = (w - AW) / 2, ay = flip ? (SBH - AH + 1) / 2 :
+		(SBH - AH) / 2;
+	char *s;
+
+	for (r = 0; r < SBH; ++r) {
+		b[2 * r] = b[2 * r + 1] = held ? 0377 : 0;
+		if (r < ay || r >= ay + AH)
+			continue;
+		s = arrow[flip ? AH - 1 - (r - ay) : r - ay];
+		for (c = 0; c < AW && s[c]; ++c)
+			if (s[c] == '#') {
+				k = ax + c;
+				b[2 * r + k / 8] ^= 0200 >> (k & 7);
+			}
+	}
+	g_bits(x, y, w, SBH, b, 2);
+}
+
+/* Archaic's scroll bar. Each pixel is drawn once: no white first. */
 static void drawbar()
 {
-	static unsigned char pat[68 * 2];	/* the shaft: 1 dot in 8, as GEM's */
 	static int made;
-	int x = vieww + 1, w = SBW - 1, a, b, ey, eh, y, n;
+	int x = vieww + 1, w = SBW - 1, a, b, ey, eh, y;
 
 	if (!made) {
 		for (y = 0; y < 68; ++y)
@@ -1002,23 +1046,20 @@ static void drawbar()
 		made = 1;
 	}
 	g_fill(vieww, 0, 1, viewh, 1);		/* the line left of it */
-	g_fill(x, 0, w, viewh, 0);
-	if (viewh < 2 * SBH + 2)
+	if (viewh < 2 * SBH + 2) {
+		g_fill(x, 0, w, viewh, 0);
 		return;
-	pict(x + (w - AW) / 2, (SBH - AH) / 2, arrow, AW, AH, 0);
-	g_fill(x, SBH, w, 1, 1);
-	pict(x + (w - AW) / 2, viewh - SBH + (SBH - AH + 1) / 2, arrow, AW, AH, 1);
-	g_fill(x, viewh - SBH - 1, w, 1, 1);
-	if (bpart == B_UP)		/* held down */
-		g_invert(x, 0, w, SBH);
-	if (bpart == B_DN)
-		g_invert(x, viewh - SBH, w, SBH);
-	if (!barpos(&a, &b, &ey, &eh))
-		return;
-	for (y = a + 1; y < b - 1; y += n) {
-		n = b - 1 - y < 64 ? b - 1 - y : 64;
-		g_bits(x, y, w, n, pat + 2 * (y & 3), 2);
 	}
+	arrowbox(x, 0, w, 0, bpart == B_UP);
+	g_fill(x, SBH, w, 1, 1);
+	arrowbox(x, viewh - SBH, w, 1, bpart == B_DN);
+	g_fill(x, viewh - SBH - 1, w, 1, 1);
+	if (!barpos(&a, &b, &ey, &eh)) {
+		g_fill(x, SBH + 1, w, viewh - 2 * SBH - 2, 0);
+		return;
+	}
+	shaft(x, w, a + 1, ey);			/* above the elevator, */
+	shaft(x, w, ey + eh, b - 1);		/* and below it */
 	g_fill(x, ey + 1, w, eh - 2, 0);	/* the elevator */
 	g_fill(x, ey, w, 1, 1);
 	g_fill(x, ey + eh - 1, w, 1, 1);
@@ -1046,6 +1087,94 @@ static void showbar()
 	}
 }
 
+/* white for x0 up to x1, y0 up to y1 of the page part, but not under the
+ * tall picture's frame: drawtall() draws all of that */
+static void blank(x0, y0, x1, y1)
+int x0, y0, x1, y1;
+{
+	Item *it;
+	int fx0, fx1, fy0, fy1, a, b;
+
+	if (tall < 0) {
+		fill(x0, y0, x1 - x0, y1 - y0, 0);
+		return;
+	}
+	it = &items[tall];
+	fx0 = it->x;
+	fx1 = it->x + it->w;
+	fy0 = it->y - top;
+	fy1 = fy0 + it->h;
+	if (fx0 >= x1 || fx1 <= x0 || fy0 >= y1 || fy1 <= y0) {
+		fill(x0, y0, x1 - x0, y1 - y0, 0);
+		return;
+	}
+	if (y0 < fy0)		/* above the frame, */
+		fill(x0, y0, x1 - x0, fy0 - y0, 0);
+	if (y1 > fy1)		/* below it, */
+		fill(x0, fy1, x1 - x0, y1 - fy1, 0);
+	a = y0 > fy0 ? y0 : fy0;
+	b = y1 < fy1 ? y1 : fy1;
+	if (x0 < fx0)		/* left of it, */
+		fill(x0, a, fx0 - x0, b - a, 0);
+	if (x1 > fx1)		/* right of it */
+		fill(fx1, a, x1 - fx1, b - a, 0);
+}
+
+/* the box in the middle of an empty window (nbox): its title in white
+ * on black, then its lines */
+static void drawnbox()
+{
+	static char a[100], b[120];
+	char *ln[7];
+	int n, i, k, w, h, x, y, lh = fh + 2, tb = fh + 6;
+
+	if (headless || nitems > 0 || !nbox)
+		return;
+	sprintf(a, "Address: %.60s", nbat);
+	ln[1] = a;
+	if (nbox == NB_FAIL) {
+		sprintf(b, "Error: %.100s", nbwhy);
+		ln[0] = "Unable to connect to WRP";
+		ln[2] = b;
+		ln[3] = "";
+		ln[4] = "Ensure WRP is up and running.";
+		ln[5] = "To use another address: archaic HOST:PORT";
+		ln[6] = "Return: try again";
+		n = 7;
+	} else {
+		ln[0] = nbox == NB_CONNECT ? "Connecting to WRP" :
+			"Waiting for WRP";
+		ln[2] = "Esc: stop";
+		n = 3;
+	}
+	w = 0;
+	for (i = 0; i < n; ++i)
+		if ((k = tw(ln[i], len(ln[i]))) > w)
+			w = k;
+	w += 4 * cw + 4;		/* 2 letters each side, the border */
+	h = tb + (n - 1) * lh + 2 * (lh / 2) + 2;
+	x = (vieww - w) / 2;
+	y = (viewh - h) / 2;
+	if (x < 0)
+		x = 0;
+	if (y < 0)
+		y = 0;
+	fill(x, y, w, tb, 1);			/* the title bar, */
+	fill(x, y + tb, 2, h - tb, 1);		/* the border, */
+	fill(x + w - 2, y + tb, 2, h - tb, 1);
+	fill(x + 2, y + h - 2, w - 4, 2, 1);
+	fill(x + 2, y + tb, w - 4, h - tb - 2, 0);	/* the inside */
+	k = len(ln[0]);
+	i = x + (w - tw(ln[0], k)) / 2;
+	while (k > 0 && i + tw(ln[0], k) > vieww)
+		--k;
+	if (k > 0 && y + 3 + fh <= viewh)
+		g_text(i, y + 3, ln[0], k, 1);
+	for (i = 1; i < n; ++i)
+		text(x + 2 + 2 * cw, y + tb + lh / 2 + (i - 1) * lh + 1, ln[i],
+			len(ln[i]));
+}
+
 /* draw the part x, y, w, h of the window again */
 static void redraw(rx, ry, rw, rh)
 int rx, ry, rw, rh;
@@ -1059,7 +1188,7 @@ int rx, ry, rw, rh;
 	if (r > vieww)
 		r = vieww;
 	if (ry < viewh && rx < r) {
-		fill(rx, ry, r - rx, rh, 0);
+		blank(rx, ry, r, r1);
 		for (i = 0; i < nitems; ++i) {
 			it = &items[i];
 			y = it->y - top;
@@ -1090,6 +1219,7 @@ int rx, ry, rw, rh;
 				break;
 			}
 		}
+		drawnbox();
 		if (popup >= 0 && ry < py + ph && r1 > py && rx < px + pw &&
 			r > px)
 			drawpop();
@@ -1106,6 +1236,40 @@ int i;
 {
 	if (i >= 0 && i < nitems)
 		redraw(items[i].x, items[i].y - top, items[i].w, items[i].h);
+}
+
+/* http.c: what http_open() does now (H_CONNECT, H_WAIT, H_BODY; 0 at
+ * the end). ui_poll() counts the seconds of the wait. With no page,
+ * the box in the middle says it too. */
+void ui_note(p)
+int p;
+{
+	int k;
+
+	phase = p;
+	tphase = now();
+	tshown = 0;
+	if (p == H_CONNECT)
+		sprintf(nbat, "%.60s:%d", http_host, http_port);
+	if (nitems == 0 && (p == H_CONNECT || p == H_WAIT)) {
+		k = p == H_CONNECT ? NB_CONNECT : NB_WAIT;
+		if (nbox != k) {
+			nbox = k;
+			redraw(0, 0, winw, viewh);
+		}
+	}
+	if (!p || !what[0])
+		return;
+	if (p == H_CONNECT)
+		sprintf(msg, "%.50s: connecting to %.60s port %d", what,
+			http_host, http_port);
+	else if (p == H_WAIT)
+		sprintf(msg, "%.50s: waiting for %.60s", what, http_host);
+	else {
+		progress();
+		return;
+	}
+	say(msg);
 }
 
 static void openpop(i)
@@ -1560,12 +1724,39 @@ int f, b;
 }
 
 /* scroll to place v of the page (see curpos) */
+/* rows y0 up to y1 of the page part, x up to x + w: the pixels move d
+ * rows up (down if d < 0), and only the rows that come in are drawn. So
+ * a scroll does not flicker, and needs less. 0 if the display did not
+ * move them (g_copy): then all of it is drawn again. */
+static int shift(x, w, y0, y1, d)
+int x, w, y0, y1, d;
+{
+	int n = d < 0 ? -d : d;
+
+	if (headless)
+		return 1;
+	if (n == 0 || n >= y1 - y0 || w <= 0)
+		return 0;
+	if (d > 0) {
+		if (!g_copy(x, y0 + n, w, y1 - y0 - n, -n))
+			return 0;
+		redraw(x, y1 - n, w, n);
+	} else {
+		if (!g_copy(x, y0, w, y1 - y0 - n, n))
+			return 0;
+		redraw(x, y0, w, n);
+	}
+	showbar();
+	g_flush();
+	return 1;
+}
+
 static void scrollto(v)
 long v;
 {
 	Item *it;
 	long r, ooy = oy, m = maxpos();
-	int otop = top, opop = popup, a, b;
+	int otop = top, opop = popup, a, b, w;
 
 	if (v > m)
 		v = m;
@@ -1592,7 +1783,12 @@ long v;
 			a = 0;
 		if (b > viewh)
 			b = viewh;
-		redraw(0, a, winw, b - a);
+		w = it->x + it->w > vieww ? vieww - it->x : it->w;
+		if (!shift(it->x, w, a, b, (int)(oy - ooy)))
+			redraw(0, a, winw, b - a);
+	} else if (oy == ooy && opop < 0) {	/* only the page moved */
+		if (!shift(0, vieww, 0, viewh, top - otop))
+			redraw(0, 0, winw, viewh);
 	} else
 		redraw(0, 0, winw, viewh);
 }
@@ -2048,6 +2244,44 @@ static void freeslices()
 	}
 }
 
+/* why http_open() failed, for the status line. When it could not
+ * connect: to WRP (from WRP's page), or to that server */
+static char *openerr()
+{
+	char *c = http_err[0] ? ": " : "";
+
+	if (stop)
+		return "Stopped";
+	if (!http_noconn)
+		return http_err;
+	if (wrpform() >= 0)
+		sprintf(emsg, "Unable to connect to WRP at %.60s:%d%s%.60s. Ensure WRP is up and running.",
+			http_host, http_port, c, http_err);
+	else
+		sprintf(emsg, "Unable to connect to %.60s:%d%s%.60s", http_host,
+			http_port, c, http_err);
+	return emsg;
+}
+
+/* no page, and WRP did not answer: the box in the middle of the window
+ * says so, the status line, and the terminal */
+static void nopage()
+{
+	scopy(nbwhy, stop ? "stopped" : http_err[0] ? http_err :
+		"can't connect", (int)sizeof nbwhy);
+	nbox = NB_FAIL;
+	sprintf(msg, "Unable to connect to WRP at %.60s: %.80s. Return: try again",
+		nbat, nbwhy);
+	say(msg);
+	if (!stop) {
+		fprintf(stderr, "archaic: unable to connect to WRP at %s: %s\n",
+			nbat, nbwhy);
+		fprintf(stderr, "archaic: ensure WRP is up and running. To use another address: archaic HOST:PORT\n");
+		fflush(stderr);
+	}
+	redraw(0, 0, winw, viewh);
+}
+
 /* picture k of the n on the page: item i */
 static void loadimg(i, k, n)
 int i, k, n;
@@ -2061,7 +2295,7 @@ int i, k, n;
 	else
 		scopy(what, "Picture", (int)sizeof what);
 	if (http_open(u, (char *)0) < 0) {
-		say(http_err);
+		say(openerr());
 		return;
 	}
 	if (http_status != 200) {
@@ -2161,7 +2395,7 @@ long a, b;
 	else {
 		sprintf(surl + n, "%cy=%ld&h=%ld", c, a, b - a);
 		if (http_open(surl, (char *)0) < 0)
-			say(http_err);
+			say(openerr());
 		else {
 			if (http_status != 200) {
 				sprintf(msg, "Picture: HTTP %d", http_status);
@@ -2375,6 +2609,25 @@ int n;
 		scopy(msg + 5, "an answer with no page", (int)sizeof msg - 5);
 }
 
+/* the window's title: the page's. WRP's page is titled WRP and the
+ * page's address: there the window says Archaic - and the address. */
+static char *wintitle()
+{
+	static char t[MAXTITLE + 8];
+
+	if (!title[0])
+		return "Archaic";
+	if (wrpform() >= 0 && strnieq(title, "WRP", 3) &&
+		(title[3] == 0 || title[3] == ' ')) {
+		if (title[3] && title[4])
+			sprintf(t, "Archaic - %s", title + 4);
+		else
+			scopy(t, "Archaic", (int)sizeof t);
+		return t;
+	}
+	return title;
+}
+
 static void load(url, post)
 char *url, *post;
 {
@@ -2389,6 +2642,7 @@ char *url, *post;
 	pclick = pwide = 0;
 	note = 0;
 	scopy(lurl, url, MAXURL);
+	scopy(nbat, url, 60);	/* until ui_note() has its host and port */
 	if (post)
 		scopy(lbody, post, MAXURL);
 	loading = 1;
@@ -2399,11 +2653,12 @@ char *url, *post;
 	lbytes = 0;
 	scopy(what, "Page", (int)sizeof what);
 	if (http_open(lurl, post ? lbody : (char *)0) < 0) {
-		if (nitems == 0) {	/* no page: nothing to click */
-			sprintf(msg, "%.150s. Return: try again", http_err);
-			say(msg);
-		} else
-			say(http_err);
+		if (stop && pending)	/* the next load is waiting */
+			goto out;
+		if (nitems == 0)	/* no page: nothing to click */
+			nopage();
+		else
+			say(openerr());
 		goto out;
 	}
 	if (strnieq(http_type, "image/", 6) && fromwrp) {
@@ -2465,15 +2720,16 @@ char *url, *post;
 	tall = -1;
 	freeimgs();
 	freeslices();
+	nbox = 0;
 	if (html_parse(page, n) < 0)
 		say("The page is too big: only its start is shown");
 	oldpic = 0;
 	for (i = 0; i < nitems; ++i)
 		if (items[i].type == I_IMAGE && nimgs < MAXIMG)
 			items[i].img = nimgs++;
-	if (!headless)
-		g_title(title[0] ? title : "Archaic");
 	wrpforms();
+	if (!headless)
+		g_title(wintitle());
 	findtall();
 	layout();
 	if (tall >= 0 && items[tall].ih <= items[tall].h) {
@@ -2517,6 +2773,10 @@ char *url, *post;
 		say(msg);
 	}
 out:
+	if (nbox && nbox != NB_FAIL && !pending) {	/* WRP's answer: no page */
+		nbox = 0;
+		redraw(0, 0, winw, viewh);
+	}
 	loading = 0;
 	oldpic = 0;
 	spinto(0);

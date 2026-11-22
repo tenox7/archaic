@@ -788,6 +788,13 @@ void g_flush()
 {
 }
 
+/* a scroll draws all of it again */
+int g_copy(x, y, w, h, dy)
+int x, y, w, h, dy;
+{
+	return 0;
+}
+
 /* the canvas's file: input there ends the network's wait (nsock.c) */
 int g_fd()
 {

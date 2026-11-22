@@ -434,6 +434,13 @@ void g_flush()
 {
 }
 
+/* a scroll draws all of it again */
+int g_copy(x, y, w, h, dy)
+int x, y, w, h, dy;
+{
+	return 0;
+}
+
 /* no file to select() on: ntwg.c waits in short steps instead */
 int g_fd()
 {

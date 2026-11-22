@@ -1,6 +1,6 @@
 /* x11.c - Archaic's display for X11: Xlib only, calls that X11R2
  * already had. One font. Xlib has no scroll bars: Archaic draws its own
- * (g_bar).
+ * (g_bar). Page Up, Page Down and the up and down arrows scroll.
  *
  * The colors are the default visual's. Black and white (depth 1): the
  * pictures in 1 bit. TrueColor (and DirectColor): each color's pixel
@@ -16,6 +16,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
+#include <X11/keysym.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -361,6 +362,42 @@ unsigned char *pix, *pal;
 	XDestroyImage(im);		/* and its data */
 }
 
+/* g_copy waits for the server's answer to its copy: NoExpose, or
+ * GraphicsExpose for the parts that were covered. An Expose before it
+ * was a part that was white when it was copied. */
+static int cbad;
+
+static Bool copied(d, e, a)
+Display *d;
+XEvent *e;
+char *a;
+{
+	if (e->type == Expose)
+		cbad = 1;
+	return e->type == NoExpose || e->type == GraphicsExpose;
+}
+
+/* a scroll: the pixels move, and do not flicker. 0 if a part did not
+ * come: main.c draws all of it again */
+int g_copy(x, y, w, h, dy)
+int x, y, w, h, dy;
+{
+	static XEvent ev;
+
+	cbad = 0;
+	XCopyArea(dpy, win, win, gc, x, y, (unsigned)w, (unsigned)h, x,
+		y + dy);
+	for (;;) {
+		XIfEvent(dpy, &ev, copied, (char *)0);
+		if (ev.type == NoExpose)
+			break;
+		cbad = 1;
+		if (ev.xgraphicsexpose.count == 0)
+			break;
+	}
+	return !cbad;
+}
+
 void g_flush()
 {
 	XFlush(dpy);
@@ -416,6 +453,17 @@ int wait;
 		case KeyPress:
 			n = XLookupString(&ev.xkey, s, (int)sizeof s, &ks,
 				(XComposeStatus *)0);
+			/* Page Up and Down (Prev and Next on HP's keyboards)
+			 * scroll a window, the arrows a quarter of it */
+			if (ks == XK_Prior || ks == XK_Next || ks == XK_Up ||
+				ks == XK_Down) {
+				e->type = E_SCROLL;
+				e->x = 0;
+				e->y = ks == XK_Prior || ks == XK_Up ? -1 : 1;
+				e->key = ks == XK_Prior || ks == XK_Next ?
+					S_PAGE : S_STEP;
+				return 1;
+			}
 			if (n > 0) {
 				e->type = E_KEY;
 				e->key = s[0] & 0377;

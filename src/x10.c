@@ -265,6 +265,13 @@ void g_flush()
 	XFlush();
 }
 
+/* a scroll draws all of it again */
+int g_copy(x, y, w, h, dy)
+int x, y, w, h, dy;
+{
+	return 0;
+}
+
 int g_fd()
 {
 	return dpy ? dpyno() : -1;

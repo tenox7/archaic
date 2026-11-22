@@ -31,6 +31,7 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 | AT&T UNIX PC (3B1, PC 7300) | its own | WIN/TCP on its Ethernet board | release: `archaic-unixpc` |
 | SunOS 4.1 on a Sun-4 (SPARC) | SunView, in color | BSD sockets | release: `archaic-sun4` |
 | SunOS 3.5 on a Sun-3 (68020) | SunView | BSD sockets | release: `archaic-sun3` |
+| HP-UX 9 on an HP 9000/700 (PA-RISC) | X11, in color | BSD sockets | `sh mkhpux` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
 | anything with SDL 2 | SDL 2 | BSD sockets | `make sdl` |
@@ -45,11 +46,12 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
    Use WRP 4.11.0 or newer. An older WRP works, with fewer features.
 2. Copy the binary to the old computer as `archaic`, and make it executable:
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
-   - 3B1 and SunOS: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
+   - 3B1, SunOS and HP-UX: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
 3. Start the window system, then type `archaic` in a shell window:
    - Idris: log in as `root`, then `/usr/X/bin/xstart`.
    - 3B1: Office > UNIX System.
    - SunOS: log in as `root` at the console, then `sunview` (SunOS 3: `suntools`).
+   - HP-UX: log in at the VUE login, then open a terminal.
 4. Click the address box, type an address, press Return.
 5. **Ctrl-Q** quits. On the 3B1: **Exit**.
 
@@ -120,6 +122,7 @@ On the old systems, copy the sources in, then:
 | Idris | `sh mkinc`, then `sh mk` | Whitesmiths C 3.2 |
 | 3B1 | `sh mkunixpc` | gcc 2.5.8 |
 | SunOS 3 and 4 | `sh mksunview` | Sun's cc |
+| HP-UX 9 | `sh mkhpux` | HP's cc |
 
 Which files to copy and how, the facts of each system, and how to port:
 see [AGENTS.md](AGENTS.md).

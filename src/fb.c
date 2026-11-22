@@ -102,6 +102,42 @@ int x, y, w, h, c;
 	}
 }
 
+/* x, y, w, h moved dy rows down (up if dy < 0), the part on the screen */
+int g_copy(x, y, w, h, dy)
+int x, y, w, h, dy;
+{
+	unsigned int *s, *d;
+	int a = y, b = y + h, i, j, n, x1 = x + w, dx, ty, cw, ch;
+
+	if (a < 0)
+		a = 0;
+	if (a + dy < 0)
+		a = -dy;
+	if (b > fbh)
+		b = fbh;
+	if (b + dy > fbh)
+		b = fbh - dy;
+	if (x < 0)
+		x = 0;
+	if (x1 > fbw)
+		x1 = fbw;
+	n = x1 - x;
+	if (dy == 0 || b <= a || n <= 0)
+		return 1;
+	dx = x;
+	ty = a + dy;
+	cw = n;
+	ch = b - a;
+	clip(&dx, &ty, &cw, &ch);	/* where they go: changed */
+	for (j = 0; j < b - a; ++j) {	/* down: the last row first */
+		s = fb + (long)(dy > 0 ? b - 1 - j : a + j) * fbw + x;
+		d = s + (long)dy * fbw;
+		for (i = 0; i < n; ++i)
+			d[i] = s[i];
+	}
+	return 1;
+}
+
 void g_invert(x, y, w, h)
 int x, y, w, h;
 {

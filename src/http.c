@@ -40,6 +40,7 @@ char http_host[128];		/* the server of the last http_open() */
  * white picture (ABM: see pic.c). With -f gif, main.c leaves ABM out. */
 char *http_accept = "text/html, image/x-abm, image/gif";
 int http_port;
+int http_noconn;		/* 1: the last http_open() could not connect */
 static char path[MAXURL];
 
 long now()
@@ -329,6 +330,7 @@ char *url, *post;
 	scopy(http_url, url, MAXURL);
 	for (redir = 0;; ++redir) {
 		http_err[0] = 0;
+		http_noconn = 0;
 		http_type[0] = 0;
 		http_len = -1;
 		http_got = 0;
@@ -341,6 +343,7 @@ char *url, *post;
 		ui_note(H_CONNECT);
 		conn = n_open(http_host, http_port, http_err);
 		if (conn < 0) {
+			http_noconn = 1;
 			ui_note(0);
 			return -1;
 		}

@@ -354,7 +354,8 @@ fi
 # 5b. WRP's errors: from WRP's page, an answer with no form (like WRP's
 # "Unable to find map" after a click on an old picture) keeps WRP's page,
 # puts the error on the status line, and gets WRP's new picture at once
-# (St). With no page at all (no server), Return tries again.
+# (St). With no page at all (no server), Return tries again, and the
+# terminal says what is wrong.
 cat >"$here/data/wrp2.html" <<'EOF'
 <HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
 <FORM ACTION="/wrp2.html" METHOD="GET">
@@ -385,11 +386,13 @@ else
 	grep -E '^status|field .* url' "$tmp/e.out"
 	grep -E 'GET /(err|wrp2)' "$tmp/http.log"
 fi
-if [ "$(grep -c "^status: can't connect to 127.0.0.1 port 1. Return: try again$" "$tmp/e1.out")" = 2 ]; then
-	ok "no page: Return tries again"
+if [ "$(grep -c '^status: Unable to connect to WRP at 127.0.0.1:1: connection refused. Return: try again$' "$tmp/e1.out")" = 2 ] &&
+	[ "$(grep -c '^archaic: unable to connect to WRP at 127.0.0.1:1: connection refused$' "$tmp/e1.out")" = 2 ] &&
+	grep -q '^archaic: ensure WRP is up and running. To use another address: archaic HOST:PORT$' "$tmp/e1.out"; then
+	ok "no page: Return tries again; the terminal says WRP is not there"
 else
-	bad "no page: Return did not try again:"
-	grep '^status' "$tmp/e1.out"
+	bad "no page: Return did not try again, or no message:"
+	grep -e '^status' -e '^archaic' "$tmp/e1.out"
 fi
 
 # 6. WRP, when it runs: the start page, then a page with its picture,
@@ -446,6 +449,18 @@ if [ -x "$hl" ]; then
 		bad "headless: the typed form was not sent:"
 		grep 'GET /go' "$tmp/http.log"
 	fi
+	# No WRP: the box in the middle of the empty window. Its title bar
+	# is black; a window with no box is all white there.
+	printf '%s\n' "shot $tmp/nb.png" quit |
+		"$hl" -g 640x400 http://127.0.0.1:1/ >"$tmp/nb.out" 2>&1
+	if magick "$tmp/nb.png" -crop 320x180+150+100 -format '%[fx:mean < 0.95]' info: 2>/dev/null | grep -qx 1 &&
+		magick "$tmp/nb.png" -crop 600x90+0+0 -format '%[fx:mean]' info: 2>/dev/null | grep -qx 1 &&
+		grep -q '^archaic: unable to connect to WRP at 127.0.0.1:1' "$tmp/nb.out"; then
+		ok "headless: no WRP: a box in the middle says so"
+	else
+		bad "headless: no WRP: no box in the middle, or no message:"
+		cat "$tmp/nb.out"
+	fi
 else
 	echo "skip  headless: no $hl"
 fi
@@ -485,7 +500,7 @@ fi
 # again (St), as wide as the window. A new height alone sends nothing.
 # Text typed in a field (K) stays.
 cat >"$here/data/wrp3.html" <<'EOF'
-<HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
+<HTML><HEAD><TITLE>WRP http://x.org/</TITLE></HEAD><BODY>
 <FORM ACTION="/wrp3.html" METHOD="GET">
 <INPUT TYPE="TEXT" NAME="url" VALUE="http://x.org/" SIZE="20">
 <INPUT TYPE="SUBMIT" NAME="Fn" VALUE="St">
@@ -510,6 +525,12 @@ if [ "$(grep -c 'GET /wrp3\.html?.*Fn=St' "$tmp/http.log")" = 1 ] &&
 else
 	bad "new width: wrong:"
 	grep 'GET /wrp3' "$tmp/http.log"
+fi
+if grep -qx 'title Archaic - http://x.org/' "$tmp/r.out" && ! grep -q '^title WRP' "$tmp/r.out"; then
+	ok "window title: Archaic in the place of WRP"
+else
+	bad "window title: wrong:"
+	grep '^title' "$tmp/r.out"
 fi
 
 # 8. The tall picture: WRP's picture of a whole page (sl=1), in a frame
