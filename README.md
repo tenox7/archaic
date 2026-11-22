@@ -7,6 +7,12 @@ WRP runs a modern browser on a modern computer. It sends each web page as a pict
 with a click map, plus a small form. Archaic shows them, and sends your clicks and keys back.
 WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
 
+**Why Archaic is fast:** Mosaic and Netscape know nothing about WRP. Archaic does.
+It tells WRP its window size, the colors of its screen and its place on the page,
+so WRP makes each picture to fit. WRP keeps a picture of the whole page,
+and sends only small slices of it. While you read, Archaic asks for the next slices:
+scrolling is smooth, and most scrolls do not wait for the network.
+
 ![Archaic in Hatari: Idris on an Atari Mega ST, showing Wikipedia](screenshots/hatari.png)
 
 ![Archaic in FreeBee: the AT&T UNIX PC (3B1), showing Wikipedia](screenshots/freebee.png)
