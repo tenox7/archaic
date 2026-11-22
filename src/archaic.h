@@ -35,7 +35,7 @@
 #define P(a) a
 #endif
 
-#define VERSION "0.6"
+#define VERSION "0.7"
 
 /* WRP's address when none is given: WRP's default port. In the emulators
  * the host is 10.0.2.2 (slirp, QEMU's user network): Whitesmiths C

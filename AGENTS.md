@@ -127,7 +127,7 @@ With `-t`, the `title` line is still the page's own title.
 ## Colors
 
 Archaic asks the display how many colors it shows.
-The first status line says what it found, like `Archaic 0.6, millions of colors`.
+The first status line says what it found, like `Archaic 0.7, millions of colors`.
 
 | Display | Colors |
 |---|---|
@@ -979,8 +979,8 @@ Test on a copy of your SunOS disk.
 
 - **HP-UX 9.05** with X11 and HP VUE, on an HP 9000/715 (PA-RISC). Kit: `hpux905-715-lemu` (QEMU),
   on osarchive in `os/hpux/Qemu/`. It has HP's C compiler.
-- Build it there (see Building on HP-UX 9). Copy `archaic` to `/usr/local/bin/archaic`,
-  then `chmod 755 /usr/local/bin/archaic`.
+- Release binary: `archaic-hpux9`. Copy it to HP-UX as `/usr/local/bin/archaic`,
+  then `chmod 755 /usr/local/bin/archaic`. Or build it there: see Building on HP-UX 9.
 - Log in as `root` at the VUE login (the kit has no password). In a terminal (hpterm), type `archaic`.
   The window is 640 x 400: `archaic -g 860x660+360+120` gives a larger one.
 - **Ctrl-Q** quits, or Close in the window's menu.

@@ -31,7 +31,7 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 | AT&T UNIX PC (3B1, PC 7300) | its own | WIN/TCP on its Ethernet board | release: `archaic-unixpc` |
 | SunOS 4.1 on a Sun-4 (SPARC) | SunView, in color | BSD sockets | release: `archaic-sun4` |
 | SunOS 3.5 on a Sun-3 (68020) | SunView | BSD sockets | release: `archaic-sun3` |
-| HP-UX 9 on an HP 9000/700 (PA-RISC) | X11, in color | BSD sockets | `sh mkhpux` |
+| HP-UX 9 on an HP 9000/700 (PA-RISC) | X11, in color | BSD sockets | release: `archaic-hpux9` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
 | anything with SDL 2 | SDL 2 | BSD sockets | `make sdl` |
