@@ -543,8 +543,9 @@ PATH=/opt/X11/bin:$PATH sh test/xshot.sh 127.0.0.1:7 shot.png 1 '%%' 127.0.0.1:8
   xstart puts `/usr/X/bin` on the search path. From a telnet login, type `/usr/X/bin/archaic`.
 - **Ctrl-Q** quits.
 - In the kit, your computer is `10.0.2.2` for Idris. So Archaic on Idris looks for WRP at `http://10.0.2.2:8080/`.
-- `screenshots/idris.png`: the ST's own screen, 640 x 400, black and white
-  (Archaic under the xterm, after three clicks on the ↓ button).
+- `screenshots/idris.png`: the ST's own screen, 640 x 400, black and white:
+  `uname -a` in the lower xterm, and Archaic under it (`=638x290+0+108`) with
+  Wikipedia's Idris article.
 
 ## Building in Idris
 
@@ -585,7 +586,7 @@ All 11 files (124 KB) take about 2 minutes.
 
 ```
 sh mkinc     # once per folder: the X10 headers
-sh mk        # compile and link: archaic, about 118 KB
+sh mk        # compile and link: archaic, about 126 KB
 ```
 
 With Hatari's fast-forward on, `sh mk` takes about 2.5 minutes.
@@ -733,7 +734,7 @@ Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
 2. Build:
 
    ```
-   sh mkunixpc     # compile and link: archaic, about 66 KB
+   sh mkunixpc     # compile and link: archaic, about 67 KB
    ```
 
    It takes about 1 minute in FreeBee at turbo 10.
@@ -849,7 +850,7 @@ Needs Sun's C compiler, `cc` (the kit has it), and SunView's libraries in `/usr/
 2. Build:
 
    ```
-   sh mksunview    # compile and link: archaic, about 104 KB
+   sh mksunview    # compile and link: archaic, about 106 KB
    ```
 
    It takes about 6 s in the kit.
@@ -1006,7 +1007,7 @@ Needs HP's C compiler, `cc` (the kit has HP C A.09.73), and X11R5 (HP-UX 9 has i
 2. Build:
 
    ```
-   sh mkhpux       # compile and link: archaic, about 112 KB
+   sh mkhpux       # compile and link: archaic, about 115 KB
    ```
 
    It takes about 3 s in the kit.
