@@ -50,23 +50,31 @@ int y, n;
 	img_rows(img, y, n);
 }
 
-/* n bytes at p to 0 (white). p is from malloc: longs fit there */
-void pic_wipe(p, n)
+/* n bytes at p to c, a long at a time. p is from malloc: longs fit there */
+void pic_fill(p, n, c)
 unsigned char *p;
 register long n;
+int c;
 {
 	register long *q = (long *)p;
+	register long v;
 	register unsigned char *b;
+	unsigned long u;
+	int i;
 
+	c &= 255;
+	for (u = (unsigned long)c, i = 1; i < (int)sizeof u; ++i)
+		u = u << 8 | (unsigned long)c;
+	v = (long)u;
 	while (n >= 4 * (long)sizeof (long)) {
-		*q++ = 0;
-		*q++ = 0;
-		*q++ = 0;
-		*q++ = 0;
+		*q++ = v;
+		*q++ = v;
+		*q++ = v;
+		*q++ = v;
 		n -= 4 * (long)sizeof (long);
 	}
 	for (b = (unsigned char *)q; n > 0; --n)
-		*b++ = 0;
+		*b++ = (unsigned char)c;
 }
 
 /* show the rows that are whole now; the next ones when 8 more are */

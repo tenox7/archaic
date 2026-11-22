@@ -14,6 +14,10 @@
  * pixels a 10 MHz 68010 needs 7.5 seconds the slow way (44 microseconds
  * a pixel), and 1.3 seconds the fast way. (WRP's ABM is faster still:
  * see pic.c.)
+ *
+ * With 8 bits, a picture as wide as its screen and not interlaced (all
+ * of WRP's) takes the 8-bit way (lzw8): the picture is its own
+ * dictionary, so each code is one copy of pixels that came before.
  */
 #include "archaic.h"
 
@@ -36,6 +40,9 @@ static unsigned char row[MAXW];		/* color numbers of one row */
 static unsigned short tail[4096];
 static unsigned char ntail[4096];
 static short chain[260];		/* a long string's codes, last first */
+/* lzw8: where each code's pixels are in im->bits (prefix has how many).
+ * From malloc, the first time a picture needs it. */
+static unsigned char **where;
 static int dither[4][4] = {		/* 4x4 Bayer thresholds, 8..248 */
 	{ 8, 136, 40, 168 },
 	{ 200, 72, 232, 104 },
@@ -84,17 +91,14 @@ int n;
  * (white, mostly) until their rows come */
 static void setpal()
 {
-	long i, n;
-	int c, k;
+	int c, i;
 
 	for (i = 0; i < 768; ++i)
 		im->pal[i] = rgb[i];
-	for (c = k = 0; k < 256; ++k)
-		if (gray[k] > gray[c])
-			c = k;
-	n = (long)im->bpl * im->h;
-	for (i = 0; i < n; ++i)
-		im->bits[i] = c;
+	for (c = i = 0; i < 256; ++i)
+		if (gray[i] > gray[c])
+			c = i;
+	pic_fill(im->bits, (long)im->bpl * im->h, c);
 }
 
 /* skip data blocks up to the empty one */
@@ -462,6 +466,133 @@ bad:
 	return -1;
 }
 
+/* LZW, the 8-bit way: the picture is its own dictionary (as Larry Bank's
+ * AnimatedGIF does it). A code's pixels are already in the picture, where
+ * they came the first time: where[] has the place, prefix[] how many. So
+ * a code is one copy, and each pixel is written once. (The slow way puts
+ * each pixel on a stack, then into row[], then into the picture.) For an
+ * 8-bit picture as wide as its screen, not interlaced: its rows lie
+ * together in im->bits. */
+static int lzw8(mcs)
+int mcs;
+{
+	register unsigned long acc;	/* code bits not used yet, nacc of them */
+	register unsigned char *ip, *lim;	/* the image data at hand */
+	register unsigned char *op, *sp;	/* the next pixel; a copy's start */
+	register int c, n, nacc;
+	unsigned char *end, *rowe;
+	unsigned char *pp;	/* where the last code's pixels are, */
+	int plen;		/*  how many */
+	int clear, eoi, next, size, mask, cmax, w, y, yend;
+
+	clear = 1 << mcs;
+	eoi = clear + 1;
+	size = mcs + 1;
+	mask = (1 << size) - 1;
+	cmax = 1 << size;
+	/* After a clear, the first code makes no new code. So that no test
+	 * is needed for it, it makes one at eoi, which is never looked up. */
+	next = eoi;
+	acc = 0;
+	nacc = 0;
+	w = im->w;
+	y = top;
+	yend = top + ih < im->h ? top + ih : im->h;
+	op = im->bits + (long)y * w;
+	end = im->bits + (long)yend * w;
+	rowe = op + w;
+	pp = op;
+	plen = 0;
+	ip = lim = http_p;
+	for (;;) {
+		while (nacc < size) {
+			if (ip < lim)
+				c = *ip++;
+			else {
+				http_p = ip;
+				c = dmore();
+				ip = http_p;
+				lim = dlim;
+				if (c < 0)
+					goto out;
+			}
+			acc |= (unsigned long)c << nacc;
+			nacc += 8;
+		}
+		c = (int)acc & mask;
+		acc >>= size;
+		nacc -= size;
+		if (c < clear)			/* one pixel */
+			n = 0;
+		else if (c < next && c > eoi) {	/* an earlier code's pixels */
+			n = prefix[c];
+			sp = where[c];
+		} else if (c == next && c > eoi) {
+			n = plen + 1;		/* the last pixels and their first */
+			sp = pp;
+		} else if (c == clear) {
+			size = mcs + 1;
+			mask = (1 << size) - 1;
+			cmax = 1 << size;
+			next = eoi;
+			continue;
+		} else if (c == eoi)
+			break;
+		else
+			goto bad;
+		if (next < 4096) {
+			/* a new code: the last code's pixels, and the first
+			 * pixel of these, which comes next to them */
+			where[next] = pp;
+			prefix[next] = plen + 1;
+			if (++next >= cmax && size < 12) {
+				++size;
+				mask = (1 << size) - 1;
+				cmax = 1 << size;
+			}
+		}
+		pp = op;
+		if (n == 0) {
+			plen = 1;
+			if (op < end)
+				*op++ = c;
+		} else {
+			plen = n;
+			if ((long)n > end - op)		/* below the screen */
+				n = (int)(end - op);
+			/* forward: at c == next, the last pixel is the first */
+			while (n >= 4) {
+				*op++ = *sp++;
+				*op++ = *sp++;
+				*op++ = *sp++;
+				*op++ = *sp++;
+				n -= 4;
+			}
+			while (--n >= 0)
+				*op++ = *sp++;
+		}
+		if (op >= rowe) {		/* rows done */
+			http_p = ip;
+			do {
+				rowdone(y);
+				rowe += w;
+				if (++y >= yend)
+					goto out;
+			} while (op >= rowe);
+		}
+	}
+out:
+	http_p = ip;
+	ry = y - top;
+	blk += (int)(lim - ip);	/* the bytes after ip are not taken yet */
+	return 0;
+bad:
+	http_p = ip;
+	ry = y - top;
+	blk += (int)(lim - ip);
+	return -1;
+}
+
 /* read a GIF into img (bits and pal from malloc), after its first two
  * bytes "GI": 0 ok, -1 not a GIF or broken */
 int gif_load(img)
@@ -549,7 +680,14 @@ Image *img;
 		for (i = 0; pure && i < 1 << mcs; ++i)
 			if (gray[i] > 7 && gray[i] < 248)
 				pure = 0;
-		r = pure ? lzw1(mcs) : lzw(mcs);
+		if (pure)
+			r = lzw1(mcs);
+		else if (im->depth == 8 && !ilace && left == 0 && iw == w &&
+			(where || (where = (unsigned char **)malloc((unsigned)
+			(4096 * sizeof *where))) != 0))
+			r = lzw8(mcs);
+		else
+			r = lzw(mcs);
 		if (r == 0) {			/* read to the end: all of it counts */
 			while (!dend && blk > 0 && HGETC() >= 0)
 				--blk;

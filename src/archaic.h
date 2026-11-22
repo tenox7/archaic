@@ -160,7 +160,8 @@ int pic_load P((Image *im));
 #define P_GIF 1			/* Image's kind: a GIF, */
 #define P_ABM 2			/*  WRP's ABM; 0: not a picture */
 void pic_rows P((Image *im, int y, int n));	/* http_sync(), then img_rows() */
-void pic_wipe P((unsigned char *p, long n));	/* n bytes to 0 */
+void pic_fill P((unsigned char *p, long n, int c));	/* n bytes to c */
+#define pic_wipe(p, n) pic_fill(p, n, 0)		/* n bytes to 0 */
 /* gif.c: a GIF, after its first 2 bytes "GI" */
 int gif_load P((Image *im));
 

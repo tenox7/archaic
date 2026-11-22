@@ -47,10 +47,13 @@ static long vms;		/* the milliseconds the counted waits skipped */
 
 int g_bar = 1;
 
-/* fb.c's screen has millions of colors */
+/* fb.c's screen has millions of colors. $ARCHAIC_COLORS: as many as a
+ * display with that many says (for the tests: 256, an 8-bit colormap) */
 long g_colors()
 {
-	return 1L << 24;
+	char *s = getenv("ARCHAIC_COLORS");
+
+	return s && atol(s) >= 2 ? atol(s) : 1L << 24;
 }
 
 void g_sbar(pos, max, vis)

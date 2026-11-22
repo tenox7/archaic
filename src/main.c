@@ -8,8 +8,8 @@
  * =WxH+X+Y	window size and place (or -g WxH+X+Y)
  * -a		show WRP's M, T and C menus (mode, picture type, colors)
  * -c n		start with pictures of n colors (2 to 256), not as many
- *		as the display shows (g_colors). With -t: as if the
- *		display showed n
+ *		as the display shows (g_colors; 216 for a colormap of
+ *		256). With -t: as if the display showed n
  * -f fmt	gif: ask WRP for GIFs only. abm (as without -f): WRP may
  *		send its black and white pictures as ABM (see pic.c). To
  *		compare the two on a computer
@@ -2782,7 +2782,12 @@ char **argv;
 	dcolors = headless ? (copt ? (long)copt : 2L) : g_colors();
 	if (dcolors < 2)
 		dcolors = 2;
-	ncol = copt ? copt : dcolors > 256 ? 256 : (int)dcolors;
+	/* a colormap of 256 (8 bits): 216, the web colors (WRP makes GIP's
+	 * pictures for them), as the old browsers had. They are the same on
+	 * every page, and x11.c takes cells only for the ones a picture
+	 * uses. C has 256 too. */
+	ncol = copt ? copt : dcolors > 256 ? 256 : dcolors == 256 ? 216 :
+		(int)dcolors;
 	cmenu = dcolors > 2;
 	idepth = cmenu ? 8 : 1;
 	sprintf(msg, "Archaic %s, %s", VERSION, cname(dcolors));

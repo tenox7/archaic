@@ -115,7 +115,7 @@ else
 fi
 
 # 2. Gray and color GIFs (dithered): the size must be right.
-for f in hn216 ex16; do
+for f in hn216 ex16 full runs ilace; do
 	"$bin" -t -o "$tmp/$f.pbm" "http://127.0.0.1:$port/$f.gif" >"$tmp/$f.out" 2>&1
 	want=$(magick identify -format '%wx%h' "$here/data/$f.gif[0]")
 	got=$(grep -o 'got [0-9]*x[0-9]*' "$tmp/$f.out" | head -1 | cut -c5-)
@@ -127,8 +127,11 @@ for f in hn216 ex16; do
 done
 
 # 2b. With colors (-c 256: as on a display with colors), the pixels
-#     keep their colors: the same as ImageMagick's, exactly.
-for f in hn216 ex16 hn2; do
+#     keep their colors: the same as ImageMagick's, exactly. The 8-bit
+#     way (lzw8): also full.gif (the code table full, and no clear) and
+#     runs.gif (long runs: codes made from the last one); ilace.gif is
+#     interlaced, so it goes the slow way.
+for f in hn216 ex16 hn2 full runs ilace; do
 	"$bin" -t -c 256 -o "$tmp/$f.ppm" "http://127.0.0.1:$port/$f.gif" >"$tmp/$f.cout" 2>&1
 	magick "$here/data/$f.gif[0]" -depth 8 "$tmp/$f-ref.ppm"
 	if grep -q ' got [0-9]*x[0-9]* gif sum [0-9a-f]* colors$' "$tmp/$f.cout" &&
@@ -465,6 +468,14 @@ if [ -x "$hl" ]; then
 		ok "headless: a color picture on the screen exactly; the shot in colors"
 	else
 		bad "headless: the color picture is wrong ($(magick identify -format '%[channels]' "$tmp/c1.png"))"
+	fi
+	# a display of 256 colors (an 8-bit colormap) asks WRP for 216
+	echo quit | ARCHAIC_COLORS=256 "$hl" "http://127.0.0.1:$port/" >/dev/null 2>&1
+	if grep -q 'GET /?m=ismap&t=gif&c=216&sl=1 ' "$tmp/http.log"; then
+		ok "headless: a display of 256 colors asks WRP for 216"
+	else
+		bad "headless: a display of 256 colors did not ask for 216:"
+		grep 'GET /?m=' "$tmp/http.log"
 	fi
 else
 	echo "skip  headless colors: no $hl"

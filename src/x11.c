@@ -5,9 +5,12 @@
  * The colors are the default visual's. Black and white (depth 1): the
  * pictures in 1 bit. TrueColor (and DirectColor): each color's pixel
  * from the visual's masks. A colormap (PseudoColor, StaticColor, the
- * grays): the colors of a picture are allocated (XAllocColor), shared
- * with the other programs; when the colormap is full, the nearest
- * color it has. A new picture's colors free the last ones.
+ * grays): only the colors that a picture uses are allocated
+ * (XAllocColor), when it is drawn, shared with the other programs; when
+ * the colormap is full, the nearest color it has. A new palette's colors
+ * free the last ones. WRP's pictures of 216 colors (GIP) have the web
+ * colors: the same palette on every page, so its colors stay allocated,
+ * and a page of text takes 20 to 90 cells.
  */
 #include "archaic.h"
 #include <X11/Xlib.h>
@@ -36,6 +39,7 @@ static Colormap cmap;
 static int depth, truec;		/* truec: TrueColor or DirectColor */
 static unsigned char ppal[768];		/* the colors pmap is for */
 static unsigned long pmap[256];		/* their pixels */
+static unsigned char got[256];		/* pmap[i] is set (getcols) */
 static int pvalid;
 static unsigned long cells[256];	/* the cells allocated for them */
 static int ncells;
@@ -233,12 +237,13 @@ int r, g, b;
 	return p;
 }
 
-/* pmap: the pixel of each color of pal, unless pal is the last one */
+/* pmap: the pixel of each color of pal, unless pal is the last one. With a
+ * colormap, a new pal frees the cells of the last one, and getcols gets
+ * the cells for the colors that a picture uses */
 static void mappal(pal)
 unsigned char *pal;
 {
-	XColor c;
-	int i, j;
+	int i;
 
 	for (i = 0; i < 768 && pal[i] == ppal[i]; ++i)
 		;
@@ -260,24 +265,52 @@ unsigned char *pal;
 	if (cmc)
 		free((char *)cmc);
 	cmc = 0;
+	for (i = 0; i < 256; ++i)
+		got[i] = 0;
+}
+
+/* a cell for each color of the palette (ppal) that w x h pixels use, and
+ * that has none yet. A palette of 216 colors takes only the cells that
+ * its pictures need, not 216: the other programs keep the rest */
+static void getcols(pix, w, h, bpl)
+unsigned char *pix;
+int w, h, bpl;
+{
+	static unsigned char use[256];
+	unsigned char *b;
+	XColor c;
+	int i, j;
+
+	if (truec)
+		return;
+	for (i = 0; i < 256; ++i)
+		use[i] = 0;
+	for (j = 0; j < h; ++j)
+		for (b = pix + (long)j * bpl, i = 0; i < w; ++i)
+			use[b[i]] = 1;
 	for (i = 0; i < 256; ++i) {
-		for (j = 0; j < i; ++j)		/* the same as one before */
-			if (pal[3 * j] == pal[3 * i] && pal[3 * j + 1] ==
-				pal[3 * i + 1] && pal[3 * j + 2] == pal[3 * i + 2])
+		if (!use[i] || got[i])
+			continue;
+		got[i] = 1;
+		for (j = 0; j < 256; ++j)	/* the same color as one set */
+			if (got[j] && j != i && ppal[3 * j] == ppal[3 * i] &&
+				ppal[3 * j + 1] == ppal[3 * i + 1] &&
+				ppal[3 * j + 2] == ppal[3 * i + 2])
 				break;
-		if (j < i) {
+		if (j < 256) {
 			pmap[i] = pmap[j];
 			continue;
 		}
-		c.red = pal[3 * i] * 257;
-		c.green = pal[3 * i + 1] * 257;
-		c.blue = pal[3 * i + 2] * 257;
+		c.red = ppal[3 * i] * 257;
+		c.green = ppal[3 * i + 1] * 257;
+		c.blue = ppal[3 * i + 2] * 257;
 		c.flags = DoRed | DoGreen | DoBlue;
 		if (XAllocColor(dpy, cmap, &c)) {
 			pmap[i] = c.pixel;
 			cells[ncells++] = c.pixel;
 		} else
-			pmap[i] = nearest(pal[3 * i], pal[3 * i + 1], pal[3 * i + 2]);
+			pmap[i] = nearest(ppal[3 * i], ppal[3 * i + 1],
+				ppal[3 * i + 2]);
 	}
 }
 
@@ -296,6 +329,7 @@ unsigned char *pix, *pal;
 	if (w <= 0 || h <= 0)
 		return;
 	mappal(pal);
+	getcols(pix, w, h, bpl);
 	im = XCreateImage(dpy, vis, (unsigned)depth, ZPixmap, 0, (char *)0,
 		(unsigned)w, (unsigned)h, 32, 0);
 	if (!im)

@@ -25,7 +25,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/main.c` | the page on the screen: layout, drawing, mouse, keys, forms |
 | `src/html.c` | HTML reader: forms, menus, links, images, text |
 | `src/http.c` | URLs and HTTP/1.0, with a 16 KB read buffer |
-| `src/gif.c` | GIF decoder: the colors, or black and white with a 4x4 dither. WRP's black and white GIFs go a fast way |
+| `src/gif.c` | GIF decoder: the colors, or black and white with a 4x4 dither. WRP's black and white GIFs go a fast way, and its pictures in colors the 8-bit way (see Pictures: GIF and ABM) |
 | `src/pic.c` | pictures: looks at what came (GIF or ABM); the ABM decoder |
 | `src/x10.c` | display for X10 (Idris) |
 | `src/nidris.c` | network for Idris: TCP through netd |
@@ -47,7 +47,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
 | `test/run.sh` | tests: GIF decoder, HTML, forms, WRP, the headless display |
 | `test/xshot.sh` | test: run the X11 build and take a screenshot |
-| `test/data/` | GIFs saved from WRP, for the tests; two of them also as ABM |
+| `test/data/` | GIFs saved from WRP, for the tests; two of them also as ABM. `full.gif`, `runs.gif` and `ilace.gif` are made for the 8-bit way: a full code table with no clear, long runs, interlaced |
 | `test/cfacts.c`, `cfacts2.c` | probe for a new port: what its C compiler and linker do (name length, case, struct copies) |
 | `screenshots/` | the pictures in README.md: the emulators' windows, the scroll bar, and WRP's buttons and labels in `icons/` (drawn from the pictures in `main.c`, as `drawbutton()` draws them, at their real size). Also each system's own screen, for this file (see each Running section) |
 
@@ -130,12 +130,14 @@ The first status line says what it found, like `Archaic 0.6, millions of colors`
 | SunView | a color screen (8 bits, as the cg3): 128, in a colormap segment of Archaic's own. A black and white screen (bw2, as the Sun-3's bwtwo): black and white |
 | X11 | the default visual. Depth 1: black and white. TrueColor: millions. A colormap (8-bit PseudoColor, as on old workstations): its size, like 256 |
 | Cocoa, SDL | the screen's depth: millions |
-| `archaic-headless` | millions, like SDL (`-c 2` for black and white) |
+| `archaic-headless` | millions, like SDL (`-c 2` for black and white). `ARCHAIC_COLORS=N`: as a display of N colors (for the tests) |
 
 On a display with colors:
 
 - WRP's **C** menu shows. It is set to the display's colors: the nearest of WRP's
   choices (256, 216, 128, 64, 16, 2) that is not more, or to `-c n`.
+  A display of 256 colors (an 8-bit colormap) gets 216: the web colors, as the old browsers had
+  (see 216 colors: GIP). Choose 256 in C for the page's own colors.
 - Choose another number there, and Archaic sends WRP's form at once with St (stop).
   WRP takes the picture again in those colors, and does not load the page again.
   The frame stays where it was.
@@ -145,15 +147,47 @@ On a display with colors:
   When a picture has more colors than places (C at 256, or 128 with no pure black),
   the color nearest to another one gives up its place, until they fit:
   so a small red line keeps its red. The others take the nearest color.
-- X11 with a colormap: Archaic gets the picture's colors in the default colormap,
-  shared with the other programs. When the colormap is full, it takes the nearest color
-  the colormap has. A new picture's colors free the last ones.
+- X11 with a colormap: Archaic takes cells in the default colormap only for the colors
+  that a picture uses, when it draws it. They are shared with the other programs.
+  When the colormap is full, it takes the nearest color the colormap has.
+  A new palette frees the last one's cells.
 
 On a black and white display, the C menu is hidden. Archaic asks WRP for 2 colors
 (or for `-c n`). The pictures are 1 bit a pixel; one with more colors gets a 4x4 dither.
 
 Archaic's own start page request asks WRP for the same settings as the next ones
-(`/?m=ismap&t=gif&c=256&sl=1`), so that WRP's form does not change after the first page.
+(`/?m=ismap&t=gif&c=256&sl=1`, with C's colors), so that WRP's form does not change after the first page.
+
+### 216 colors: GIP
+
+With C at 216, WRP makes **GIP** pictures: the 216 web colors (a 6 x 6 x 6 color cube), with no dither.
+Archaic still sends `t=gif&c=216`, not `t=gip`: WRP shows the C menu only for GIF.
+(WRP before November 2026 makes 216 colors of the page itself, with median cut, as for 256.)
+
+The web colors are the same on every page. On a display with a colormap (8 bits) this matters:
+
+- Archaic takes cells only for the colors a picture uses: a page of text takes 20 to 90 cells.
+  The cells stay from page to page, and the other programs keep the rest.
+- Other programs that show the web colors (as the old browsers) share the same cells.
+- WRP's own 216 colors (median cut) are new on each page, and a slice uses almost all of them.
+
+Measured on 7 text pages (Wikipedia, Hacker News, BBC News, CNN Lite, the Go docs, a man page, GitHub),
+slices of 632 x 351, the same screenshots:
+
+| | Median cut, 216 | GIP |
+|---|---|---|
+| All 7 pages | 9.9 MB | 5.4 MB |
+| One slice, decoded on the 3B1 (3 of the pages) | 2.2 to 3.2 s | 1.8 to 2.2 s |
+| WRP's work for a page | 7 to 67 ms more (the page's palette) | none |
+| Colors in the first 2 slices | 79 to 215 | 16 to 87 |
+| Text (macOS OCR, and by eye at 2x) | the same | the same |
+| Light tints: Hacker News's beige, gray code boxes | kept | white |
+| Photos | good | bands of color |
+
+On an 8-bit X display (Xvfb) with 183 free cells, 4 Archaic windows with 4 of these pages
+took 72 cells with GIP, and all showed the right colors. Before Archaic took cells only for
+used colors, one window took all 183, with GIP too. With median cut, the windows after the first
+had no free cells, and their photos lost their colors.
 
 ## Pictures: GIF and ABM
 
@@ -171,7 +205,9 @@ That was most of the time of a page, also on a slow line.
 - `-f gif` makes Archaic ask for GIFs only. Use it to compare the two on your computer:
   `archaic -t -f gif ...`, then `archaic -t ...`. The last status line has the time.
 - WRP's black and white GIF (2 colors in its color table) goes a fast way in the GIF decoder too:
-  about 5 times faster than before. Other GIFs are decoded a pixel at a time.
+  about 5 times faster than before.
+- A GIF in colors, on a display with colors, goes the 8-bit way (`lzw8`), if it fills its screen
+  and is not interlaced (WRP's GIFs do). Other GIFs are decoded a pixel at a time.
 
 Measured with `-t`: one page with 6 pictures of 551 x 310 pixels (42 KB as GIF, 37 KB as ABM):
 
@@ -203,6 +239,26 @@ from 12 web pages. The times are for one picture on the 3B1, with no network:
 - The bits as they are, and XBM, are never faster: they are 3 and 15 times larger than ABM.
 - VNC (RFB) has no 1-bit pixels. Its simple encodings carry 8 bits or more a pixel
   (Raw: 24 times the GIF, Hextile: 2.7 times). Its small ones (Zlib, ZRLE, Tight) are deflate: see above.
+
+**The 8-bit way** uses the picture as its own dictionary, as Larry Bank's
+[AnimatedGIF](https://github.com/bitbank2/AnimatedGIF) does in its Turbo mode.
+A code's pixels are already in the picture, where they came the first time.
+So for each code Archaic keeps that place and the number of pixels (16 KB from malloc, once),
+and a code is one copy of earlier pixels. Each pixel is written once.
+The way before put each pixel on a stack, then in a row, then in the picture.
+The picture is also filled with its lightest color first, now 4 bytes at a time (not 1).
+
+Measured on the 3B1 (10 MHz 68010, CPU time for one 632 x 351 slice from WRP, no network):
+
+| Slice | Before | The 8-bit way |
+|---|---|---|
+| Wikipedia, GIF 216 colors (25 KB) | 9.1 s | 2.2 s |
+| BBC News, GIF 216 colors (45 KB) | 10.5 s | 3.2 s |
+| Hacker News, GIF 216 colors (41 KB) | 10.2 s | 2.9 s |
+| Hacker News, GIP (20 KB) | 8.8 s | 1.9 s |
+
+On the Mac it is 2 to 3 times faster than before. Wuffs, the fastest GIF decoder found,
+keeps up to 8 pixels for each code; it is C99, and Archaic's compilers are older.
 
 The ABM file format is in `src/pic.c`.
 
@@ -394,6 +450,7 @@ At the end of the input, Archaic quits.
 
 Empty lines and lines that start with `#` do nothing. Standard output gets
 `title TEXT` for each page, and `shot FILE WxH` for each screenshot.
+With `ARCHAIC_COLORS=N` set, the display says it shows N colors (256: as an 8-bit colormap).
 
 ```
 printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' \
@@ -407,7 +464,8 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    ABM pictures give exactly the pixels of the GIF, and a broken ABM is refused.
    Archaic asks for ABM and GIF, and with `-f gif` only for GIF.
 2. Gray and color GIFs decode at the right size.
-   With colors (`-c 256`), the colors are **exactly** ImageMagick's.
+   With colors (`-c 256`), the colors are **exactly** ImageMagick's. Also in the hard cases
+   of the 8-bit way: a full code table with no clear, long runs, and an interlaced GIF (the way before).
 3. HTML: title, entities, fields, menus, hidden fields, buttons, links, comments.
 4. A button click sends the form with the right query.
 5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons and the labels Z, C, D and K are pictures, Go stays text. A new choice in WRP's D menu sends the form at once.
@@ -420,6 +478,7 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
    A color picture on the screen is exactly the GIF's, and the PNG is in colors.
+   A display of 256 colors (`ARCHAIC_COLORS=256`) asks WRP for 216.
    A new width: one St with the new width, once the size stays (none for a new height); typed text stays.
 8. The tall picture, with no WRP: the test server cuts a random 600 x 1500 GIF into slices.
    After a wheel step, a window and a scroll to the end, the frame must show exactly the right rows.
@@ -926,6 +985,7 @@ A port is **one display file** and **one network file**.
 
 **Memory note for 16-bit systems:** the static data is about 145 KB
 (page 30 KB, items 50 KB, read buffer 16 KB, GIF tables 32 KB).
+On a display with colors, the GIF decoder also takes 16 KB from malloc, once.
 On DOS or Win16, use the large memory model, or make these smaller in `archaic.h`.
 
 ## Roadmap: poor systems with no web browser
@@ -1076,8 +1136,10 @@ It also knows the 4010's commands.
 - On the 3B1, the font has only ASCII: other letters in WRP's form show as `?`.
 - In SunView, a second window with many colors (another Archaic) can change the colors of the first one,
   until the pointer is in it (see SunOS 4 and SunView: what to know).
+- With a WRP before November 2026, C at 216 is WRP's median cut: new colors on each page,
+  and on an 8-bit X display almost all of the colormap (see 216 colors: GIP).
 - WRP before commit 3126bc0 (November 2026) could hang for good on back (← arrow),
   when Chrome took the page from its back-forward cache. Use a newer WRP.
 - With slices, a link to a place on the same page (`#name`) does not scroll the frame there.
-- Only WRP's black and white pictures come as ABM. Pictures with colors are GIFs, and the GIF decoder
-  does them a pixel at a time: slow on an old CPU (see Pictures: GIF and ABM).
+- Only WRP's black and white pictures come as ABM. Pictures with colors are GIFs: a 10 MHz 68010
+  needs 2 to 3 s for one 632 x 351 slice, also the 8-bit way (see Pictures: GIF and ABM).
