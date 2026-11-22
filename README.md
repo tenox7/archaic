@@ -13,6 +13,8 @@ WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
 
 ![Archaic in LEMU (QEMU): SunOS 4.1.4 with SunView on a SPARCstation 5, showing Wikipedia in color](screenshots/lemu.png)
 
+![Archaic in TME: SunOS 3.5 with SunView on a Sun-3/160, showing Wikipedia](screenshots/tme.png)
+
 ## Platforms
 
 | System | Window system | Network | Get it |
