@@ -39,14 +39,6 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 The binaries are in [releases](https://github.com/tenox7/archaic/releases).
 The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 
-Emulator kits, on osarchive:
-
-| Kit | Emulator | Folder |
-|---|---|---|
-| `atarist-idris314-hatari` | Hatari | `os/idris/virt/` (newer kits have Archaic) |
-| `att3b1-unix351-freebee` | FreeBee | `os/att/3b1/virt/` |
-| `sunos414-lemu` | LEMU (QEMU) | `os/sunos/Virtual/qemu/SunOS414/` |
-
 ## Quick start
 
 1. On your computer, start [WRP](https://github.com/tenox7/wrp): `wrp`. It listens on port 8080.
@@ -60,17 +52,6 @@ Emulator kits, on osarchive:
    - SunOS: log in as `root` at the console, then `sunview` (SunOS 3: `suntools`).
 4. Click the address box, type an address, press Return.
 5. **Ctrl-Q** quits. On the 3B1: **Exit**.
-
-Archaic looks for WRP at port 8080 of:
-
-| System | WRP's host |
-|---|---|
-| Idris, 3B1, Sun-3 | `10.0.2.2`: your computer, in the emulators (the Sun-3: TME with slirp) |
-| SunOS on SPARC | `192.168.1.10`: your computer, in the kit |
-| other systems | `127.0.0.1` |
-
-To use another WRP: `archaic HOST:PORT`, or set `WRP` to `HOST:PORT`.
-In the kits, the 3B1 and SunOS have no DNS: give addresses as numbers.
 
 ## Using it
 
