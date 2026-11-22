@@ -127,12 +127,12 @@ On the old systems, copy the sources in, then:
 Which files to copy and how, the facts of each system, and how to port:
 see [AGENTS.md](AGENTS.md).
 
-## Next ports
+## Roadmap
 
-Old systems with no web browser: MGR, the Blit and DMD 5620, QNX Windows on QNX 2,
+MGR, the Blit and DMD 5620, QNX Windows on QNX 2,
 SunView on the Sun-2, SunWindows on SunOS 1, VWS and EWS on the VAX,
 NeWS and Display PostScript, Windows 1 and 2, OS/2 1.x,
-Tektronix 4010, 4014 and 4105 terminals.
+Tektronix 4010, 4014 and 4105 terminals. Plan 9 RIO.
 
 ## License
 
