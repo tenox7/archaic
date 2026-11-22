@@ -49,7 +49,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `test/xshot.sh` | test: run the X11 build and take a screenshot |
 | `test/data/` | GIFs saved from WRP, for the tests; two of them also as ABM |
 | `test/cfacts.c`, `cfacts2.c` | probe for a new port: what its C compiler and linker do (name length, case, struct copies) |
-| `screenshots/` | the pictures in README.md: the emulators' windows, the scroll bar, and WRP's buttons and labels in `icons/` (drawn from the pictures in `main.c`, as `drawbutton()` draws them, at 2x). Also each system's own screen, for this file (see each Running section) |
+| `screenshots/` | the pictures in README.md: the emulators' windows, the scroll bar, and WRP's buttons and labels in `icons/` (drawn from the pictures in `main.c`, as `drawbutton()` draws them, at their real size). Also each system's own screen, for this file (see each Running section) |
 
 ## Options
 
