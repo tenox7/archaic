@@ -9,7 +9,7 @@ WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
 
 **Why Archaic is fast:**
 
-- Archaic tells WRP its window size, colors and place on the page.
+- Unlike existing browsers, Archaic tells WRP its window size, colors and place on the page.
 - WRP keeps the full page as a picture. It sends only the part you see.
 - While you read, Archaic asks WRP for the next part. Most scrolls do not wait.
 - Mosaic and Netscape cannot do this.
