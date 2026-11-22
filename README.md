@@ -1,19 +1,19 @@
 # Archaic
 
-A small and ultra fast web browser for very old computers.
+Small and ultra fast web browser for very old computers. 
 
-Archaic is a client of **[WRP, the Web Rendering Proxy](https://github.com/tenox7/wrp)**.
+Archaic is a dedicated client of **[WRP, the Web Rendering Proxy](https://github.com/tenox7/wrp)**.
 WRP runs a modern browser on a modern computer. It sends each web page as a picture
 with a click map, plus a small form. Archaic shows them, and sends your clicks and keys back.
 WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
 
-**Why Archaic is fast:**
+## Performance
 
-- Unlike existing browsers, Archaic tells WRP its window size, colors and place on the page.
-- **Two-level cache:**
-  - **WRP** (big): the full page, as a picture. It sends only small parts.
-  - **Archaic** (small): 4 parts in memory. While you read, it loads the next and the previous part.
-- Most scrolls do not wait for the network.
+Archaic provides ultra fast and smooth browsing experience on vintage computers.
+Unlike Netscape or Mosaic, Archaic is tightly integrated with WRP and provides the window size, scroll bar position and display properties.
+This allows to pre-load and optimize, cache, send only small chunks of the page as you scroll.
+
+## Screenshots
 
 ![Archaic in Hatari: Idris on an Atari Mega ST, showing Wikipedia](screenshots/hatari.png)
 
