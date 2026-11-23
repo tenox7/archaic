@@ -52,8 +52,6 @@ static int dither[4][4] = {		/* 4x4 Bayer thresholds, 8..248 */
 static unsigned char bit[8] = { 0200, 0100, 040, 020, 010, 04, 02, 01 };
 static int blk;				/* bytes left in this data block */
 static int dend;			/* the last data block has been read */
-static unsigned long acc;		/* bits not used yet */
-static int nacc;
 static Image *im;
 static int left, top, iw, ih, ilace, pass, ry;
 static int pend0, npend;		/* rows done, not yet shown */
@@ -234,6 +232,11 @@ static void putrow()
 static int lzw(mcs)
 int mcs;
 {
+	/* acc and nacc are local, as in lzw1 and lzw8. MetaWare C on AIX
+	 * PS/2 kept a static nacc in a register across the call in DBYTE(),
+	 * and shifted by that old value. */
+	register unsigned long acc;	/* code bits not used yet, nacc of them */
+	register int nacc;
 	int clear, eoi, next, size, old, first, in, c, sp, x;
 
 	clear = 1 << mcs;
@@ -247,6 +250,8 @@ int mcs;
 	old = -1;
 	first = 0;
 	x = 0;
+	acc = 0;
+	nacc = 0;
 	while (ry < ih) {
 		while (nacc < size) {
 			c = DBYTE();
@@ -485,9 +490,11 @@ int mcs;
 	int plen;		/*  how many */
 	int clear, eoi, next, size, mask, cmax, w, y, yend;
 
+	/* size first: with 1 << mcs as the first line, MetaWare C on AIX
+	 * PS/2 took the shift count from a register it had not loaded */
+	size = mcs + 1;
 	clear = 1 << mcs;
 	eoi = clear + 1;
-	size = mcs + 1;
 	mask = (1 << size) - 1;
 	cmax = 1 << size;
 	/* After a clear, the first code makes no new code. So that no test
@@ -671,8 +678,6 @@ Image *img;
 		if (mcs < 2 || mcs > 8)
 			break;
 		blk = dend = 0;
-		acc = 0;
-		nacc = 0;
 		ry = pass = 0;
 		/* pure black and white: the dither changes no pixel */
 		pure = im->depth == 1 && !ilace && left == 0 && top == 0 &&

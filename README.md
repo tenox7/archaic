@@ -42,6 +42,7 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 | HP-UX 9 on an HP 9000/700 (PA-RISC) | X11, in color | BSD sockets | release: `archaic-hpux9` |
 | DG/UX R4.20 on a PC (Intel) | X11, in color | BSD sockets | in the DG/UX kit, or `sh mkdgux` |
 | AIX 3.2 on an IBM RS/6000 | X11, in color | BSD sockets | release: `archaic-aix3`, or in the AIX kit |
+| AIX PS/2 1.3 on a PC (486) | X11, in color | BSD sockets | release: `archaic-aixps2`, or in the AIX PS/2 kit |
 | Ultrix 4.5 on a DECstation (MIPS) | X11 (DECwindows), in color | BSD sockets | release: `archaic-ultrix4`, or in the DECstation kit |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
@@ -58,7 +59,7 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 2. Copy the binary to the old computer as `archaic`, and make it executable:
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
    - 3B1, SunOS, HP-UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
-   - DG/UX, AIX in the RS/6000 kit, and Ultrix in the DECstation kit: the kit has it already, in `/usr/local/bin`.
+   - DG/UX, AIX in the RS/6000 and PS/2 kits, and Ultrix in the DECstation kit: the kit has it already, in `/usr/local/bin`.
 3. Start the window system, then type `archaic` in a shell window:
    - Idris: log in as `root`, then `/usr/X/bin/xstart`.
    - 3B1: Office > UNIX System.
@@ -141,6 +142,7 @@ On the old systems, copy the sources in, then:
 | HP-UX 9 | `sh mkhpux` | HP's cc |
 | DG/UX R4.20 | `sh mkdgux` | DG/UX's cc (GCC 2.7.2) |
 | AIX 3.2 | `sh mkaix` | IBM's XL C 1.3, or gcc 2.7.2 |
+| AIX PS/2 1.3 | `sh mkaixps2` | MetaWare High C R2.2g |
 | Ultrix 4 | `sh mkultrix` | Ultrix's cc, or gcc 3.0.4 |
 
 Which files to copy and how, the facts of each system, and how to port:

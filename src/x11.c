@@ -33,7 +33,7 @@ void free();
 
 static Display *dpy;
 static Window win;
-static GC gc;
+static GC gc, bgc;			/* bgc: for g_bits */
 static XFontStruct *font;
 static int scr, ww, wh;
 static unsigned long black, white;
@@ -62,6 +62,7 @@ char *geom;
 int *w, *h;
 {
 	static XSizeHints hints;
+	static XGCValues gv;
 	static char *names[] = { "6x13", "fixed", "9x15" };
 	Atom proto;
 	int x = 0, y = 0, m, i;
@@ -101,6 +102,12 @@ int *w, *h;
 		ButtonReleaseMask | ButtonMotionMask | StructureNotifyMask);
 	gc = XCreateGC(dpy, win, 0L, (XGCValues *)0);
 	XSetFont(dpy, gc, font->fid);
+	/* no NoExpose events from g_bits: g_copy waits for its own */
+	gv.graphics_exposures = False;
+	gv.foreground = black;
+	gv.background = white;
+	bgc = XCreateGC(dpy, win, (unsigned long)(GCGraphicsExposures |
+		GCForeground | GCBackground), &gv);
 	/* the window manager's close button (ICCCM, X11R4 and later) */
 	proto = XInternAtom(dpy, "WM_PROTOCOLS", False);
 	wmdel = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
@@ -164,22 +171,31 @@ int *height, *base;
 	*base = font->ascent;
 }
 
-/* rows of 1-bit pixels, 1 black, high bit left */
+/* rows of 1-bit pixels, 1 black, high bit left. They go into a pixmap
+ * first, then to the window. IBM's X server on AIX PS/2 lost pixels of
+ * 1-bit pictures put straight into a window (with XPutImage or
+ * XCopyPlane), at most places that do not start on a byte of the
+ * screen: WRP's buttons lost the right part of their pictures. */
 void g_bits(x, y, w, h, bits, bpl)
 int x, y, w, h, bpl;
 unsigned char *bits;
 {
 	XImage *im;
+	Pixmap pm;
 
-	im = XCreateImage(dpy, DefaultVisual(dpy, scr), 1, XYBitmap, 0,
-		(char *)bits, (unsigned)w, (unsigned)h, 8, bpl);
+	if (w <= 0 || h <= 0)
+		return;
+	im = XCreateImage(dpy, vis, 1, XYBitmap, 0, (char *)bits,
+		(unsigned)w, (unsigned)h, 8, bpl);
 	if (!im)
 		return;
 	im->byte_order = MSBFirst;
 	im->bitmap_bit_order = MSBFirst;
-	XSetForeground(dpy, gc, black);
-	XSetBackground(dpy, gc, white);
-	XPutImage(dpy, win, gc, im, 0, 0, x, y, (unsigned)w, (unsigned)h);
+	pm = XCreatePixmap(dpy, win, (unsigned)w, (unsigned)h,
+		(unsigned)depth);
+	XPutImage(dpy, pm, bgc, im, 0, 0, 0, 0, (unsigned)w, (unsigned)h);
+	XCopyArea(dpy, pm, win, bgc, 0, 0, (unsigned)w, (unsigned)h, x, y);
+	XFreePixmap(dpy, pm);
 	im->data = 0;
 	XDestroyImage(im);
 }

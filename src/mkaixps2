@@ -1,0 +1,11 @@
+# mkaixps2 - build Archaic on AIX PS/2 1.3 (i386) for X11: sh mkaixps2
+# cc is MetaWare High C R2.2g. Keep -O: without it, the code generator
+# uses registers that it did not load. CC=hcc sh mkaixps2 works too
+# (hcc takes one file at a time). X11 and the BSD sockets (nsock.c) are
+# on the default paths, in libX11.a and libc.
+CC=${CC-cc}
+for f in main html http gif pic nsock x11; do
+	$CC -O -c $f.c || exit 1
+done
+$CC -o archaic main.o html.o http.o gif.o pic.o nsock.o x11.o -lX11 &&
+ls -l archaic
