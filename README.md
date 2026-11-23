@@ -29,6 +29,8 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 
 ![Archaic in LEMU (QEMU): AIX 3.2.5 on an IBM RS/6000 7006, showing Wikipedia in 216 colors](screenshots/lemu-aix.png)
 
+![Archaic in LEMU (QEMU): AIX PS/2 1.3 on a 486 PC, showing Wikipedia in 216 colors](screenshots/lemu-aixps2.png)
+
 ![Archaic in gxemul: Ultrix 4.5 with DECwindows on a DECstation 5000/200, showing Wikipedia in 216 colors](screenshots/gxemul.png)
 
 ## Platforms
