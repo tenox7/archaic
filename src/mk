@@ -6,6 +6,7 @@ c html.c
 c http.c
 c gif.c
 c pic.c
+c update.c
 c x10.c
 c nidris.c
 sh lka

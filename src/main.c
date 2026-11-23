@@ -21,6 +21,10 @@
  *		Return, @x,y; is a click, % waits 2 seconds. A load that a
  *		key or click starts ends before the script goes on (so do
  *		the slices of the tall picture that a scroll needs).
+ * -u		update: ask WRP for a newer Archaic and install it (see
+ *		update.c), then quit. No window
+ * -n		no updates. Without it, Archaic asks WRP once a run, when
+ *		WRP's first page is here (not with -t or -s)
  *
  * Keys: Tab next field, Return sends the form, Backspace, Ctrl-U clears
  * the field, Esc stops a load. Space and b scroll a window when no field
@@ -77,6 +81,7 @@ void free();
 #define BPAD 5		/* left and right inside buttons */
 
 int stop;		/* end the load that is running */
+char ident[] = IDENT;	/* "@(#)Archaic 0.8": VERSION is in it */
 
 static Image imgs[MAXIMG];
 static int nimgs;
@@ -191,6 +196,9 @@ static char num[16];
 static char pendurl[MAXURL], pendbody[MAXURL];
 static char lurl[MAXURL], lbody[MAXURL];
 static char *script, *pbm;
+static int updon = 3;		/* the update: tries left (-n: 0); see autoupd */
+static char wrpu[MAXURL];	/* WRP's address, as Archaic started */
+static char *prog;		/* the program, as it was started (argv[0]) */
 static long t0;
 static char u[MAXURL], q[MAXURL];
 static char page[MAXPAGE + 1];
@@ -497,6 +505,19 @@ static void progress()
 	else
 		sprintf(msg, "%.50s: %s", what, bytes(g));
 	sayp(msg, g, n);
+}
+
+/* update.c: what is coming, for the status line ("": nothing shows) */
+void ui_what(s)
+char *s;
+{
+	scopy(what, s, (int)sizeof what);
+}
+
+/* update.c: how much of it has come */
+void ui_prog()
+{
+	progress();
 }
 
 /* WRP's url field gets a clear button at its right end, while it has
@@ -2986,6 +3007,32 @@ long n;
 	return nb;
 }
 
+/* The update (update.c), once a run: WRP's first page is here, and there
+ * is nothing else to do. The question is quiet; the status line says
+ * only what the user needs: a newer Archaic is out, or installed, or an
+ * install failed (the terminal too). A click stops it: it tries again
+ * later, up to 3 times. Esc stops it for this run. */
+static void autoupd()
+{
+	int r;
+
+	scopy(ssave, sline, (int)sizeof ssave);
+	loading = 1;
+	r = upd_run(wrpu, prog);
+	loading = 0;
+	if (r == U_STOP && pending && --updon > 0)
+		return;
+	updon = 0;
+	if (r == U_OUT || r == U_DONE || r == U_FAIL) {
+		say(upd_msg);
+		fprintf(stderr, "archaic: %s\n", upd_msg);
+		fflush(stderr);
+	} else if (r == U_STOP && !pending)
+		say("Stopped");
+	else if (!pending)
+		say(ssave);	/* the status line as it was */
+}
+
 /* one step of the -s script */
 static void runscript()
 {
@@ -3028,18 +3075,24 @@ char **argv;
 {
 	static Event e;
 	char *a, *url = 0, *geom = 0;
-	int i, n;
+	int i, n, upd = 0;
 
+	prog = argv[0];
 	for (i = 1; i < argc; ++i) {
 		a = argv[i];
 		if (a[0] == '=')
 			geom = a;
 		else if (a[0] == '-' && a[1] && !a[2] &&
-			(a[1] == 'a' || a[1] == 't' || a[1] == 'v')) {
+			(a[1] == 'a' || a[1] == 't' || a[1] == 'v' || a[1] == 'u' ||
+			a[1] == 'n')) {
 			if (a[1] == 'a')
 				allset = 1;
 			else if (a[1] == 't')
 				headless = 1;
+			else if (a[1] == 'u')
+				upd = 1;
+			else if (a[1] == 'n')
+				updon = 0;
 			else
 				verbose = 1;
 		} else if (a[0] == '-' && a[1] && !a[2] && i + 1 < argc &&
@@ -3066,7 +3119,7 @@ char **argv;
 			} else
 				geom = argv[++i];
 		} else if (a[0] == '-') {
-			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-f gif|abm] [-t] [-v] [-o file] [-s script] [url]\n");
+			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-f gif|abm] [-t] [-v] [-o file] [-s script] [-u] [-n] [url]\n");
 			return 2;
 		} else
 			url = a;
@@ -3086,7 +3139,16 @@ char **argv;
 	if (!u[i])
 		scopy(u + i, "/", MAXURL - i);
 	scopy(base, u, MAXURL);
+	scopy(wrpu, u, MAXURL);
+	if (upd) {		/* -u: the update alone, with no window */
+		headless = 1;
+		i = upd_run(wrpu, prog);
+		fprintf(i == U_NONE || i == U_DONE ? stdout : stderr,
+			"archaic: %s\n", upd_msg);
+		return i == U_NONE || i == U_DONE ? 0 : 1;
+	}
 	if (headless) {
+		updon = 0;	/* -t: no updates */
 		winw = 640;
 		winh = 400;
 		fh = 13;
@@ -3153,6 +3215,10 @@ char **argv;
 		}
 		if (slicework(1))	/* the frame's slices, then the next ones */
 			continue;
+		if (updon > 0 && nitems > 0 && wrpform() >= 0) {
+			autoupd();	/* once a run, on WRP's page */
+			continue;
+		}
 		/* a part of the scroll bar held down: wait 1/10 s at most */
 		if (g_event(&e, bpart && bpart != B_DRAG ? 2 : 1))
 			event(&e);

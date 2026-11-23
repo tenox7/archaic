@@ -5,6 +5,6 @@
 # /usr/include/X11R5 and /usr/lib/X11R5.
 # The network is BSD sockets (nsock.c).
 CC=cc
-$CC -O +DA1.0 -DNOPROTO -I/usr/include/X11R5 -c main.c html.c http.c gif.c pic.c nsock.c x11.c &&
-$CC -o archaic main.o html.o http.o gif.o pic.o nsock.o x11.o -L/usr/lib/X11R5 -lX11 &&
+$CC -O +DA1.0 -DNOPROTO -I/usr/include/X11R5 -c main.c html.c http.c gif.c pic.c update.c nsock.c x11.c &&
+$CC -o archaic main.o html.o http.o gif.o pic.o update.o nsock.o x11.o -L/usr/lib/X11R5 -lX11 &&
 ls -l archaic

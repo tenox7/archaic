@@ -62,6 +62,7 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
    - 3B1, SunOS, HP-UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
    - DG/UX, AIX in the RS/6000 and PS/2 kits, and Ultrix in the DECstation kit: the kit has it already, in `/usr/local/bin`.
+   - With curl or wget: `curl -O http://HOST:8080/archaic-download/archaic-hpux9`. WRP gets it from the newest release.
 3. Start the window system, then type `archaic` in a shell window:
    - Idris: log in as `root`, then `/usr/X/bin/xstart`.
    - 3B1: Office > UNIX System.
@@ -109,7 +110,7 @@ Where the window system has no scroll bar, Archaic draws its own, in the style o
 ![Archaic's own scroll bar at the right, in GEM style: Wikipedia's Atari ST article](screenshots/scrollbar.png)
 
 ```
-archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [url]
+archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [-u] [-n] [url]
 ```
 
 | Option | Does |
@@ -123,6 +124,11 @@ archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [url]
 | `-v` | status messages also to stderr |
 | `-o file` | save the first picture (PBM or PPM) |
 | `-s script` | play a script, then quit |
+| `-u` | update Archaic now, then quit |
+| `-n` | no updates |
+
+Archaic updates itself through WRP. Once a run it asks WRP for a newer Archaic.
+Started as root, it installs it. Else it says that a newer one is out.
 
 ## Building
 

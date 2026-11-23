@@ -262,7 +262,10 @@ int *w, *h;
 	if (open("/dev/window", O_RDWR) != 0)
 		return -1;
 	dup(0);
-	dup(0);
+	/* standard error is not the window: its text would draw over the
+	 * page. Archaic's messages are on its status line. */
+	if (open("/dev/null", O_WRONLY) != 2)
+		dup(0);
 	winit();
 	if (!iswind())
 		return -1;

@@ -4,8 +4,8 @@
 # (hcc takes one file at a time). X11 and the BSD sockets (nsock.c) are
 # on the default paths, in libX11.a and libc.
 CC=${CC-cc}
-for f in main html http gif pic nsock x11; do
+for f in main html http gif pic update nsock x11; do
 	$CC -O -c $f.c || exit 1
 done
-$CC -o archaic main.o html.o http.o gif.o pic.o nsock.o x11.o -lX11 &&
+$CC -o archaic main.o html.o http.o gif.o pic.o update.o nsock.o x11.o -lX11 &&
 ls -l archaic

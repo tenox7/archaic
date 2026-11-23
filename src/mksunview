@@ -3,6 +3,6 @@
 # suntool (the toolkit), sunwindow (windows, the notifier), pixrect.
 # The network is BSD sockets (nsock.c).
 CC=cc
-$CC -O -DNOPROTO -DSUNVIEW -c main.c html.c http.c gif.c pic.c nsock.c sunview.c &&
-$CC -o archaic main.o html.o http.o gif.o pic.o nsock.o sunview.o -lsuntool -lsunwindow -lpixrect &&
+$CC -O -DNOPROTO -DSUNVIEW -c main.c html.c http.c gif.c pic.c update.c nsock.c sunview.c &&
+$CC -o archaic main.o html.o http.o gif.o pic.o update.o nsock.o sunview.o -lsuntool -lsunwindow -lpixrect &&
 ls -l archaic

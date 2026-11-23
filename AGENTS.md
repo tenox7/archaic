@@ -27,6 +27,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/http.c` | URLs and HTTP/1.0, with a 16 KB read buffer |
 | `src/gif.c` | GIF decoder: the colors, or black and white with a 4x4 dither. WRP's black and white GIFs go a fast way, and its pictures in colors the 8-bit way (see Pictures: GIF and ABM) |
 | `src/pic.c` | pictures: looks at what came (GIF or ABM); the ABM decoder |
+| `src/update.c` | updates: asks WRP for a newer Archaic, and puts it in the place of the program (see Updates) |
 | `src/x10.c` | display for X10 (Idris) |
 | `src/nidris.c` | network for Idris: TCP through netd |
 | `src/x11.c` | display for X11 (Unix, HP-UX, DG/UX, AIX, Ultrix, macOS with XQuartz) |
@@ -59,7 +60,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 ## Options
 
 ```
-archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
+archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-u] [-n] [url]
 ```
 
 | Option | Meaning |
@@ -73,6 +74,8 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 | `-v` | status messages also go to stderr |
 | `-o file` | at the end, save the first picture: PBM, or PPM if it has colors |
 | `-s script` | play a script, then quit (see Scripts, in Building in Idris) |
+| `-u` | update: ask WRP for a newer Archaic and install it, with no window, then quit (see Updates) |
+| `-n` | no updates. Without it, Archaic asks WRP once a run (not with `-t` or `-s`) |
 
 ## WRP's form
 
@@ -375,7 +378,7 @@ Archaic keeps WRP's page and shows the error on the status line, like
 - A picture or a file from WRP is not shown: the status line says what it was.
 - No page at all (WRP did not answer at the start): a box in the middle of the window says
   `Unable to connect to WRP`, with WRP's address and the error, like `connection refused` or
-  `no answer`. The status line says it too, and so does the terminal (standard error):
+  `no answer`. The status line says it too, and so does the terminal (standard error; not on the 3B1):
 
   ```
   archaic: unable to connect to WRP at 10.0.2.2:8080: no answer
@@ -451,6 +454,125 @@ Archaic's own scroll bar is at the right of the window, 17 pixels wide (`screens
 
 On X10 the elevator moves when the button is let go (as in GEM), and held parts do not repeat:
 X10 has no events for the mouse moving with a button down, and can't wait for a time.
+
+## Updates
+
+Archaic updates itself, through WRP. So a kit with Archaic in it needs no new disk for a new Archaic.
+The old systems have no HTTPS: WRP gets the file from GitHub for them.
+
+```
+Archaic --HTTP--> WRP, /archaic-update --HTTPS--> GitHub: the newest release of tenox7/archaic
+```
+
+- Once a run, when WRP's first page is here, Archaic asks WRP for the newest Archaic for its system.
+  The question is quiet: when there is no newer Archaic, the status line does not change.
+- A newer one, and Archaic can write the folder of its program (root can): Archaic installs it.
+  The status line says `Archaic 0.9 is installed. Start archaic again to use it: /usr/local/bin/archaic`.
+  The program that runs stays as it is, until you quit it.
+- Archaic can't write the folder: `Archaic 0.9 is out. To install it, start archaic as root`.
+- These lines also go to the terminal (standard error).
+- A click while Archaic asks: the question stops, and comes again later (3 times at most).
+  Esc stops it for this run.
+- `archaic -u`: update now, with no window, then quit. Exit status 0: installed, or this is the newest.
+- `archaic -n`: no updates. With `-t` or `-s`, Archaic asks for none.
+- Versions compare as numbers, part by part: 0.10 is newer than 0.9. Archaic installs only a newer one.
+
+**How Archaic installs it** (`update.c`):
+
+1. It finds its own file: the name it was started with (if it has a `/`), else the first `archaic` on `$PATH`,
+   else `/usr/local/bin/archaic` (on Idris `/usr/X/bin/archaic`).
+2. If that file already is the new version (another Archaic installed it), Archaic says so, and gets nothing.
+   Else it writes the new file into the same folder, as `archaic.PID` (13 letters at most: old file systems take 14).
+3. It reads the file again, and checks its size and CRC-32 against WRP's answer.
+4. It makes the file executable (755). The old program stays as `archaic.old`.
+5. It puts the new file in the place of the old one, with `rename()`. Idris and the 3B1 have no `rename()`
+   (`NORENAME` in `archaic.h`): there it is `unlink()`, then `link()`, and only if `archaic.old` was made.
+   If `link()` fails, `archaic.old` goes back.
+
+A broken file, a full disk or Esc: the old program stays, and no `archaic.PID` stays.
+
+**WRP's side** (`archaic.go` in WRP):
+
+- `wrp -archaic URL`: the release, as a GitHub API address. Default:
+  `https://api.github.com/repos/tenox7/archaic/releases/latest`. `-archaic ""`: no updates.
+- WRP keeps the release's list for 15 minutes (after an error, 2 minutes), and each file it got,
+  until the release changes that file. A file that is not good: WRP keeps why for 2 minutes.
+- WRP checks each file: its size and SHA-256 must be the release's (GitHub's `digest`),
+  and its marks (see below) must name the system and a version.
+
+The question and the answer are plain text, a line each:
+
+```
+GET /archaic-update?p=unixpc&v=0.8
+
+archaic-update 1
+version 0.9
+file archaic-unixpc
+size 67027
+crc 1f2e3d4c
+get archaic-update?p=unixpc&f=0.9
+```
+
+- The `get` line gives the file (`application/octet-stream`). A version that is not the newest gets 404.
+- With no file for the system, WRP sends `note` and why, with no `version`:
+  `note no archaic-dgux in release v0.9`. Archaic then says `WRP has no update: no archaic-dgux in release v0.9`.
+- An older WRP sends its page. Archaic then says `This WRP has no updates for Archaic: it is an older WRP`.
+
+**The marks.** Each program carries 2 strings, for WRP. `what` and `strings` show them too:
+
+| Mark | Set in `archaic.h` by | Like |
+|---|---|---|
+| `@(#)Archaic VERSION` | `IDENT` | `@(#)Archaic 0.9` |
+| `@(#)Archaic for SYSTEM` | `SYSID` | `@(#)Archaic for unixpc` |
+
+WRP reads the marks in the file, not the release's tag:
+
+- A release also has older files, for the systems not built again. WRP offers a file only if its own version
+  is newer than the question's. So an old file in a new release can't start an update loop.
+- WRP does not offer a file with the mark of another system (a file put in the wrong place in the release).
+- WRP does not offer a file with no marks (Archaic 0.8 and older).
+
+**System names.** `archaic.h` sets `SYSID` from the names that the compiler defines.
+The release's file is `archaic-` and the system name.
+
+| System | Compiler defines | Name |
+|---|---|---|
+| Idris (Atari ST) | `_WSLAS` | `idris` |
+| AT&T UNIX PC (3B1) | `unixpc` | `unixpc` |
+| SunOS 4 (Sun-4) | `SUNVIEW` (mksunview), `sparc` | `sun4` |
+| SunOS 3.5 (Sun-3) | `SUNVIEW` (mksunview), `mc68020` | `sun3` |
+| HP-UX 9 | `__hpux` | `hpux9` |
+| DG/UX | `__DGUX__` | `dgux` (no release has `archaic-dgux` yet) |
+| AIX 3.2 | `_AIX`, `_IBMR2` | `aix3` |
+| AIX PS/2 1.3 | `_AIX`, `ps2` | `aixps2` |
+| Ultrix 4 | `ultrix` | `ultrix4` |
+
+A build with no `SYSID` gets no updates: macOS, Linux, the tests. For a new port:
+`cc -DSYSID='"@(#)Archaic for NAME"'`, or a line in `archaic.h`.
+
+**A first install, with curl or wget.** WRP also gives the release's files as they are
+(older builds too, with no marks): `/archaic-download/archaic-NAME` (or `/archaic-download/NAME`).
+`/archaic-download` alone lists the files, with their sizes.
+
+```
+curl -O http://HOST:8080/archaic-download/archaic-hpux9
+chmod 755 archaic-hpux9
+mv archaic-hpux9 /usr/local/bin/archaic
+```
+
+WRP checks each file's size and SHA-256, and does not give a file with the mark of another system.
+An error is a short text with HTTP 404: `curl -f` does not save it.
+
+**For a release:**
+
+- Change `IDENT` in `archaic.h`. Then build the systems again, or keep their old files:
+  WRP offers only a file that is newer.
+- Keep the files' names (`archaic-NAME`).
+- The first version with updates must go into each kit once. After that, a kit's Archaic updates itself.
+
+**Trust.** Archaic and WRP talk plain HTTP, as for the pages. WRP gets the file from GitHub over HTTPS,
+and checks it against the release's SHA-256. The CRC-32 finds a broken download, not an attack.
+Use a WRP that you trust, on your own network.
 
 ## Building and testing on Unix or macOS
 
@@ -539,6 +661,14 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    dragged (back to where it was, and past the end), an arrow held down for 1 s.
    In 10 shots, the frame must show the right rows, and the elevator must be at the right place.
    Clicks on the bar must not go to the page.
+10. The status line: connecting, waiting (counted), the page in bytes, a part in KB, time and size.
+11. Updates, with the test server as WRP: a build with the system name `test` (and the headless display).
+    `-u` asks `archaic-update?p=test&v=VERSION`, installs 99.0 and keeps `archaic.old`; the new file runs.
+    The file installed already (by another Archaic): no download. Started by its name alone,
+    the search path finds it (`dir:dir`, and Idris's `|dir/|dir/`).
+    The same version, a wrong CRC, a short file, WRP's note, an older WRP, a folder it can't write
+    (not as root): nothing changes, and no file is left.
+    In the window: installed once WRP's page is here; none with `-n` or `-t`.
 
 Run WRP for the tests: `wrp -l 127.0.0.1:8089`.
 
@@ -599,7 +729,7 @@ hget 10.0.2.2 8077 /src/fetch fetch
 sh fetch
 ```
 
-All 11 files (124 KB) take about 2 minutes.
+All 12 files (153 KB) take about 2 minutes.
 
 ### 2. Build
 
@@ -653,6 +783,11 @@ Example: load a page, then keep the window 40 s for a screenshot:
 | Wikipedia page with its picture (8 KB as ABM) | 10 s from Return (Archaic 0.3: 30 s) |
 | decode check (`-t`, `hn2.abm`, 9 KB) | 9 s |
 | decode check (`-t`, `hn2.gif`, 11 KB: a GIF with 256 colors in its table, so the slow way) | 27 s |
+| update with `-u` (a program of 132 KB, about 1.9 KB/s) | 1 min 24 s |
+| the same update in the window, after WRP's first page (about 1.25 KB/s) | 2 min 10 s |
+
+Before an update's download, Archaic reads its own file for its CRC (8 s on the ST):
+if another Archaic has installed the new one already, there is nothing to get.
 
 ## Idris on the Atari ST: what to know
 
@@ -699,6 +834,9 @@ Test on a copy of your Idris disk.
 - `chmod 755 file` does not work: chmod takes flags, not numbers.
   `chmod file` (no mode) makes a file executable.
 - `$PATH` is `$P` followed by `ATH`. The command search path is `$X`.
+- In the environment, `PATH` is like `|/etc/|/bin/|/etc/bin/|/usr/bin/`: `|` before each folder,
+  a `/` at the end of each, and the empty first one is the current folder. `set X ...` changes it too.
+  A program started by name gets only its name as `argv[0]`.
 
 ### X10 on this ST
 
@@ -747,8 +885,8 @@ Test on a copy of your Idris disk.
 
 Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
 
-1. Copy these 9 files (126 KB) into a folder on the 3B1, with ftp, rcp or a floppy:
-   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `unixpc.c`, `ntwg.c` and `mkunixpc`.
+1. Copy these 10 files (155 KB) into a folder on the 3B1, with ftp, rcp or a floppy:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `unixpc.c`, `ntwg.c` and `mkunixpc`.
    The FreeBee kit forwards the 3B1's ftp to port 35121 on your computer, and rsh to 35514.
 2. Build:
 
@@ -831,6 +969,9 @@ Test on a copy of your 3B1 disk.
 - **SIGWIND** (the window has a new size) goes only to the window's process group.
   Archaic calls `setpgrp()` before it opens the window, then `ioctl(wn, WIOCPGRP, 0)`.
 - `wprompt()` text shows on the screen's prompt line: 72 characters fit.
+- Archaic's status line holds about 74 characters: put the main point of a message first.
+- Standard error goes to `/dev/null` while the window is open. As 0 and 1, fd 2 was the window,
+  and a line on it drew over the page. Archaic's messages are on its status line.
 
 ### WIN/TCP
 
@@ -863,9 +1004,9 @@ Test on a copy of your 3B1 disk.
 Needs Sun's C compiler, `cc` (the kit has it), and SunView's libraries in `/usr/lib`:
 `libsuntool`, `libsunwindow`, `libpixrect` (SunOS has them with SunView).
 
-1. Copy these 9 files (131 KB) into a folder on SunOS, with ftp, rcp or a CD
+1. Copy these 10 files (165 KB) into a folder on SunOS, with ftp, rcp or a CD
    (the kit: `CD=file.iso ./run.sh`, then `mount -rt hsfs /dev/sr0 /cdrom`):
-   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `nsock.c`, `sunview.c` and `mksunview`.
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `sunview.c` and `mksunview`.
    The kit lets root in with rsh, on port 41414 of your computer.
 2. Build:
 
@@ -959,7 +1100,7 @@ Test on a copy of your SunOS disk.
 
 ## Building on SunOS 3.5
 
-The same 9 files and the same script as on SunOS 4 (see Building on SunOS 4), with Sun's `cc`:
+The same 10 files and the same script as on SunOS 4 (see Building on SunOS 4), with Sun's `cc`:
 
 ```
 sh mksunview    # compile and link: archaic, about 570 KB
@@ -1022,8 +1163,8 @@ Test on a copy of your SunOS disk.
 
 Needs HP's C compiler, `cc` (the kit has HP C A.09.73), and X11R5 (HP-UX 9 has it).
 
-1. Copy these 9 files (133 KB) into a folder on HP-UX, with ftp, rcp or NFS:
-   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `nsock.c`, `x11.c` and `mkhpux`.
+1. Copy these 10 files (159 KB) into a folder on HP-UX, with ftp, rcp or NFS:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkhpux`.
 2. Build:
 
    ```
@@ -1102,8 +1243,8 @@ Test on a copy of your HP-UX disk.
 Needs DG/UX's C compiler, `cc` (in the SDK, `/usr/opt/sdk`), and X11 (DG/UX has X11R6).
 The kit has both.
 
-1. Copy these 9 files (140 KB) into a folder on DG/UX, with ftp, rcp or NFS:
-   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `nsock.c`, `x11.c` and `mkdgux`.
+1. Copy these 10 files (159 KB) into a folder on DG/UX, with ftp, rcp or NFS:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkdgux`.
 2. Build:
 
    ```
@@ -1179,8 +1320,8 @@ Test on a copy of your DG/UX disk.
 Needs IBM's C compiler, `cc` (XL C 1.3 in the kit), and X11R5 (AIX 3.2 has it in AIXwindows).
 The kit has both.
 
-1. Copy these 9 files (140 KB) into a folder on AIX, with ftp, rcp or NFS:
-   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `nsock.c`, `x11.c` and `mkaix`.
+1. Copy these 10 files (159 KB) into a folder on AIX, with ftp, rcp or NFS:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkaix`.
 2. Build:
 
    ```
@@ -1263,8 +1404,8 @@ Test on a copy of your AIX disk.
 Needs the MetaWare High C compiler, `cc` (R2.2g), and X11 (AIX PS/2 has it in X Windows).
 The kit has both.
 
-1. Copy these 9 files (143 KB) into a folder on AIX PS/2, with ftp, rcp or NFS:
-   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `nsock.c`, `x11.c` and `mkaixps2`.
+1. Copy these 10 files (159 KB) into a folder on AIX PS/2, with ftp, rcp or NFS:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkaixps2`.
 2. Build:
 
    ```
@@ -1356,8 +1497,8 @@ Test on a copy of your AIX PS/2 disk.
 
 Needs Ultrix's C compiler, `cc`, and X11 (the UWS subsets: DECwindows). The kit has both.
 
-1. Copy these 9 files (140 KB) into a folder on Ultrix, with ftp, rcp or NFS:
-   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `nsock.c`, `x11.c` and `mkultrix`.
+1. Copy these 10 files (159 KB) into a folder on Ultrix, with ftp, rcp or NFS:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkultrix`.
    The kit lets root in with rsh, on port 45514 of your computer.
 2. Build:
 
@@ -1423,7 +1564,8 @@ Test on a copy of your Ultrix disk.
 
 ## Porting to DOS, OS/2, Win16 and others
 
-The core (`main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`) does not change.
+The core (`main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`) does not change.
+Give the port a system name for the updates (`SYSID`, see Updates).
 A port is **one display file** and **one network file**.
 
 **Display (`g_` functions)**
@@ -1462,6 +1604,8 @@ A port is **one display file** and **one network file**.
 - No arrays in local variables (Whitesmiths bug). Make them static.
 - `unsigned char` for bytes. `long` for byte counts and pixel offsets (int may be 16 bits).
 - Few library calls: malloc, free, sprintf, printf, fprintf, getenv, time.
+  `update.c` also needs open, creat, read, write, close, access, chmod, link, unlink, getpid, getuid,
+  and rename (or `NORENAME`).
 
 **Memory note for 16-bit systems:** the static data is about 145 KB
 (page 30 KB, items 50 KB, read buffer 16 KB, GIF tables 32 KB).

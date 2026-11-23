@@ -35,7 +35,14 @@
 #define P(a) a
 #endif
 
-#define VERSION "0.8"
+/* The version. The program carries it as "@(#)Archaic 0.8" (what(1)
+ * shows it): WRP reads it in the files of the release, for the updates
+ * (update.c). VERSION is the number alone. */
+#ifndef IDENT
+#define IDENT "@(#)Archaic 0.8"
+#endif
+extern char ident[];
+#define VERSION (ident + 12)
 
 /* WRP's address when none is given: WRP's default port. In the emulators
  * the host is 10.0.2.2 (slirp, QEMU's user network): Whitesmiths C
@@ -63,6 +70,56 @@
 #endif
 #ifndef DEFURL
 #define DEFURL "http://127.0.0.1:8080/"
+#endif
+#endif
+
+/* The system, for the updates (update.c): Archaic's file for it in the
+ * GitHub release is archaic-NAME, and the program carries "@(#)Archaic
+ * for NAME", which WRP checks. A build with no SYSID gets no updates:
+ * macOS, Linux, a new port (cc -DSYSID='"@(#)Archaic for NAME"' gives
+ * one). UPDPATH: where the program is put, if Archaic can't find its
+ * file by its name and the search path. NORENAME: the system has no
+ * rename(); NOUNISTD: no unistd.h (update.c includes it only for an
+ * ANSI compiler, as the 3B1's gcc). */
+#ifndef SYSID
+#ifdef _WSLAS
+#define SYSID "@(#)Archaic for idris"
+#define UPDPATH "/usr/X/bin/archaic"
+#define NORENAME
+#define NOUNISTD
+#endif
+#ifdef unixpc
+#define SYSID "@(#)Archaic for unixpc"
+#define NORENAME
+#define NOUNISTD
+#endif
+#ifdef SUNVIEW
+#ifdef sparc
+#define SYSID "@(#)Archaic for sun4"
+#endif
+#ifdef mc68020
+#define SYSID "@(#)Archaic for sun3"
+#endif
+#endif
+#ifdef __hpux
+#define SYSID "@(#)Archaic for hpux9"
+#endif
+#ifdef __DGUX__
+#define SYSID "@(#)Archaic for dgux"
+#endif
+#ifdef _AIX
+#ifdef _IBMR2
+#define SYSID "@(#)Archaic for aix3"
+#endif
+#ifdef ps2
+#define SYSID "@(#)Archaic for aixps2"
+#endif
+#endif
+#ifdef ultrix
+#define SYSID "@(#)Archaic for ultrix4"
+#endif
+#ifndef UPDPATH
+#define UPDPATH "/usr/local/bin/archaic"
 #endif
 #endif
 
@@ -185,6 +242,18 @@ void ui_note P((int phase));	/* http.c: what http_open() does now, */
 #define H_CONNECT 1		/*  connecting to http_host, */
 #define H_WAIT 2		/*  waiting for the answer, */
 #define H_BODY 3		/*  the headers have come; 0: no load */
+void ui_what P((char *s));	/* update.c: what comes ("": show nothing), */
+void ui_prog P((void));		/*  and how much of it has come */
+
+/* update.c: ask WRP for the newest Archaic, install it if it can */
+int upd_run P((char *wrp, char *prog));
+extern char upd_msg[];		/* what it did, or why not */
+#define U_NONE 0		/* this is the newest */
+#define U_ERR 1			/* no answer, or WRP has no file for this system */
+#define U_OUT 2			/* a newer one is out: Archaic can't install it */
+#define U_DONE 3		/* installed, for the next start */
+#define U_FAIL 4		/* the install failed */
+#define U_STOP 5		/* stopped */
 
 /* events from the display */
 #define E_NONE 0

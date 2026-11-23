@@ -5,6 +5,6 @@
 # X11 (UWS, DECwindows) is on the default paths. Ultrix has no shared
 # libraries, so Xlib is in the program. The network is BSD sockets (nsock.c).
 CC=${CC-cc}
-$CC -O -c main.c html.c http.c gif.c pic.c nsock.c x11.c &&
-$CC -o archaic main.o html.o http.o gif.o pic.o nsock.o x11.o -lX11 &&
+$CC -O -c main.c html.c http.c gif.c pic.c update.c nsock.c x11.c &&
+$CC -o archaic main.o html.o http.o gif.o pic.o update.o nsock.o x11.o -lX11 &&
 ls -l archaic

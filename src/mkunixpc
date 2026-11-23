@@ -5,7 +5,7 @@
 # with -DSYSTEM5 -DSHORT_IDENT. -shlib links the shared library, which
 # has libc and tam, the window library.
 CC=/usr/local/bin/gcc
-$CC -O -c main.c html.c http.c gif.c pic.c unixpc.c &&
+$CC -O -c main.c html.c http.c gif.c pic.c update.c unixpc.c &&
 $CC -O -DSYSTEM5 -DSHORT_IDENT -I/usr/ethernet/include -c ntwg.c &&
-$CC -o archaic main.o html.o http.o gif.o pic.o unixpc.o ntwg.o -lnet -shlib &&
+$CC -o archaic main.o html.o http.o gif.o pic.o update.o unixpc.o ntwg.o -lnet -shlib &&
 ls -l archaic

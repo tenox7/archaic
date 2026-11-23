@@ -8,6 +8,7 @@ hget 10.0.2.2 8077 /src/html.c html.c
 hget 10.0.2.2 8077 /src/http.c http.c
 hget 10.0.2.2 8077 /src/gif.c gif.c
 hget 10.0.2.2 8077 /src/pic.c pic.c
+hget 10.0.2.2 8077 /src/update.c update.c
 hget 10.0.2.2 8077 /src/x10.c x10.c
 hget 10.0.2.2 8077 /src/nidris.c nidris.c
 hget 10.0.2.2 8077 /src/mkinc mkinc
