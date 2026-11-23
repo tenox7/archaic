@@ -1227,6 +1227,8 @@ Test on a copy of your AIX disk.
 - **Ultrix 4.5** with DECwindows (UWS V4.5: X11 and Motif), on a DECstation 5000/200 (MIPS R3000).
   Kit: `decstation5000-ultrix45-gxemul` (gxemul), on osarchive in `os/ultrix/virt/`.
   Archaic is in the kit: `/usr/local/bin/archaic`, and its source in `/usr/local/src/archaic`.
+- Release binary: `archaic-ultrix4` (the kit's). On another Ultrix 4 with X11, copy it as `/usr/local/bin/archaic`,
+  then `chmod 755 /usr/local/bin/archaic`. Or build it there: see Building on Ultrix 4.
 - Log in as `root` at the DECwindows login (the kit's password is `ultrix`).
   Open a DECterm (Session Manager: Applications > DECterm) and type `archaic HOST:8080`.
 - **Ctrl-Q** quits, or Close in the window's menu.
