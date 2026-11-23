@@ -1161,7 +1161,9 @@ Test on a copy of your DG/UX disk.
 
 - **AIX 3.2.5** with X11R5 (AIXwindows), on an IBM RS/6000 7006-41T (PowerPC 601).
   Kit: `aix325rs6000-lemu` (QEMU), on osarchive in `os/aix/Virtual/`. It has IBM's C compiler.
-- Build Archaic there (see Building on AIX 3.2), then copy it to `/usr/local/bin/archaic`.
+  Archaic is in the kit: `/usr/local/bin/archaic`, and its source in `/usr/local/src/archaic`.
+- Release binary: `archaic-aix3` (the kit's). On another AIX 3.2 with X11, copy it as `/usr/local/bin/archaic`,
+  then `chmod 755 /usr/local/bin/archaic`. Or build it there: see Building on AIX 3.2.
 - Log in as `root` at the xdm login (the kit has no password). An aixterm opens: type `archaic`.
 - **Ctrl-Q** quits, or Close in the window's menu.
 - Archaic looks for WRP at `http://10.0.2.2:8080/`: your computer, in the kit's network (QEMU NAT).
