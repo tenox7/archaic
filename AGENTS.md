@@ -1220,13 +1220,6 @@ Test on a copy of your AIX disk.
   (it works through QEMU NAT).
 - `grep` has no `\|`: use `egrep`. `tr` does not know `\n`: write `\012`.
 - Stop AIX with `shutdown -F`. Wait for `Halt completed` on the screen, then quit QEMU.
-- LEMU's GXT150L (in the kit) draws some X fills in the wrong place. For these, the X server
-  puts the window's place in the origin register (0x80), clears bit 0x10000 of the mode register,
-  and sends the fill in window coordinates. LEMU does not add the origin, so the fill goes to
-  that place on the screen. While a page loads, a few black bars can show in the page:
-  the status line's progress bar, at its place in the window taken as a place on the screen.
-  They stay until that part of the window is drawn again (`xrefresh` draws all windows again).
-  Other X programs' fills go to the wrong place too: this is LEMU's fault, not Archaic's.
 
 ## Porting to DOS, OS/2, Win16 and others
 
