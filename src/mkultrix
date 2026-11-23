@@ -1,0 +1,10 @@
+# mkultrix - build Archaic on Ultrix 4 (DECstation, MIPS) for X11: sh mkultrix
+# cc is Ultrix's own C compiler, in its default mode: it takes the
+# prototypes, with no __STDC__. gcc builds it too (3.0.4 in
+# /freeware/gnu-tools/mips/bin in the gxemul kit): CC=gcc sh mkultrix.
+# X11 (UWS, DECwindows) is on the default paths. Ultrix has no shared
+# libraries, so Xlib is in the program. The network is BSD sockets (nsock.c).
+CC=${CC-cc}
+$CC -O -c main.c html.c http.c gif.c pic.c nsock.c x11.c &&
+$CC -o archaic main.o html.o http.o gif.o pic.o nsock.o x11.o -lX11 &&
+ls -l archaic

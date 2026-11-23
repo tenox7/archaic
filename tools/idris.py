@@ -6,9 +6,12 @@
   idris.py PORT put DIR FILE...     copy text files into DIR (cat > NAME),
                                     one line at a time (slow: use it only
                                     to bring in hget.c)
-  idris.py PORT serve DIR [HPORT]   serve DIR over HTTP on 127.0.0.1:HPORT
+  idris.py PORT serve DIR [HPORT [ADDR]]
+                                    serve DIR over HTTP on 127.0.0.1:HPORT
                                     (default 8077) for hget in Idris, which
-                                    reaches it as 10.0.2.2:HPORT
+                                    reaches it as 10.0.2.2:HPORT. ADDR: listen
+                                    on that address instead (Ultrix in gxemul
+                                    can't reach 127.0.0.1: use the LAN address)
 
 PORT is the Mac port that run.sh forwards to Idris port 23 (NETPORT).
 """
@@ -118,13 +121,13 @@ def put(port, d, files):
     t.s.close()
 
 
-def serve(d, hport):
+def serve(d, hport, addr="127.0.0.1"):
     # ABM as WRP sends it: Archaic shows only image/ types
     http.server.SimpleHTTPRequestHandler.extensions_map[".abm"] = "image/x-abm"
     h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=d)
     http.server.ThreadingHTTPServer.allow_reuse_address = True
-    srv = http.server.ThreadingHTTPServer(("127.0.0.1", hport), h)
-    print("serving %s on 127.0.0.1:%d (Idris: 10.0.2.2:%d)" % (d, hport, hport), flush=True)
+    srv = http.server.ThreadingHTTPServer((addr, hport), h)
+    print("serving %s on %s:%d (Idris: 10.0.2.2:%d)" % (d, addr, hport, hport), flush=True)
     srv.serve_forever()
 
 
@@ -137,7 +140,8 @@ def main():
     elif what == "put":
         put(port, sys.argv[3], sys.argv[4:])
     elif what == "serve":
-        serve(sys.argv[3], int(sys.argv[4]) if len(sys.argv) > 4 else 8077)
+        serve(sys.argv[3], int(sys.argv[4]) if len(sys.argv) > 4 else 8077,
+              sys.argv[5] if len(sys.argv) > 5 else "127.0.0.1")
     else:
         sys.exit(__doc__)
 

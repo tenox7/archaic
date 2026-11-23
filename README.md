@@ -29,6 +29,8 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 
 ![Archaic in LEMU (QEMU): AIX 3.2.5 on an IBM RS/6000 7006, showing Wikipedia in 216 colors](screenshots/lemu-aix.png)
 
+![Archaic in gxemul: Ultrix 4.5 with DECwindows on a DECstation 5000/200, showing Wikipedia in 216 colors](screenshots/gxemul.png)
+
 ## Platforms
 
 | System | Window system | Network | Get it |
@@ -40,6 +42,7 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 | HP-UX 9 on an HP 9000/700 (PA-RISC) | X11, in color | BSD sockets | release: `archaic-hpux9` |
 | DG/UX R4.20 on a PC (Intel) | X11, in color | BSD sockets | in the DG/UX kit, or `sh mkdgux` |
 | AIX 3.2 on an IBM RS/6000 | X11, in color | BSD sockets | `sh mkaix` |
+| Ultrix 4.5 on a DECstation (MIPS) | X11 (DECwindows), in color | BSD sockets | in the DECstation kit, or `sh mkultrix` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
 | anything with SDL 2 | SDL 2 | BSD sockets | `make sdl` |
@@ -55,7 +58,7 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 2. Copy the binary to the old computer as `archaic`, and make it executable:
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
    - 3B1, SunOS and HP-UX: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
-   - DG/UX: the kit has it already, in `/usr/local/bin`.
+   - DG/UX and Ultrix: the kit has it already, in `/usr/local/bin`.
    - AIX: build it there with `sh mkaix`, then copy it to `/usr/local/bin`.
 3. Start the window system, then type `archaic` in a shell window:
    - Idris: log in as `root`, then `/usr/X/bin/xstart`.
@@ -64,6 +67,8 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
    - HP-UX: log in at the VUE login, then open a terminal.
    - DG/UX: log in as `root` at the X login. An xterm opens.
    - AIX: log in as `root` at the xdm login. An aixterm opens.
+   - Ultrix: log in as `root` at the DECwindows login, then Applications > DECterm.
+     Type `archaic HOST:8080`, with your computer's LAN address: gxemul's network can't reach its 127.0.0.1.
 4. Click the address box, type an address, press Return.
 5. **Ctrl-Q** quits. On the 3B1: **Exit**.
 
@@ -137,6 +142,7 @@ On the old systems, copy the sources in, then:
 | HP-UX 9 | `sh mkhpux` | HP's cc |
 | DG/UX R4.20 | `sh mkdgux` | DG/UX's cc (GCC 2.7.2) |
 | AIX 3.2 | `sh mkaix` | IBM's XL C 1.3, or gcc 2.7.2 |
+| Ultrix 4 | `sh mkultrix` | Ultrix's cc, or gcc 3.0.4 |
 
 Which files to copy and how, the facts of each system, and how to port:
 see [AGENTS.md](AGENTS.md).
