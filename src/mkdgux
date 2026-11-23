@@ -1,0 +1,8 @@
+# mkdgux - build Archaic on DG/UX R4.20 (Intel) for X11: sh mkdgux
+# cc is DG/UX's C compiler, from the SDK (/usr/opt/sdk): GCC 2.7.2 inside.
+# X11R6 is on the default paths. The network is BSD sockets (nsock.c):
+# on DG/UX they are in libsocket and libnsl, as on System V Release 4.
+CC=cc
+$CC -O -c main.c html.c http.c gif.c pic.c nsock.c x11.c &&
+$CC -o archaic main.o html.o http.o gif.o pic.o nsock.o x11.o -lX11 -lsocket -lnsl &&
+ls -l archaic

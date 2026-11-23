@@ -40,8 +40,8 @@
 /* WRP's address when none is given: WRP's default port. In the emulators
  * the host is 10.0.2.2 (slirp, QEMU's user network): Whitesmiths C
  * (_WSLAS) means Idris, gcc's unixpc the AT&T UNIX PC (3B1), SUNVIEW
- * (mksunview's build) SunOS 3 or 4 with SunView, and __hpux HP-UX (WRP
- * does not run there). */
+ * (mksunview's build) SunOS 3 or 4 with SunView, __hpux HP-UX and
+ * __DGUX__ DG/UX (WRP does not run there). */
 #ifndef DEFURL
 #ifdef _WSLAS
 #define DEFURL "http://10.0.2.2:8080/"
@@ -53,6 +53,9 @@
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifdef __hpux
+#define DEFURL "http://10.0.2.2:8080/"
+#endif
+#ifdef __DGUX__
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifndef DEFURL
