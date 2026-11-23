@@ -351,6 +351,75 @@ else
 	grep 'GET /wrpd' "$tmp/http.log"
 fi
 
+# 5c. WRP's one menu (WRP 4.12.0 or newer): C's lines are a number and a
+#     letter, d dither, n no dither, p only photos (2 colors), and there
+#     is no D menu. With colors: C is set to the first line of
+#     the nearest number (256d; 216n; for 100 colors 64d). A new line sends
+#     St at once, and the next page keeps it. Black and white: C shows only
+#     the lines of 2, set to 2p, and its label is the dither pattern (9
+#     pixels wide). A new line sends St at once.
+cat >"$here/data/wrpc.html" <<'EOF'
+<HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
+<FORM ACTION="/wrpc.html" METHOD="GET">
+<INPUT TYPE="TEXT" NAME="url" VALUE="" SIZE="20">
+<INPUT TYPE="SUBMIT" VALUE="Go">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="St">
+W <INPUT TYPE="TEXT" NAME="w" VALUE="1152" SIZE="4">
+H <INPUT TYPE="TEXT" NAME="h" VALUE="600" SIZE="4">
+C <SELECT NAME="c">
+<OPTION DISABLED>Ncol</OPTION>
+<OPTION VALUE="256d">256d</OPTION>
+<OPTION VALUE="256n">256n</OPTION>
+<OPTION VALUE="216n" SELECTED>216n</OPTION>
+<OPTION VALUE="216d">216d</OPTION>
+<OPTION VALUE="128d">128d</OPTION>
+<OPTION VALUE="128n">128n</OPTION>
+<OPTION VALUE="64d">64d</OPTION>
+<OPTION VALUE="64n">64n</OPTION>
+<OPTION VALUE="16d">16d</OPTION>
+<OPTION VALUE="16n">16n</OPTION>
+<OPTION VALUE="2p">2p</OPTION>
+<OPTION VALUE="2d">2d</OPTION>
+<OPTION VALUE="2n">2n</OPTION>
+</SELECT>
+</FORM>
+</BODY></HTML>
+EOF
+"$bin" -t "http://127.0.0.1:$port/wrpc.html" >"$tmp/c2.out" 2>&1
+"$bin" -t -c 256 "http://127.0.0.1:$port/wrpc.html" >"$tmp/c256.out" 2>&1
+"$bin" -t -c 216 "http://127.0.0.1:$port/wrpc.html" >"$tmp/c216.out" 2>&1
+"$bin" -t -c 100 "http://127.0.0.1:$port/wrpc.html" >"$tmp/c100.out" 2>&1
+ux=$(awk '$2 == "field" && $8 == "url" { print $3 + 5; exit }' "$tmp/c256.out")
+uy=$(awk '$2 == "field" && $8 == "url" { print $4 + 5; exit }' "$tmp/c256.out")
+cx=$(awk '$2 == "select" && $8 == "c" { print $3 + 5; exit }' "$tmp/c256.out")
+cy=$(awk '$2 == "select" && $8 == "c" { print $4 + 5; exit }' "$tmp/c256.out")
+oy=$(awk '$2 == "select" && $8 == "c" { print $4 + $6 + 1 + 6 * 15 + 7; exit }' "$tmp/c256.out")
+"$bin" -t -c 256 -s "@$cx,$cy;@$cx,$oy;@$ux,$uy;x~" "http://127.0.0.1:$port/wrpc.html" >/dev/null 2>&1
+bx=$(awk '$2 == "select" && $8 == "c" { print $3 + 5; exit }' "$tmp/c2.out")
+by=$(awk '$2 == "select" && $8 == "c" { print $4 + 5; exit }' "$tmp/c2.out")
+py=$(awk '$2 == "select" && $8 == "c" { print $4 + $6 + 1 + 2 * 15 + 7; exit }' "$tmp/c2.out")
+"$bin" -t -s "@$bx,$by;@$bx,$py;" "http://127.0.0.1:$port/wrpc.html" >/dev/null 2>&1
+rm -f "$here/data/wrpc.html"
+if grep -q 'select .* c sel 1: -Ncol=Ncol 256d=256d 256n=256n 216n=216n ' "$tmp/c256.out" &&
+	grep -q 'select .* c sel 3: ' "$tmp/c216.out" && grep -q 'select .* c sel 7: ' "$tmp/c100.out" &&
+	grep -Eq 'GET /wrpc\.html\?url=&Fn=St&c=128n&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log" &&
+	grep -Eq 'GET /wrpc\.html\?url=x&c=128n&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log"; then
+	ok "wrp one menu, colors: C set to 256d (216n; 64d for 100); 128n sends St at once, the next page keeps it"
+else
+	bad "wrp one menu, colors: the C menu is wrong:"
+	grep 'select' "$tmp/c256.out" "$tmp/c216.out" "$tmp/c100.out"
+	grep 'GET /wrpc' "$tmp/http.log"
+fi
+if grep -q 'select .* c sel 1: -Ncol=Ncol 2p=2p 2d=2d 2n=2n$' "$tmp/c2.out" &&
+	[ "$(awk '$2 == "text" && $8 == "\"C\"" && $9 == "icon" { print $5; exit }' "$tmp/c2.out")" = 9 ] &&
+	grep -Eq 'GET /wrpc\.html\?url=&Fn=St&c=2d&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log"; then
+	ok "wrp one menu, black and white: C has only 2p 2d 2n, set to 2p, the dither picture; 2d sends St at once"
+else
+	bad "wrp one menu, black and white: the C menu is wrong:"
+	grep -E 'select|"C"' "$tmp/c2.out"
+	grep 'GET /wrpc' "$tmp/http.log"
+fi
+
 # 5b. WRP's errors: from WRP's page, an answer with no form (like WRP's
 # "Unable to find map" after a click on an old picture) keeps WRP's page,
 # puts the error on the status line, and gets WRP's new picture at once

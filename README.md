@@ -54,7 +54,7 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 ## Quick start
 
 1. On your computer, start [WRP](https://github.com/tenox7/wrp): `wrp`. It listens on port 8080.
-   Use WRP 4.11.0 or newer. An older WRP works, with fewer features.
+   Use WRP 4.12.0 or newer. An older WRP works, with fewer features.
 2. Copy the binary to the old computer as `archaic`, and make it executable:
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
    - 3B1, SunOS, HP-UX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
@@ -84,8 +84,8 @@ WRP's form is one line at the top of the window:
 | ![reload](screenshots/icons/re.png) | reload |
 | ![Backspace](screenshots/icons/bs.png) ![Return](screenshots/icons/rt.png) | Backspace, Return: for the web page |
 | ![zoom](screenshots/icons/z.png) | zoom |
-| ![colors](screenshots/icons/c.png) | colors (only on a display with colors) |
-| ![dither](screenshots/icons/d.png) | dither, only in black and white: All, Pics (sharp text, the default), None |
+| ![colors](screenshots/icons/c.png) | colors, with d (dither) or n (no dither): 256d, 216n ... (only on a display with colors) |
+| ![dither](screenshots/icons/d.png) | dither, in black and white: 2p (only photos: sharp text, the default), 2d (all), 2n (none) |
 | ![keys](screenshots/icons/k.png) | text to type into the web page |
 
 To type into a box on the web page: click the box in the picture, type in ![keys](screenshots/icons/k.png), then click ![Return](screenshots/icons/rt.png).

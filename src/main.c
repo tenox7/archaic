@@ -177,7 +177,8 @@ static int loading, quit, pending, pendpost, headless, verbose, allset;
 static long dcolors;		/* the colors the display shows (g_colors) */
 static int ncol;		/* the colors asked of WRP, 2 to 256 */
 static int copt;		/* -c's colors, or 0 */
-static int cmenu;		/* WRP's C menu is shown */
+static int cmenu;		/* the display has colors: WRP's C menu is shown */
+static char cval[8];		/* the line chosen in C, as 128n, or "" */
 static int idepth = 1;		/* the pictures' pixels: 1 or 8 bits */
 static int wrpf[MAXFORM];	/* the form is WRP's */
 static int oldpic;		/* WRP's next page comes: the picture shown is old */
@@ -697,8 +698,10 @@ char **p;
 
 /* WRP's one-letter labels get pictures too: Z a magnifying glass for the
  * zoom, C a palette for the colors, D a dither pattern, K a keyboard for
- * the keys to send. Z and D are narrower than the others: with the 3B1's
- * 9-pixel font, WRP's form then still fits on one line (680 of 682). */
+ * the keys to send. On a black and white display, C (WRP's one menu) has
+ * only the dither: it gets D's picture. Z and D are narrower than the
+ * others: with the 3B1's 9-pixel font, WRP's form then still fits on one
+ * line (680 of 682). */
 static char *kicon[] = {
 	".............",
 	".###########.",
@@ -772,8 +775,8 @@ Item *it;
 		return kicon;
 	if (f->type != I_SELECT)
 		return (char **)0;
-	if (strieq(f->name, "c"))
-		return cicon;
+	if (strieq(f->name, "c"))	/* black and white: WRP's one menu */
+		return cmenu ? cicon : dicon;
 	if (strieq(f->name, "z"))
 		return zicon;
 	if (strieq(f->name, "d"))
@@ -1449,8 +1452,31 @@ static void layout()
 	place();
 }
 
+/* Is it WRP's one menu for the colors and the dither? Its lines are a
+ * number and a letter, as 256d, 128n and 2p. An older WRP's C has only
+ * numbers, and its D menu has the dither of 2 colors. */
+static int onemenu(it)
+Item *it;
+{
+	char *v;
+	int j, n;
+
+	if (it->type != I_SELECT || !it->name || !strieq(it->name, "c"))
+		return 0;
+	for (j = 0; j < it->nopt; ++j) {
+		v = opts[it->opt + j].val;
+		n = v ? len(v) : 0;
+		if (n > 1 && v[0] >= '0' && v[0] <= '9' &&
+			v[n - 1] >= 'a' && v[n - 1] <= 'z')
+			return 1;
+	}
+	return 0;
+}
+
 /* Is it one of WRP's settings that Archaic sets itself? w and h always;
- * m, t and c unless -a, and c not if its menu is shown. */
+ * m, t and c unless -a, and c not if its menu is shown: on a display with
+ * colors, and WRP's one menu on a black and white one (not with -c n:
+ * then Archaic asks for n colors). */
 static int ours(it)
 Item *it;
 {
@@ -1461,7 +1487,7 @@ Item *it;
 		return 0;
 	for (i = 0; i < (allset ? 2 : 5); ++i)
 		if (strieq(it->name, set[i]))
-			return i < 4 || !cmenu;
+			return i < 4 || !(cmenu || (ncol == 2 && onemenu(it)));
 	return 0;
 }
 
@@ -1473,7 +1499,8 @@ Item *it;
 		it->form >= 0 && it->form < MAXFORM && wrpf[it->form];
 }
 
-/* Is it WRP's D menu: what WRP dithers in a black and white picture? */
+/* Is it WRP's D menu: what WRP dithers in a black and white picture?
+ * (An older WRP: a newer one has it in C.) */
 static int isdmenu(it)
 Item *it;
 {
@@ -1481,13 +1508,22 @@ Item *it;
 		it->form >= 0 && it->form < MAXFORM && wrpf[it->form];
 }
 
-/* WRP's C menu: the choice nearest ncol, and not above it if it can */
+/* WRP's C menu: the line chosen last (cval), else the first line of the
+ * number nearest ncol, and not above it if it can. In WRP's one menu, the
+ * first line of a number is WRP's default for it, as 256d and 216n. */
 static void setcol(it)
 Item *it;
 {
 	Opt *o;
 	int j, v, best = -1, bv = 0;
 
+	for (j = 0; cval[0] && j < it->nopt; ++j) {
+		o = &opts[it->opt + j];
+		if (!o->dis && o->val && strieq(o->val, cval)) {
+			it->sel = j;
+			return;
+		}
+	}
 	for (j = 0; j < it->nopt; ++j) {
 		o = &opts[it->opt + j];
 		v = atoin(o->val);
@@ -1501,6 +1537,24 @@ Item *it;
 	}
 	if (best >= 0)
 		it->sel = best;
+}
+
+/* A black and white display: WRP's one menu keeps only its lines of 2
+ * colors (2p, 2d, 2n). They say what WRP dithers. */
+static void only2(it)
+Item *it;
+{
+	Opt *o = &opts[it->opt];
+	int j, n = 0;
+
+	for (j = 0; j < it->nopt; ++j)
+		if (o[j].dis || atoin(o[j].val) == 2) {
+			o[n].val = o[j].val;
+			o[n].text = o[j].text;
+			o[n].dis = o[j].dis;
+			++n;
+		}
+	it->nopt = n;
 }
 
 /* A new page: find WRP's form (it has a url and a w field), and hide
@@ -1528,9 +1582,12 @@ static void wrpforms()
 			strieq(it[-1].text, it->name))
 			it[-1].type = I_HIDDEN;	/* no name: not sent */
 	}
-	for (i = 0; cmenu && !allset && i < nitems; ++i)
-		if (iscmenu(&items[i]))
+	for (i = 0; !allset && i < nitems; ++i)
+		if (iscmenu(&items[i])) {
+			if (!cmenu)
+				only2(&items[i]);
 			setcol(&items[i]);
+		}
 }
 
 /* The size of WRP's next picture: as wide as the window, and as high as
@@ -2009,13 +2066,20 @@ int f;
 }
 
 /* a new choice in WRP's C menu: send the form now, with St, so that WRP
- * takes the picture again in those colors */
+ * takes the picture again in those colors (and that dither). The next
+ * pages keep the line. */
 static void newcol(it)
 Item *it;
 {
-	ncol = atoin(opts[it->opt + it->sel].val);
+	char *v = opts[it->opt + it->sel].val;
+	int i;
+
+	ncol = atoin(v);
 	if (ncol < 2 || ncol > 256)
 		ncol = ncol < 2 ? 2 : 256;
+	for (i = 0; v && v[i] && i < (int)sizeof(cval) - 1; ++i)
+		cval[i] = v[i];
+	cval[i] = 0;
 	submit(it->form, stbutton(it->form));
 }
 
@@ -2036,7 +2100,7 @@ int x, y, b;
 		}
 		closepop();
 		drawone(i);
-		if (it->sel != old && cmenu && !allset && iscmenu(it))
+		if (it->sel != old && !allset && iscmenu(it))
 			newcol(it);
 		else if (it->sel != old && !allset && isdmenu(it))
 			submit(it->form, stbutton(it->form));

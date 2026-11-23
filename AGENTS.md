@@ -82,23 +82,33 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 | W, H | the window's size: the picture fills the window. Always, also with `-a` |
 | M (mode) | ISMAP |
 | T (picture type) | GIF. WRP sends its black and white pictures (2 colors) as ABM in its place (see Pictures: GIF and ABM) |
-| C (colors) | black and white display: 2 (or `-c n`), not shown. A display with colors: the menu shows (see Colors) |
+| C (colors) | a display with colors: the menu shows (see Colors). Black and white: WRP's one menu shows its lines of 2 (see below); with an older WRP, or with `-c n`, Archaic sends 2 (or n), and C is not shown |
 | SL (slices) | 1: the whole page, in slices (see Scrolling). An older WRP ignores it |
 
 So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom),
-**C** (colors, only on a display with colors), **D** (dither, only for black and white) and **K** (keys).
-The labels Z, C, D and K are pictures: a magnifying glass, a palette, a dither pattern (a checkerboard)
-and a keyboard.
+**C** (colors and dither) and **K** (keys).
+The labels Z, C and K are pictures: a magnifying glass, a palette and a keyboard.
+On a black and white display, C has only the dither, and its label is a dither pattern (a checkerboard).
 
-**D** says what WRP dithers in a black and white picture (a WRP of November 2026 or newer has it):
+**C** is one menu for the colors and the dither (WRP 4.12.0 or newer).
+Each line is a number of colors and a letter:
 
-| D | The picture |
+| Letter | The picture |
 |---|---|
-| All | all of the page is dithered. Good for photos. Text in a color, gray text and text on a color become dots |
-| Pics | WRP's default, for reading: only photos are dithered. Text and lines are sharp, and the pictures are about 20% smaller |
-| None | no dither at all. The smallest pictures |
+| d | dithered (Floyd-Steinberg): all of the page. Photos and shades keep their tones. In 2 colors, text in a color, gray text and text on a color become dots |
+| n | no dither: each pixel gets the nearest color. Photos get bands of color. In 2 colors, the smallest pictures |
+| p | only in 2 colors, for reading: only photos are dithered. Text and lines are sharp, and the pictures are about 20% smaller than 2d |
 
-Choose another one, and Archaic sends WRP's form at once with St: WRP makes the picture again.
+The lines are 256d, 256n, 216n, 216d, 128d, 128n, 64d, 64n, 16d, 16n, 2p, 2d and 2n.
+The first line of each number is WRP's default for it: 216 is sharp (the web colors, see 216 colors: GIP),
+2 dithers only photos, and the other numbers are dithered.
+
+- On a display with colors, C shows all the lines. On a black and white display, only 2p, 2d and 2n.
+- Choose another line, and Archaic sends WRP's form at once with St: WRP makes the picture again.
+  The next pages keep the line.
+- An older WRP has only numbers in C, and dithers no colors. Its **D** menu has the dither of 2 colors:
+  All (2d), Pics (2p) and None (2n). Archaic shows D on a black and white display, and hides C there.
+- Archaic 0.7 and older keep only the number: on the next page, C is at the first line of that number again.
 
 The address box has a clear button (a white × in a black circle) at its right end,
 while it has text. Click it: the box is empty, and ready for a new address.
@@ -142,11 +152,11 @@ The first status line says what it found, like `Archaic 0.7, millions of colors`
 
 On a display with colors:
 
-- WRP's **C** menu shows. It is set to the display's colors: the nearest of WRP's
-  choices (256, 216, 128, 64, 16, 2) that is not more, or to `-c n`.
-  A display of 256 colors (an 8-bit colormap) gets 216: the web colors, as the old browsers had
-  (see 216 colors: GIP). Choose 256 in C for the page's own colors.
-- Choose another number there, and Archaic sends WRP's form at once with St (stop).
+- WRP's **C** menu shows. It is set to the display's colors: the first line of the nearest of WRP's
+  numbers (256, 216, 128, 64, 16, 2) that is not more, or of `-c n`.
+  A display of 256 colors (an 8-bit colormap) gets 216n: the web colors, as the old browsers had
+  (see 216 colors: GIP). Choose 256d in C for the page's own colors.
+- Choose another line there, and Archaic sends WRP's form at once with St (stop).
   WRP takes the picture again in those colors, and does not load the page again.
   The frame stays where it was.
 - The pictures keep their colors: a byte for each pixel, and the GIF's colors.
@@ -160,16 +170,18 @@ On a display with colors:
   When the colormap is full, it takes the nearest color the colormap has.
   A new palette frees the last one's cells.
 
-On a black and white display, the C menu is hidden. Archaic asks WRP for 2 colors
-(or for `-c n`). The pictures are 1 bit a pixel; one with more colors gets a 4x4 dither.
+On a black and white display, C shows only its lines of 2 (an older WRP: C is hidden).
+Archaic asks WRP for 2 colors (or for `-c n`: then C is hidden).
+The pictures are 1 bit a pixel; one with more colors gets a 4x4 dither.
 
 Archaic's own start page request asks WRP for the same settings as the next ones
 (`/?m=ismap&t=gif&c=256&sl=1`, with C's colors), so that WRP's form does not change after the first page.
 
 ### 216 colors: GIP
 
-With C at 216, WRP makes **GIP** pictures: the 216 web colors (a 6 x 6 x 6 color cube), with no dither.
-Archaic still sends `t=gif&c=216`, not `t=gip`: WRP shows the C menu only for GIF.
+With C at 216n, WRP makes **GIP** pictures: the 216 web colors (a 6 x 6 x 6 color cube), with no dither.
+216d dithers the page to the same 216 colors.
+Archaic still asks for GIF (`t=gif`), not `t=gip`: WRP shows the C menu only for GIF.
 (WRP before November 2026 makes 216 colors of the page itself, with median cut, as for 256.)
 
 The web colors are the same on every page. On a display with a colormap (8 bits) this matters:
@@ -505,6 +517,9 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons and the labels Z, C, D and K are pictures, Go stays text. A new choice in WRP's D menu sends the form at once.
    With colors: C shows, set to the colors (for 100 colors: 64); another choice sends St at once;
    the start page request has WRP's settings.
+   WRP's one menu (5c): with colors, C is set to the first line of the nearest number (256d, 216n,
+   64d for 100 colors); a new line sends St at once, and the next page keeps it.
+   In black and white, C has only 2p, 2d and 2n, is set to 2p, and its label is the dither pattern.
    Text in K, then ↵ or ⌫: the text and the key go as keys (`k=ab%0D`), with no button.
    The address box's clear button empties it.
    WRP's error (an answer with no form, after a click on the picture): WRP's page stays, the error
@@ -801,9 +816,10 @@ Test on a copy of your 3B1 disk.
   Archaic makes white lit, so pictures are not negatives.
 - Text: the font file `/usr/lib/wfont/system.8.ft` (9 x 12, ASCII only), drawn with `wrastop()`.
   Every letter is 9 pixels wide.
-- With this font, WRP's form (WRP 4.11.0) only just fits on one line: it ends at x 680, and 682 is the limit
+- With this font, WRP's form (WRP 4.12.0) only just fits on one line: it ends at x 680, and 682 is the limit
   (686 less the margin). One more letter or item puts the last button on a second line.
   So the Z and D pictures are narrower than the others (11 and 9 pixels), and the D menu's words have 4 letters.
+  WRP's one menu (C) has only 2p, 2d and 2n there, with D's picture: the form still ends at x 680.
   To check a change: in a copy of `main.c`, make `tw()` return `n * 9` and the `-t` window 686 wide,
   then run `archaic -t -c 2` with WRP. This gives the same places as the real 3B1.
 - `keypad(wn, 1)`: the 3B1's keys come as one code each (`kcodes.h`): Exit 0350, Cancl 0370, Page 0371.
@@ -1060,7 +1076,7 @@ Test on a copy of your HP-UX disk.
 - From an rsh or telnet login, `DISPLAY=:0` reaches the screen (as root, with root logged in to VUE).
 - Page Up and Page Down come as the keys Prior and Next (Prev and Next on an HP keyboard).
 - The colormap: VUE takes most of it. In the kit, 160 to 180 cells were free.
-  A page of text took 30 to 55 cells (C at 216), and 63 with C at 256.
+  A page of text took 30 to 55 cells (C at 216), and 63 with C at 256 (with no dither, as 256n now).
   When Archaic quits, the X server frees them all.
 - `mount`, `shutdown` and other system programs are in `/etc`: rsh's PATH does not have it.
   `/etc/mount HOST:/dir /mnt` mounts an NFS folder.
