@@ -19,6 +19,9 @@
 #include <X11/keysym.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#ifdef _AIX
+#include <sys/select.h>	/* AIX 3: fd_set is here */
+#endif
 #include <unistd.h>
 
 #ifdef NOPROTO

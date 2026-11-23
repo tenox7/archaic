@@ -7,6 +7,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#ifdef _AIX
+#include <sys/select.h>	/* AIX 3: fd_set is here */
+#endif
 #include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <netdb.h>

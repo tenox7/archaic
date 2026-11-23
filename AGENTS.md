@@ -29,7 +29,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/pic.c` | pictures: looks at what came (GIF or ABM); the ABM decoder |
 | `src/x10.c` | display for X10 (Idris) |
 | `src/nidris.c` | network for Idris: TCP through netd |
-| `src/x11.c` | display for X11 (Unix, HP-UX, DG/UX, macOS with XQuartz) |
+| `src/x11.c` | display for X11 (Unix, HP-UX, DG/UX, AIX, macOS with XQuartz) |
 | `src/cocoa.m` | display for macOS: a Cocoa window |
 | `src/sdl.c` | display for SDL 2 (macOS, Linux, Windows ...) |
 | `src/headless.c` | display with no window, for tests and automation: commands on standard input, screenshots |
@@ -44,6 +44,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/mksunview` | SunOS 3 and 4 script: compile and link with Sun's cc |
 | `src/mkhpux` | HP-UX 9 script: compile and link with HP's cc, for X11 (`x11.c`, `nsock.c`) |
 | `src/mkdgux` | DG/UX R4.20 script: compile and link with DG/UX's cc, for X11 (`x11.c`, `nsock.c`) |
+| `src/mkaix` | AIX 3.2 script: compile and link with IBM's XL C (or gcc), for X11 (`x11.c`, `nsock.c`) |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
@@ -61,7 +62,7 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [url]
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, SunView and HP-UX: `10.0.2.2`, other Unix: `127.0.0.1`) |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, SunView, HP-UX, DG/UX and AIX: `10.0.2.2`, other Unix: `127.0.0.1`) |
 | `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
@@ -317,7 +318,7 @@ A trackpad scrolls smoothly, by pixels. Ctrl+click is the right button.
 Cmd-Q and the window's close button quit.
 Cocoa has the Mac's own scroll bar; SDL has Archaic's (see Scrolling).
 
-**With X11** (HP-UX, Linux, XQuartz ...): Page Up and Page Down scroll a window
+**With X11** (HP-UX, DG/UX, AIX, Linux, XQuartz ...): Page Up and Page Down scroll a window
 (on an HP keyboard: Prev and Next). The up and down arrows and each step of the mouse wheel
 scroll a quarter of it. Close in the window manager's menu quits. The scroll bar is Archaic's.
 
@@ -370,7 +371,7 @@ Archaic keeps WRP's page and shows the error on the status line, like
   Start WRP, then press Return: Archaic tries again. Or start Archaic with WRP's address.
 - While Archaic connects to WRP with no page yet, the box says `Connecting to WRP` and the address
   (then `Waiting for WRP`, while WRP makes the page). Esc stops.
-- With BSD sockets (`nsock.c`: Unix, macOS, SunOS, HP-UX) the connect does not hold up the window:
+- With BSD sockets (`nsock.c`: Unix, macOS, SunOS, HP-UX, DG/UX, AIX) the connect does not hold up the window:
   it is drawn, Esc stops, and after 20 s with no answer Archaic gives up (an address that
   does not exist on this network, like 10.0.2.2 outside an emulator kit).
   On the 3B1 (`ntwg.c`) the connect waits as long as the system does.
@@ -1138,6 +1139,94 @@ Test on a copy of your DG/UX disk.
 - `mount` and `umount` are in `/etc` and `/sbin`: rsh's PATH does not have them.
 - `shutdown` from rsh does nothing. `/sbin/init 0` stops DG/UX, then the PC restarts:
   its boot loader boots DG/UX again after 15 s.
+
+## Running on AIX 3.2
+
+- **AIX 3.2.5** with X11R5 (AIXwindows), on an IBM RS/6000 7006-41T (PowerPC 601).
+  Kit: `aix325rs6000-lemu` (QEMU), on osarchive in `os/aix/Virtual/`. It has IBM's C compiler.
+- Build Archaic there (see Building on AIX 3.2), then copy it to `/usr/local/bin/archaic`.
+- Log in as `root` at the xdm login (the kit has no password). An aixterm opens: type `archaic`.
+- **Ctrl-Q** quits, or Close in the window's menu.
+- Archaic looks for WRP at `http://10.0.2.2:8080/`: your computer, in the kit's network (QEMU NAT).
+  On another network: `archaic HOST:8080`, or set `WRP` to `HOST:8080`.
+  The kit has a name server, so HOST can be a name.
+- The screen has 8 bits, so the pictures have the 216 web colors (see 216 colors: GIP).
+- `screenshots/aix.png`: the screen, 1280 x 1024, with mwm: `uname -a` in an aixterm,
+  and Wikipedia's IBM AIX article in 216 colors, in 7 s.
+
+## Building on AIX 3.2
+
+Needs IBM's C compiler, `cc` (XL C 1.3 in the kit), and X11R5 (AIX 3.2 has it in AIXwindows).
+The kit has both.
+
+1. Copy these 9 files (140 KB) into a folder on AIX, with ftp, rcp or NFS:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `nsock.c`, `x11.c` and `mkaix`.
+2. Build:
+
+   ```
+   sh mkaix        # compile and link: archaic, about 120 KB
+   ```
+
+   It takes about 25 s in the kit. gcc builds it too (2.7.2.2 in `/usr/local/bin` in the kit):
+   `CC=gcc sh mkaix` takes 4 s, and the program is about 180 KB.
+3. Test. **Test mode, no window needed** (serve this folder from your computer:
+   `python3 tools/idris.py 0 serve . 8077`):
+
+   ```
+   ./archaic -t http://10.0.2.2:8077/test/data/hn2.gif
+   ```
+
+   The last line ends with `sum ae2b58f3`: the same as on the other systems.
+   With `hn2.abm` in the place of `hn2.gif`, it checks the ABM decoder: the same sum.
+   The pictures of `test/run.sh` (1, 1b, 1c, 2 and 2b) give exactly the bytes they give on the Mac.
+
+   **With the window:** `./archaic` in an aixterm.
+
+**Measured in the kit** (QEMU on an Apple Silicon Mac), from Return until the picture is complete.
+Archaic decodes a picture in about 0.1 s here: most of a page's time is WRP's.
+
+| What | Time |
+|---|---|
+| decode check (`-t`, `hn2.gif`, 11 KB, 256 colors), with the download | 0.2 s |
+| decode check (`-t`, `hn2.abm`, 9 KB) | 0.1 s |
+| Wikipedia's IBM AIX article in the window, 216 colors (34 KB) | 7 s |
+| Wikipedia's IBM article, after a click on its link (41 KB) | 7 s |
+| the same page, C set to 256 (81 KB) | 8 s |
+| Wikipedia's RS/6000 article (40 KB) | 2 s |
+| the same page, after the window was made narrower (12 KB) | 1 s |
+
+## AIX 3.2: what to know
+
+Test on a copy of your AIX disk.
+
+| Thing | AIX 3.2.5 kit |
+|---|---|
+| Computer | an IBM RS/6000 7006-41T in QEMU (LEMU): PowerPC 601, 256 MB |
+| Screen | GXT150L: 1280 x 1024, 8 bits: 256 colors in one colormap (PseudoColor) |
+| Window system | X11R5 (AIXwindows), with xdm and mwm (Motif) |
+| Network | Ethernet, BSD sockets. QEMU NAT: AIX 10.0.2.15, **your computer 10.0.2.2** (its 127.0.0.1) |
+| Names | QEMU's name server, 10.0.2.3 |
+
+- `cc` is IBM's XL C 1.3, in its extended mode. It defines `_AIX`, `_AIX32` and `_IBMR2`.
+  `archaic.h` uses `_AIX` for the WRP address. Plain `char` is unsigned.
+- XL C's code runs on every RS/6000: POWER, POWER2 and PowerPC (its default is `-qarch=com`).
+- gcc 2.7.2.2 is in `/usr/local/bin` in the kit (from the UCLA AIX PDS archive).
+- `fd_set` is in `<sys/select.h>`: `<sys/types.h>` has it only with `_BSD`.
+  `x11.c` and `nsock.c` include it on AIX.
+- BSD sockets are in libc. X11R5 is on the default paths. `dump -H archaic` lists
+  the shared libraries: `libc.a` (`shr.o`) and `libX11.a` (`shr4.o`).
+- From an rsh login as root, `DISPLAY=:0` reaches the screen (with root logged in at the xdm login).
+- rsh's PATH has no `/usr/sbin`: `/usr/sbin/mount HOST:/dir /mnt` mounts an NFS folder
+  (it works through QEMU NAT).
+- `grep` has no `\|`: use `egrep`. `tr` does not know `\n`: write `\012`.
+- Stop AIX with `shutdown -F`. Wait for `Halt completed` on the screen, then quit QEMU.
+- LEMU's GXT150L (in the kit) draws some X fills in the wrong place. For these, the X server
+  puts the window's place in the origin register (0x80), clears bit 0x10000 of the mode register,
+  and sends the fill in window coordinates. LEMU does not add the origin, so the fill goes to
+  that place on the screen. While a page loads, a few black bars can show in the page:
+  the status line's progress bar, at its place in the window taken as a place on the screen.
+  They stay until that part of the window is drawn again (`xrefresh` draws all windows again).
+  Other X programs' fills go to the wrong place too: this is LEMU's fault, not Archaic's.
 
 ## Porting to DOS, OS/2, Win16 and others
 
