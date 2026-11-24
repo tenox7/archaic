@@ -35,11 +35,11 @@
 #define P(a) a
 #endif
 
-/* The version. The program carries it as "@(#)Archaic 0.9" (what(1)
+/* The version. The program carries it as "@(#)Archaic 0.10" (what(1)
  * shows it): WRP reads it in the files of the release, for the updates
  * (update.c). VERSION is the number alone. */
 #ifndef IDENT
-#define IDENT "@(#)Archaic 0.9"
+#define IDENT "@(#)Archaic 0.10"
 #endif
 extern char ident[];
 #define VERSION (ident + 12)

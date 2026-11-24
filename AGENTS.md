@@ -146,7 +146,7 @@ With `-t`, the `title` line is still the page's own title.
 ## Colors
 
 Archaic asks the display how many colors it shows.
-The first status line says what it found, like `Archaic 0.9, millions of colors`.
+The first status line says what it found, like `Archaic 0.10, millions of colors`.
 
 | Display | Colors |
 |---|---|
