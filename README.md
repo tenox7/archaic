@@ -110,7 +110,7 @@ Where the window system has no scroll bar, Archaic draws its own, in the style o
 ![Archaic's own scroll bar at the right, in GEM style: Wikipedia's Atari ST article](screenshots/scrollbar.png)
 
 ```
-archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [-u] [-n] [url]
+archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [-u] [-n] [--version] [url]
 ```
 
 | Option | Does |
@@ -126,6 +126,7 @@ archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [-u] [
 | `-s script` | play a script, then quit |
 | `-u` | update Archaic now, then quit |
 | `-n` | no updates |
+| `--version` | show the version, then quit |
 
 Archaic updates itself through WRP. Once a run it asks WRP for a newer Archaic.
 Started as root, it installs it. Else it says that a newer one is out.

@@ -11,6 +11,7 @@ port=8079
 tmp=$(mktemp -d)
 fail=0
 here=$(cd "$(dirname "$0")" && pwd)
+ver=$(sed -n 's/^#define IDENT "@(#)Archaic \(.*\)"$/\1/p' "$here/../src/archaic.h")
 
 # The web server for the tests: python's, and GIFs cut into slices for
 # ?y=Y&h=H, as WRP does for the tall picture (with ImageMagick). ?wait=S:
@@ -511,9 +512,9 @@ if [ -x "$hl" ]; then
 		"shot $tmp/h2.png" quit |
 		"$hl" -g 640x400 "http://127.0.0.1:$port/t.html" >"$tmp/h.out" 2>&1
 	rm -f "$here/data/t.html"
-	if grep -qx 'title T&T AB' "$tmp/h.out" &&
+	if grep -qx "title Archaic v$ver" "$tmp/h.out" && grep -qx "title Archaic v$ver - T&T AB" "$tmp/h.out" &&
 		grep -qx "shot $tmp/h2.png 500x300" "$tmp/h.out"; then
-		ok "headless: title, shots, size 500 300"
+		ok "headless: title (Archaic v$ver, then the page's), shots, size 500 300"
 	else
 		bad "headless: wrong output:"
 		cat "$tmp/h.out"
@@ -608,8 +609,8 @@ else
 	bad "new width: wrong:"
 	grep 'GET /wrp3' "$tmp/http.log"
 fi
-if grep -qx 'title Archaic - http://x.org/' "$tmp/r.out" && ! grep -q '^title WRP' "$tmp/r.out"; then
-	ok "window title: Archaic in the place of WRP"
+if grep -qx "title Archaic v$ver - http://x.org/" "$tmp/r.out" && ! grep -q '^title WRP' "$tmp/r.out"; then
+	ok "window title: Archaic v$ver in the place of WRP"
 else
 	bad "window title: wrong:"
 	grep '^title' "$tmp/r.out"
@@ -769,7 +770,6 @@ fi
 #     the window the update comes once WRP's page is here; not with -n
 #     or -t.
 src=$here/../src
-ver=$(sed -n 's/^#define IDENT "@(#)Archaic \(.*\)"$/\1/p' "$src/archaic.h")
 uw="-std=c89 -pedantic -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-non-prototype -Wno-strict-prototypes -Wno-deprecated-declarations -g -O1 -fsanitize=address,undefined"
 usrc="$src/main.c $src/html.c $src/http.c $src/gif.c $src/pic.c $src/update.c $src/fb.c $src/headless.c $src/nsock.c"
 mkdir "$tmp/u"
@@ -795,8 +795,15 @@ if ${CC:-cc} $uw -DSYSID='"@(#)Archaic for test"' -o "$tmp/u/old" $usrc >"$tmp/u
 		[ "$(cat "$tmp/u/rc")" = "$1" ] && cmp -s "$tmp/u/bin/archaic" "$tmp/u/old" &&
 			[ "$(ls -A "$tmp/u/bin")" = archaic ]
 	}
+	if [ "$("$bin" --version)" = "Archaic v$ver" ] &&
+		[ "$("$tmp/u/old" --version)" = "Archaic v$ver for test" ] &&
+		[ "$("$tmp/u/new" --version)" = "Archaic v99.0 for test" ]; then
+		ok "--version: Archaic v$ver, and the system name of a release build"
+	else
+		bad "--version: $("$bin" --version) / $("$tmp/u/old" --version) / $("$tmp/u/new" --version)"
+	fi
 	uans 99.0 "$sz" "$crc"
-	if urun "Archaic 99.0 is installed. Start archaic again to use it: $tmp/u/bin/archaic" &&
+	if urun "Archaic upgraded to 99.0. Start archaic again to use it: $tmp/u/bin/archaic" &&
 		[ "$(cat "$tmp/u/rc")" = 0 ] && cmp -s "$tmp/u/bin/archaic" "$tmp/u/new" &&
 		cmp -s "$tmp/u/bin/archaic.old" "$tmp/u/old" && [ -x "$tmp/u/bin/archaic" ] &&
 		[ "$(ls -A "$tmp/u/bin" | tr '\n' ' ')" = "archaic archaic.old " ] &&
@@ -820,7 +827,7 @@ if ${CC:-cc} $uw -DSYSID='"@(#)Archaic for test"' -o "$tmp/u/old" $usrc >"$tmp/u
 	rc=$?
 	n1=$(grep -c 'GET /archaic-update?p=test&f=' "$tmp/http.log")
 	if [ $rc = 0 ] && [ "$n0" = "$n1" ] &&
-		grep -q "^archaic: Archaic 99.0 is installed. Start archaic again to use it: $tmp/u/bin/archaic\$" "$tmp/u/out" &&
+		grep -q "^archaic: Archaic upgraded to 99.0. Start archaic again to use it: $tmp/u/bin/archaic\$" "$tmp/u/out" &&
 		[ "$(ls -A "$tmp/u/bin")" = archaic ] && cmp -s "$tmp/u/bin/archaic" "$tmp/u/new"; then
 		ok "update -u: installed already, by another Archaic: no download"
 	else
@@ -838,7 +845,7 @@ if ${CC:-cc} $uw -DSYSID='"@(#)Archaic for test"' -o "$tmp/u/old" $usrc >"$tmp/u
 		(cd "$tmp/u/cwd" &&
 			python3 -I -c 'import os, sys; os.execve(sys.argv[1], ["archaic", "-u", sys.argv[3]], {"PATH": sys.argv[2]})' \
 			"$tmp/u/old" "$pth" "127.0.0.1:$port") >"$tmp/u/out" 2>&1
-		if grep -q "^archaic: Archaic 99.0 is installed. Start archaic again to use it: $tmp/u/bin/archaic\$" "$tmp/u/out" &&
+		if grep -q "^archaic: Archaic upgraded to 99.0. Start archaic again to use it: $tmp/u/bin/archaic\$" "$tmp/u/out" &&
 			cmp -s "$tmp/u/bin/archaic" "$tmp/u/new"; then
 			ok "update -u: started by its name: PATH $pth finds it"
 		else
@@ -891,7 +898,7 @@ if ${CC:-cc} $uw -DSYSID='"@(#)Archaic for test"' -o "$tmp/u/old" $usrc >"$tmp/u
 		"$tmp/u/bin/archaic" -u "127.0.0.1:$port" >"$tmp/u/out" 2>&1
 		echo $? >"$tmp/u/rc"
 		chmod 755 "$tmp/u/bin"
-		if grep -q '^archaic: Archaic 99.0 is out. To install it, start archaic as root$' "$tmp/u/out" &&
+		if grep -q '^archaic: Archaic 99.0 is out. To upgrade, start archaic as root$' "$tmp/u/out" &&
 			same 1; then
 			ok "update -u: a folder it can't write: says to start it as root"
 		else
@@ -916,7 +923,7 @@ EOF
 	printf 'sleep 100\nshot %s\n' "$tmp/u/win.png" |
 		"$tmp/u/bin/archaic" -g 640x400 "http://127.0.0.1:$port/updwrp.html" >/dev/null 2>"$tmp/u/err"
 	if [ "$n0" = "$n1" ] &&
-		grep -q "^archaic: Archaic 99.0 is installed. Start archaic again to use it: $tmp/u/bin/archaic\$" "$tmp/u/err" &&
+		grep -q "^archaic: Archaic upgraded to 99.0. Start archaic again to use it: $tmp/u/bin/archaic\$" "$tmp/u/err" &&
 		cmp -s "$tmp/u/bin/archaic" "$tmp/u/new" && cmp -s "$tmp/u/bin/archaic.old" "$tmp/u/old"; then
 		ok "update in the window: installed once WRP's page is here; none with -n or -t"
 	else

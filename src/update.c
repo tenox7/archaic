@@ -57,7 +57,6 @@ char *getenv();
 #endif
 
 char sysid[] = SYSID;
-#define SYSNAME (sysid + 16)	/* the name, after "@(#)Archaic for " */
 
 #define UMAX 8388608L		/* a larger file is not Archaic */
 
@@ -440,14 +439,14 @@ char *wrp, *prog;
 		return U_FAIL;
 	}
 	if (!findself(prog)) {
-		sprintf(upd_msg, "Archaic %s is out. To install it, start it as root, by its full name",
+		sprintf(upd_msg, "Archaic %s is out. To upgrade, start it as root, by its full name",
 			nver);
 		return U_OUT;
 	}
 	dirof();
 	if (access(dir, 2) < 0) {
 		if (getuid() != 0) {
-			sprintf(upd_msg, "Archaic %s is out. To install it, start archaic as root",
+			sprintf(upd_msg, "Archaic %s is out. To upgrade, start archaic as root",
 				nver);
 			return U_OUT;
 		}
@@ -456,7 +455,7 @@ char *wrp, *prog;
 		return U_FAIL;
 	}
 	if (ucheck(self)) {	/* another Archaic has installed it */
-		sprintf(upd_msg, "Archaic %s is installed. Start archaic again to use it: %.200s",
+		sprintf(upd_msg, "Archaic upgraded to %s. Start archaic again to use it: %.200s",
 			nver, self);
 		return U_DONE;
 	}
@@ -471,7 +470,7 @@ char *wrp, *prog;
 		r = -1;
 	}
 	if (r == 0 && uinstall() == 0) {
-		sprintf(upd_msg, "Archaic %s is installed. Start archaic again to use it: %.200s",
+		sprintf(upd_msg, "Archaic upgraded to %s. Start archaic again to use it: %.200s",
 			nver, self);
 		return U_DONE;
 	}

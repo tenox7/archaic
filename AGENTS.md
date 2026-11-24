@@ -60,7 +60,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 ## Options
 
 ```
-archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-u] [-n] [url]
+archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-u] [-n] [--version] [url]
 ```
 
 | Option | Meaning |
@@ -76,6 +76,7 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-u] [-n
 | `-s script` | play a script, then quit (see Scripts, in Building in Idris) |
 | `-u` | update: ask WRP for a newer Archaic and install it, with no window, then quit (see Updates) |
 | `-n` | no updates. Without it, Archaic asks WRP once a run (not with `-t` or `-s`) |
+| `--version` | print the version, then quit: `Archaic v0.9`. A release build also names its system (see Updates): `Archaic v0.9 for aix3` |
 
 ## WRP's form
 
@@ -137,8 +138,9 @@ To type into a box on the web page: click the box in the picture, then type in *
 (WRP alone does only the button's key when it gets both a button and keys, so Archaic sends
 the text and the button's key together as keys: `k=text%0D`. This works with every WRP.)
 
-**The window's title** is the page's title. WRP's page title is `WRP` and the page's address:
-there the window says `Archaic - ` and the address, like `Archaic - https://en.wikipedia.org/`.
+**The window's title** is Archaic's version, then the page's title, like `Archaic v0.9 - Hacker News`.
+Before the first page, it is `Archaic v0.9`. WRP's page title is `WRP` and the page's address:
+there the window says the address, like `Archaic v0.9 - https://en.wikipedia.org/`.
 With `-t`, the `title` line is still the page's own title.
 
 ## Colors
@@ -467,9 +469,9 @@ Archaic --HTTP--> WRP, /archaic-update --HTTPS--> GitHub: the newest release of 
 - Once a run, when WRP's first page is here, Archaic asks WRP for the newest Archaic for its system.
   The question is quiet: when there is no newer Archaic, the status line does not change.
 - A newer one, and Archaic can write the folder of its program (root can): Archaic installs it.
-  The status line says `Archaic 0.9 is installed. Start archaic again to use it: /usr/local/bin/archaic`.
+  The status line says `Archaic upgraded to 0.9. Start archaic again to use it: /usr/local/bin/archaic`.
   The program that runs stays as it is, until you quit it.
-- Archaic can't write the folder: `Archaic 0.9 is out. To install it, start archaic as root`.
+- Archaic can't write the folder: `Archaic 0.9 is out. To upgrade, start archaic as root`.
 - These lines also go to the terminal (standard error).
 - A click while Archaic asks: the question stops, and comes again later (3 times at most).
   Esc stops it for this run.
@@ -518,7 +520,8 @@ get archaic-update?p=unixpc&f=0.9
   `note no archaic-dgux in release v0.9`. Archaic then says `WRP has no update: no archaic-dgux in release v0.9`.
 - An older WRP sends its page. Archaic then says `This WRP has no updates for Archaic: it is an older WRP`.
 
-**The marks.** Each program carries 2 strings, for WRP. `what` and `strings` show them too:
+**The marks.** Each program carries 2 strings, for WRP. `what` and `strings` show them too,
+and `archaic --version` says them as `Archaic v0.9 for unixpc`:
 
 | Mark | Set in `archaic.h` by | Like |
 |---|---|---|
@@ -527,8 +530,9 @@ get archaic-update?p=unixpc&f=0.9
 
 WRP reads the marks in the file, not the release's tag:
 
-- A release also has older files, for the systems not built again. WRP offers a file only if its own version
-  is newer than the question's. So an old file in a new release can't start an update loop.
+- A release also has older files, for the systems not built again. WRP answers with the version in the file's marks,
+  and Archaic installs the file only if that version is newer than its own. So an old file in a new release
+  can't start an update loop.
 - WRP does not offer a file with the mark of another system (a file put in the wrong place in the release).
 - WRP does not offer a file with no marks (Archaic 0.8 and older).
 
@@ -653,7 +657,8 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    A color picture on the screen is exactly the GIF's, and the PNG is in colors.
    A display of 256 colors (`ARCHAIC_COLORS=256`) asks WRP for 216.
    A new width: one St with the new width, once the size stays (none for a new height); typed text stays.
-   No WRP: the box in the middle of the window. On WRP's page, the window's title says Archaic - and the address, not WRP.
+   No WRP: the box in the middle of the window. The window's title: `Archaic v` and the version, then the page's title;
+   on WRP's page, the address, not WRP.
 8. The tall picture, with no WRP: the test server cuts a random 600 x 1500 GIF into slices.
    After a wheel step, a window and a scroll to the end, the frame must show exactly the right rows.
    Also: the next slice comes before it is needed, and a click sends the place on the whole page.
@@ -663,6 +668,7 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    Clicks on the bar must not go to the page.
 10. The status line: connecting, waiting (counted), the page in bytes, a part in KB, time and size.
 11. Updates, with the test server as WRP: a build with the system name `test` (and the headless display).
+    `--version` names the version, and the system of the `test` build.
     `-u` asks `archaic-update?p=test&v=VERSION`, installs 99.0 and keeps `archaic.old`; the new file runs.
     The file installed already (by another Archaic): no download. Started by its name alone,
     the search path finds it (`dir:dir`, and Idris's `|dir/|dir/`).

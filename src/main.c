@@ -25,6 +25,7 @@
  *		update.c), then quit. No window
  * -n		no updates. Without it, Archaic asks WRP once a run, when
  *		WRP's first page is here (not with -t or -s)
+ * --version	print the version (and the system, see SYSID), then quit
  *
  * Keys: Tab next field, Return sends the form, Backspace, Ctrl-U clears
  * the field, Esc stops a load. Space and b scroll a window when no field
@@ -2694,23 +2695,22 @@ int n;
 		scopy(msg + 5, "an answer with no page", (int)sizeof msg - 5);
 }
 
-/* the window's title: the page's. WRP's page is titled WRP and the
- * page's address: there the window says Archaic - and the address. */
+/* the window's title: Archaic and its version, then the page's title.
+ * WRP's page is titled WRP and the page's address: there the window
+ * says Archaic v0.9 - and the address. */
 static char *wintitle()
 {
-	static char t[MAXTITLE + 8];
+	static char t[MAXTITLE + 32];
+	char *s = title;
 
-	if (!title[0])
-		return "Archaic";
 	if (wrpform() >= 0 && strnieq(title, "WRP", 3) &&
-		(title[3] == 0 || title[3] == ' ')) {
-		if (title[3] && title[4])
-			sprintf(t, "Archaic - %s", title + 4);
-		else
-			scopy(t, "Archaic", (int)sizeof t);
-		return t;
-	}
-	return title;
+		(title[3] == 0 || title[3] == ' '))
+		s = title[3] ? title + 4 : "";
+	if (*s)
+		sprintf(t, "Archaic v%.12s - %.80s", VERSION, s);
+	else
+		sprintf(t, "Archaic v%.12s", VERSION);
+	return t;
 }
 
 static void load(url, post)
@@ -3118,8 +3118,15 @@ char **argv;
 				}
 			} else
 				geom = argv[++i];
+		} else if (same(a, "--version")) {
+#ifdef SYSID
+			printf("Archaic v%s for %s\n", VERSION, SYSNAME);
+#else
+			printf("Archaic v%s\n", VERSION);
+#endif
+			return 0;
 		} else if (a[0] == '-') {
-			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-f gif|abm] [-t] [-v] [-o file] [-s script] [-u] [-n] [url]\n");
+			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-f gif|abm] [-t] [-v] [-o file] [-s script] [-u] [-n] [--version] [url]\n");
 			return 2;
 		} else
 			url = a;
@@ -3159,6 +3166,7 @@ char **argv;
 			return 1;
 		}
 		g_font(&fh, &fb);
+		g_title(wintitle());	/* Archaic and its version */
 	}
 	cw = tw("0", 1);
 	bar = !headless && g_bar;

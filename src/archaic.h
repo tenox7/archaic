@@ -122,6 +122,10 @@ extern char ident[];
 #define UPDPATH "/usr/local/bin/archaic"
 #endif
 #endif
+#ifdef SYSID
+extern char sysid[];		/* update.c: SYSID, */
+#define SYSNAME (sysid + 16)	/*  and the name after "@(#)Archaic for " */
+#endif
 
 /* limits: all memory is static or comes from malloc once per image */
 #define MAXITEM 600		/* words, fields, buttons, images on a page */
