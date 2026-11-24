@@ -39,7 +39,7 @@
  * shows it): WRP reads it in the files of the release, for the updates
  * (update.c). VERSION is the number alone. */
 #ifndef IDENT
-#define IDENT "@(#)Archaic 0.10"
+#define IDENT "@(#)Archaic 0.11"
 #endif
 extern char ident[];
 #define VERSION (ident + 12)
