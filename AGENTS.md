@@ -497,6 +497,9 @@ With a WRP that knows slices (`sl=1`), WRP makes a picture of the whole page onc
 - WRP leaves out its Up and Dn buttons.
 - A slice in 2 colors is about 5 to 9 KB for 632 x 351 pixels as GIF, and about 10% less as ABM.
   In 256 colors it is bigger: about 20 to 100 KB.
+- WRP 4.14.1 and newer make the colors and the dither of a slice when Archaic asks for it,
+  and the rest of the page in the background. So the first slice of a long page comes at once:
+  for a page of 79,499 rows, in 4 ms (2d) to 81 ms (256d) on an M1 Ultra.
 
 | Input | Scrolls the frame |
 |---|---|
@@ -1866,6 +1869,8 @@ It also knows the 4010's commands.
   and on an 8-bit X display almost all of the colormap (see 216 colors: GIP).
 - WRP before commit 3126bc0 (November 2026) could hang for good on back (← arrow),
   when Chrome took the page from its back-forward cache. Use a newer WRP.
+- With a WRP before 4.14.1, a very long page with the dither (like reddit) could time out:
+  WRP made the colors of the whole page before it answered. Use a newer WRP.
 - With slices, a link to a place on the same page (`#name`) does not scroll the frame there.
 - Only WRP's black and white pictures come as ABM. Pictures with colors are GIFs: a 10 MHz 68010
   needs 2 to 3 s for one 632 x 351 slice, also the 8-bit way (see Pictures: GIF and ABM).

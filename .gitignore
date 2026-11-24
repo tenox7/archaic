@@ -9,3 +9,5 @@ archaic-headless
 *.pbm
 ._*
 .DS_Store
+# the program before an update (see Updates in AGENTS.md)
+archaic.old
