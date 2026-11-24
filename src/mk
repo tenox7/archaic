@@ -1,7 +1,16 @@
 : mk - build Archaic on Idris. First sh mkinc once, then sh mk.
 : Each c also tries to link and prints undefined names. That is fine,
 : the link at the end, sh lka, is the real one.
-c main.c
+: main.c has more than 32 KB of code. as.68k reaches a function in the
+: same file with a 16-bit offset, so main.c goes through the passes of c
+: by hand, with as.68k -z: all calls get a 32-bit address.
+: as.68k then says 16-bit value exceeded and word pc range for branches
+: back to a label past 32 KB. These messages are false: the code is right.
+/etc/bin/pp -o main.i -x -i "|/lib/hdrs/|/lib/hdrs/sys/" +std /lib/hdrs/id68kn.h main.c
+/odd/p1 -o main.1 -m -r6 -alu -rf main.rf +std main.i
+/odd/p2.68k -o main.s -x4 -rf main.rf main.1
+/etc/bin/as.68k -o main.o -10 -x -z main.s
+rm main.i main.1 main.rf main.s
 c html.c
 c http.c
 c gif.c

@@ -625,7 +625,7 @@ The release's file is `archaic-` and the system name.
 | SunOS 4 (Sun-4) | `SUNVIEW` (mksunview), `sparc` | `sun4` |
 | SunOS 3.5 (Sun-3) | `SUNVIEW` (mksunview), `mc68020` | `sun3` |
 | HP-UX 9 | `__hpux` | `hpux9` |
-| DG/UX | `__DGUX__` | `dgux` (no release has `archaic-dgux` yet) |
+| DG/UX | `__DGUX__` | `dgux` |
 | AIX 3.2 | `_AIX`, `_IBMR2` | `aix3` |
 | AIX PS/2 1.3 | `_AIX`, `ps2` | `aixps2` |
 | Ultrix 4 | `ultrix` | `ultrix4` |
@@ -832,10 +832,10 @@ All 12 files (153 KB) take about 2 minutes.
 
 ```
 sh mkinc     # once per folder: the X10 headers
-sh mk        # compile and link: archaic, about 126 KB
+sh mk        # compile and link: archaic, about 147 KB
 ```
 
-With Hatari's fast-forward on, `sh mk` takes about 2.5 minutes.
+With Hatari's fast-forward on, `sh mk` takes about 4 minutes.
 To relink only: `sh lka`.
 
 > **Fast-forward**: turn it on only while waiting (compiles, X start).
@@ -909,6 +909,11 @@ Test on a copy of your Idris disk.
 - **Bug**: `a[n - 1]` on a **local** array reads the wrong memory. Make arrays `static`.
 - `putc()` on stderr crashes. `fprintf(stderr, ...)` is fine.
 - `c file.c` compiles, then tries to link and prints `undefined: ...`. That is normal.
+- `as.68k` reaches a function in the same file with a 16-bit offset: 32 KB at most.
+  `main.c` has more code than that, so `mk` runs the passes of `c` by hand for it, with `as.68k -z`:
+  then every call gets a 32-bit address. `c` has no flag for `-z`. `as.68k -z` then says
+  `16-bit value exceeded` and `word pc range` for about 13 branches in `main()` back to a label
+  past 32 KB. These messages are false: the code is right, and Archaic works.
 - `<X/Xlib.h>` is not on the include path, and `Xlib.h` wants a
   `<sys/param.h>` that Idris does not have. `sh mkinc` fixes both,
   in the build folder.
@@ -988,7 +993,7 @@ Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
 2. Build:
 
    ```
-   sh mkunixpc     # compile and link: archaic, about 67 KB
+   sh mkunixpc     # compile and link: archaic, about 79 KB
    ```
 
    It takes about 1 minute in FreeBee at turbo 10.
@@ -1327,6 +1332,8 @@ Test on a copy of your HP-UX disk.
 - **DG/UX R4.20MU07** with X11, on a Pentium PC in 86Box. Kit: `DGUX-R4.20MU07-86Box.tar.lz`,
   on osarchive in `os/dgux/Virtual/`. Archaic is in the kit: `/usr/local/bin/archaic`,
   and its source in `/usr/local/src/archaic`.
+- Release binary: `archaic-dgux` (the kit's). On another DG/UX R4.20 with X11, copy it as `/usr/local/bin/archaic`,
+  then `chmod 755 /usr/local/bin/archaic`. Or build it there: see Building on DG/UX.
 - Log in as `root` at the X login (the kit has no password). An xterm opens: type `archaic`.
 - **Ctrl-Q** quits.
 - Archaic looks for WRP at `http://10.0.2.2:8080/`: your computer, in 86Box's network (SLiRP).
@@ -1346,7 +1353,7 @@ The kit has both.
 2. Build:
 
    ```
-   sh mkdgux       # compile and link: archaic, about 80 KB
+   sh mkdgux       # compile and link: archaic, about 95 KB
    ```
 
    It takes about 5 s in the kit.
@@ -1423,7 +1430,7 @@ The kit has both.
 2. Build:
 
    ```
-   sh mkaix        # compile and link: archaic, about 120 KB
+   sh mkaix        # compile and link: archaic, about 146 KB
    ```
 
    It takes about 25 s in the kit. gcc builds it too (2.7.2.2 in `/usr/local/bin` in the kit):
@@ -1508,7 +1515,7 @@ The kit has both.
 2. Build:
 
    ```
-   sh mkaixps2     # compile and link: archaic, about 340 KB
+   sh mkaixps2     # compile and link: archaic, about 355 KB
    ```
 
    It takes about 3 s in the kit. The kit's `hcc` (`cc` with fixes for 5 MetaWare bugs) builds it too:
@@ -1602,7 +1609,7 @@ Needs Ultrix's C compiler, `cc`, and X11 (the UWS subsets: DECwindows). The kit 
 2. Build:
 
    ```
-   sh mkultrix     # compile and link: archaic, about 790 KB (500 KB after strip)
+   sh mkultrix     # compile and link: archaic, about 800 KB (516 KB after strip)
    ```
 
    It takes about 6 s in the kit. gcc builds it too (3.0.4 in `/freeware/gnu-tools/mips/bin` in the kit):
