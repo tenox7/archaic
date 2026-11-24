@@ -81,7 +81,7 @@ void free();
 #define BPAD 5		/* left and right inside buttons */
 
 int stop;		/* end the load that is running */
-char ident[] = IDENT;	/* "@(#)Archaic 0.8": VERSION is in it */
+char ident[] = IDENT;	/* "@(#)Archaic 0.9": VERSION is in it */
 
 static Image imgs[MAXIMG];
 static int nimgs;
