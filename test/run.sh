@@ -18,15 +18,41 @@ ver=$(sed -n 's/^#define IDENT "@(#)Archaic \(.*\)"$/\1/p' "$here/../src/archaic
 # the answer comes after S seconds, as when WRP makes a page.
 # NAME.pic is NAME.abm for a request whose Accept has image/x-abm, as WRP
 # does for a black and white picture, else NAME.gif; the log gets an
-# "accept" line.
+# "accept" line. /keys answers as WRP: a box that takes the keys (Tab: a
+# password box; ! a new page); a new wrpk*, wrpr* or wrps* page starts
+# with an empty box.
 cat >"$tmp/srv.py" <<'EOF'
 import functools, http.server, subprocess, sys, time, urllib.parse
+box = {'kind': 'text', 'val': ''}
 class H(http.server.SimpleHTTPRequestHandler):
     extensions_map = dict(http.server.SimpleHTTPRequestHandler.extensions_map,
         **{'.abm': 'image/x-abm'})
     def do_GET(self):
         u = urllib.parse.urlsplit(self.path)
         q = urllib.parse.parse_qs(u.query)
+        if u.path[:5] in ('/wrpk', '/wrpr', '/wrps'):
+            box['kind'], box['val'] = 'text', ''
+        if u.path == '/keys':
+            new = False
+            for c in q.get('k', [''])[0]:
+                if c == '\b':
+                    box['val'] = box['val'][:-1]
+                elif c == '\t':
+                    box['kind'], box['val'] = 'password', ''
+                elif c == '!':
+                    new = True
+                else:
+                    box['val'] += c
+            v = box['val'] if box['kind'] == 'text' else '*' * len(box['val'])
+            b = ('focus %s\nvalue %s\n' % (box['kind'], v)).encode('latin-1', 'replace')
+            if new:
+                b = b'focus none\npage new\n'
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.send_header('Content-Length', str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+            return
         if 'wait' in q:
             time.sleep(float(q['wait'][0]))
         if u.path.endswith('.pic'):
@@ -74,6 +100,26 @@ sleep 1
 
 ok() { echo "ok    $*"; }
 bad() { echo "FAIL  $*"; fail=1; }
+
+# 0. --help: a line for each option of the usage line (that a wrong option
+#    gets), lines of at most 79 characters, exit status 0.
+"$bin" --help >"$tmp/help.out" 2>"$tmp/help.err"
+hrc=$?
+"$bin" -z >/dev/null 2>"$tmp/usage.err"
+urc=$?
+miss=
+for o in $(grep -o '\[[^]]*\]' "$tmp/usage.err" | sed 's/^\[\([^] ]*\).*/\1/'); do
+	grep -q -e "^  $o " "$tmp/help.out" || miss="$miss $o"
+done
+nopt=$(grep -o '\[[^]]*\]' "$tmp/usage.err" | wc -l | tr -d ' ')
+if [ "$hrc" = 0 ] && [ "$urc" = 2 ] && [ ! -s "$tmp/help.err" ] && [ -z "$miss" ] &&
+	[ "$nopt" -ge 13 ] && grep -q -e '^  --help ' "$tmp/help.out" &&
+	grep -q '^usage: archaic \[options\] \[url\]$' "$tmp/help.out" &&
+	[ "$(awk 'length > 79' "$tmp/help.out" | wc -l | tr -d ' ')" = 0 ]; then
+	ok "--help: all $nopt options of the usage line, lines of at most 79 characters"
+else
+	bad "--help: status $hrc (wrong option: $urc), missing:$miss, $nopt options; $(cat "$tmp/help.err")"
+fi
 
 # 1. Black and white GIFs: the decoder must give exactly the same pixels
 #    as ImageMagick (gray below 50% = black).
@@ -245,6 +291,17 @@ else
 	bad "wrp form: shows the wrong things:"
 	echo "$shown"
 fi
+# The url field gets the room left in its line: the line ends left of
+# Archaic's logo (19 pixels, 4 right of it, 8 left of it). It was 141 wide.
+end=$(awk '$1 ~ /^[0-9]+$/ && $8 == "url" { y = $4; h = $6 }
+	$1 ~ /^[0-9]+$/ && y != "" && $5 > 0 && $4 >= y && $4 < y + h &&
+	$3 + $5 > e { e = $3 + $5 } END { print e }' "$tmp/f.out")
+uw=$(awk '$1 ~ /^[0-9]+$/ && $8 == "url" { print $5; exit }' "$tmp/f.out")
+if [ "$end" = $((640 - 4 - 19 - 8)) ] && [ "${uw:-0}" -gt 141 ]; then
+	ok "wrp form: the url field fills its line, up to Archaic's logo"
+else
+	bad "wrp form: the line ends at $end, the url field is $uw wide"
+fi
 # WRP's 7 buttons (NAME=Fn) are pictures; Go and other forms' buttons are text.
 if [ "$(grep -c '^ *[0-9]* button .* Fn "[A-Za-z]*" icon$' "$tmp/f.out")" = 7 ] &&
 	! grep -q '"Go" icon' "$tmp/f.out" && ! grep -q 'icon' "$tmp/t.out"; then
@@ -368,7 +425,7 @@ fi
 # 5c. WRP's one menu (WRP 4.12.0 or newer): C's lines are a number and a
 #     letter, d dither, n no dither, p only photos (2 colors), and there
 #     is no D menu. With colors: C is set to the first line of
-#     the nearest number (256d; 216n; for 100 colors 64d). A new line sends
+#     the nearest number (256d; 216n; for 100 colors 16d). A new line sends
 #     St at once, and the next page keeps it. Black and white: C shows only
 #     the lines of 2, set to 2p, and its label is the dither pattern (9
 #     pixels wide). A new line sends St at once.
@@ -388,8 +445,6 @@ C <SELECT NAME="c">
 <OPTION VALUE="216d">216d</OPTION>
 <OPTION VALUE="128d">128d</OPTION>
 <OPTION VALUE="128n">128n</OPTION>
-<OPTION VALUE="64d">64d</OPTION>
-<OPTION VALUE="64n">64n</OPTION>
 <OPTION VALUE="16d">16d</OPTION>
 <OPTION VALUE="16n">16n</OPTION>
 <OPTION VALUE="2p">2p</OPTION>
@@ -418,7 +473,7 @@ if grep -q 'select .* c sel 1: -Ncol=Ncol 256d=256d 256n=256n 216n=216n ' "$tmp/
 	grep -q 'select .* c sel 3: ' "$tmp/c216.out" && grep -q 'select .* c sel 7: ' "$tmp/c100.out" &&
 	grep -Eq 'GET /wrpc\.html\?url=&Fn=St&c=128n&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log" &&
 	grep -Eq 'GET /wrpc\.html\?url=x&c=128n&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log"; then
-	ok "wrp one menu, colors: C set to 256d (216n; 64d for 100); 128n sends St at once, the next page keeps it"
+	ok "wrp one menu, colors: C set to 256d (216n; 16d for 100); 128n sends St at once, the next page keeps it"
 else
 	bad "wrp one menu, colors: the C menu is wrong:"
 	grep 'select' "$tmp/c256.out" "$tmp/c216.out" "$tmp/c100.out"
@@ -478,6 +533,75 @@ else
 	grep -e '^status' -e '^archaic' "$tmp/e1.out"
 fi
 
+# 5d. Keys straight to the page: WRP's form has kb (what has the keyboard
+#     on the page). K, its label, Bs and Rt are gone; the keys go to /keys
+#     as they are typed, with no new picture, and Return goes with the
+#     form (k=%0D). The status line shows the box's text, a password as
+#     stars. Space and b scroll while no box has the keyboard. Tab in the
+#     address box: out of it, to the page. "page new": St at once. Latin-1
+#     goes as UTF-8.
+sed -e 's|ACTION="/wrp"|ACTION="/wrpk"|' -e 's|NAME="Fn" VALUE="Rt">|&\
+<INPUT TYPE="HIDDEN" NAME="kb" VALUE="text">|' "$tmp/wrp.html" >"$here/data/wrpk.html"
+sed 's|NAME="kb" VALUE="text"|NAME="kb" VALUE="none"|' "$here/data/wrpk.html" >"$here/data/wrpk0.html"
+"$bin" -t "http://127.0.0.1:$port/wrpk.html" >"$tmp/k.out" 2>&1
+"$bin" -t -v -s "$(printf 'ab\bc\txy~')" "http://127.0.0.1:$port/wrpk.html" >"$tmp/k1.out" 2>&1
+n0=$(wc -l <"$tmp/http.log")
+"$bin" -t -s ' b' "http://127.0.0.1:$port/wrpk0.html" >/dev/null 2>&1
+tail -n +$((n0 + 1)) "$tmp/http.log" >"$tmp/k0.log"
+"$bin" -t -s ' ' "http://127.0.0.1:$port/wrpk.html" >/dev/null 2>&1
+"$bin" -t -s '!' "http://127.0.0.1:$port/wrpk.html" >/dev/null 2>&1
+"$bin" -t -s "$(printf '\344')" "http://127.0.0.1:$port/wrpk.html" >/dev/null 2>&1
+kx=$(awk '$2 == "field" && $8 == "url" { print $3 + 5; exit }' "$tmp/k.out")
+ky=$(awk '$2 == "field" && $8 == "url" { print $4 + 5; exit }' "$tmp/k.out")
+"$bin" -t -s "$(printf '@%s,%s;q\tz' "$kx" "$ky")" "http://127.0.0.1:$port/wrpk.html" >"$tmp/k2.out" 2>&1
+rm -f "$here/data/wrpk.html" "$here/data/wrpk0.html"
+if [ "$(grep -c 'button .* Fn "[A-Za-z]*" icon$' "$tmp/k.out")" = 5 ] &&
+	! grep -Eq '"(Bs|Rt)"|text .* "K"|field .* k ' "$tmp/k.out" &&
+	grep -q 'hidden .* k =""' "$tmp/k.out" && grep -q 'hidden .* kb ="text"' "$tmp/k.out"; then
+	ok "keys to the page: K, its label, Bs and Rt are gone (kb in WRP's form)"
+else
+	bad "keys to the page: the form is wrong:"
+	grep -E 'field|button|hidden|"K"' "$tmp/k.out"
+fi
+kreq=$(grep -Eo 'GET /(keys|wrpk)\?[^ ]*' "$tmp/http.log" | sed -n '/keys?k=a$/,/wrpk?/p' | tr '\n' ' ')
+if [ "$kreq" = "GET /keys?k=a GET /keys?k=b GET /keys?k=%08 GET /keys?k=c GET /keys?k=%09 GET /keys?k=x GET /keys?k=y GET /wrpk?url=&z=1.0&k=%0D&kb=text&w=632&h=$(grep -Eo 'wrpk\?url=&z=1.0&k=%0D&kb=text&w=632&h=[0-9]+' "$tmp/http.log" | sed 's/.*h=//')&sl=1&m=ismap&t=gif&c=2 " ]; then
+	ok "keys to the page: each to /keys, Return with the form (k=%0D)"
+else
+	bad "keys to the page: the requests are wrong: $kreq"
+fi
+ks=$(grep -E '^status: (Box|Password|Keys to the page): ' "$tmp/k1.out" | uniq | sed 's/^status: //' | tr '\n' '|')
+if [ "$ks" = "Box: a_|Box: ab_|Box: a_|Box: ac_|Keys to the page: _|Password: _|Password: *_|Password: **_|" ]; then
+	ok "keys to the page: the status line shows the box, a password as stars"
+else
+	bad "keys to the page: the status line is wrong: $ks"
+fi
+if grep -q 'GET /wrpk0.html' "$tmp/k0.log" && ! grep -q 'GET /keys' "$tmp/k0.log" &&
+	grep -q 'GET /keys?k=+ ' "$tmp/http.log"; then
+	ok "keys to the page: Space and b scroll with no box; with a box, Space goes"
+else
+	bad "keys to the page: Space and b are wrong:"
+	grep 'GET /keys?k=[+b] ' "$tmp/http.log"
+fi
+if grep -Eq 'GET /keys\?k=%21 ' "$tmp/http.log" &&
+	grep -Eq 'GET /wrpk\?url=&Fn=St&z=1\.0&k=&kb=text&w=632' "$tmp/http.log"; then
+	ok "keys to the page: a new page (page new) gets its picture at once (St)"
+else
+	bad "keys to the page: no St after page new:"
+	grep -E 'GET /(keys\?k=%21|wrpk\?url=&Fn=St)' "$tmp/http.log"
+fi
+if grep -q 'GET /keys?k=%C3%A4 ' "$tmp/http.log"; then
+	ok "keys to the page: Latin-1 goes as UTF-8"
+else
+	bad "keys to the page: no %C3%A4:"
+	grep 'GET /keys?k=%' "$tmp/http.log"
+fi
+if grep -q 'GET /keys?k=z ' "$tmp/http.log" && ! grep -q 'GET /keys?k=q ' "$tmp/http.log"; then
+	ok "keys to the page: Tab in the address box takes the keys to the page"
+else
+	bad "keys to the page: Tab in the address box:"
+	grep 'GET /keys?k=[qz] ' "$tmp/http.log"
+fi
+
 # 6. WRP, when it runs: the start page, then a page with its picture,
 #    as wide as the window (640 - 2 x 4).
 if curl -s -m 3 -o /dev/null "http://$wrp/"; then
@@ -512,9 +636,10 @@ if [ -x "$hl" ]; then
 		"shot $tmp/h2.png" quit |
 		"$hl" -g 640x400 "http://127.0.0.1:$port/t.html" >"$tmp/h.out" 2>&1
 	rm -f "$here/data/t.html"
-	if grep -qx "title Archaic v$ver" "$tmp/h.out" && grep -qx "title Archaic v$ver - T&T AB" "$tmp/h.out" &&
+	if grep -qx "title Archaic" "$tmp/h.out" && grep -qx "title T&T AB" "$tmp/h.out" &&
+		! grep -q '^title.*Archaic v' "$tmp/h.out" &&
 		grep -qx "shot $tmp/h2.png 500x300" "$tmp/h.out"; then
-		ok "headless: title (Archaic v$ver, then the page's), shots, size 500 300"
+		ok "headless: title (Archaic, then the page's), shots, size 500 300"
 	else
 		bad "headless: wrong output:"
 		cat "$tmp/h.out"
@@ -525,6 +650,29 @@ if [ -x "$hl" ]; then
 		ok "headless: the PNG shot reads back, has the page, and equals the PBM shot"
 	else
 		bad "headless: the PNG shot is wrong or blank"
+	fi
+	# Archaic's version at the right end of the status line: the same
+	# pixels at 640 x 400 and at 500 x 300, and not blank
+	if magick "$tmp/h1.png" -crop 90x13+550+386 +repage "$tmp/v1.png" 2>/dev/null &&
+		magick "$tmp/h2.png" -crop 90x13+410+286 +repage "$tmp/v2.png" 2>/dev/null &&
+		magick compare -metric AE "$tmp/v1.png" "$tmp/v2.png" null: 2>/dev/null &&
+		magick "$tmp/v1.png" -format '%[fx:mean < 1]' info: | grep -qx 1; then
+		ok "headless: Archaic's version at the right end of the status line"
+	else
+		bad "headless: no version at the right end of the status line"
+	fi
+	# Archaic's logo in the top right corner, right of WRP's form: at 760, 4
+	# (the page part is 783 wide), the 300 black pixels of its picture.
+	# (At 640, this old form's line with C has no room for it.)
+	cp "$tmp/wrp.html" "$here/data/wrp.html"
+	printf '%s\n' "shot $tmp/lg.pbm" quit |
+		"$hl" -g 800x400 "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
+	rm -f "$here/data/wrp.html"
+	if [ "$(magick "$tmp/lg.pbm" -crop 19x19+760+4 -negate \
+		-format '%[fx:round(mean*w*h)]' info: 2>/dev/null)" = 300 ]; then
+		ok "headless: Archaic's logo in the top right corner"
+	else
+		bad "headless: no logo in the top right corner"
 	fi
 	if grep -q 'GET /go?q=hi&s=2&h=x' "$tmp/http.log"; then
 		ok "headless: click, Ctrl-U, typing and Return send the form"
@@ -575,6 +723,14 @@ if [ -x "$hl" ]; then
 		bad "headless: a display of 256 colors did not ask for 216:"
 		grep 'GET /?m=' "$tmp/http.log"
 	fi
+	# one of 128 (SunView's segment) asks for 128: WRP's C has 128d for it
+	echo quit | ARCHAIC_COLORS=128 "$hl" "http://127.0.0.1:$port/" >/dev/null 2>&1
+	if grep -q 'GET /?m=ismap&t=gif&c=128&sl=1 ' "$tmp/http.log"; then
+		ok "headless: a display of 128 colors (as SunView) asks WRP for 128"
+	else
+		bad "headless: a display of 128 colors did not ask for 128:"
+		grep 'GET /?m=' "$tmp/http.log"
+	fi
 else
 	echo "skip  headless colors: no $hl"
 fi
@@ -596,9 +752,11 @@ EOF
 "$bin" -t "http://127.0.0.1:$port/wrp3.html" >"$tmp/r0.out" 2>&1
 kx=$(awk '$2 == "field" && $8 == "k" { print $3 + 5; exit }' "$tmp/r0.out")
 ky=$(awk '$2 == "field" && $8 == "k" { print $4 + 5; exit }' "$tmp/r0.out")
-printf '%s\n' "click $kx $ky" 'type ab' 'size 640 300' 'sleep 600' 'size 500 300' \
+# 657: the page part is 640 wide, as in -t (the scroll bar is 17), so the
+# K field is where -t says (the url field takes the room that is left)
+printf '%s\n' "click $kx $ky" 'type ab' 'size 657 300' 'sleep 600' 'size 500 300' \
 	'sleep 600' 'key return' 'sleep 300' 'quit' |
-	"$hl" -g 640x400 "http://127.0.0.1:$port/wrp3.html" >"$tmp/r.out" 2>&1
+	"$hl" -g 657x400 "http://127.0.0.1:$port/wrp3.html" >"$tmp/r.out" 2>&1
 rm -f "$here/data/wrp3.html"
 q3='url=http%3A%2F%2Fx\.org%2F'
 if [ "$(grep -c 'GET /wrp3\.html?.*Fn=St' "$tmp/http.log")" = 1 ] &&
@@ -609,11 +767,71 @@ else
 	bad "new width: wrong:"
 	grep 'GET /wrp3' "$tmp/http.log"
 fi
-if grep -qx "title Archaic v$ver - http://x.org/" "$tmp/r.out" && ! grep -q '^title WRP' "$tmp/r.out"; then
-	ok "window title: Archaic v$ver in the place of WRP"
+if grep -qx "title http://x.org/" "$tmp/r.out" && ! grep -q '^title WRP' "$tmp/r.out"; then
+	ok "window title: the page's address in the place of WRP"
 else
 	bad "window title: wrong:"
 	grep '^title' "$tmp/r.out"
+fi
+
+# 7d. Keys typed into the page, then none for -r seconds (here -r 3):
+#     WRP's picture again (St), once, and the status line shows the box
+#     again. Not after a shorter pause, not with -r 0, not in a password
+#     box. A new picture that took longer than -r: no more of them.
+#     Meanwhile the wait bar beside the box's text loses a block a second.
+cat >"$here/data/wrpr.html" <<'EOF'
+<HTML><HEAD><TITLE>WRP http://x.org/</TITLE></HEAD><BODY>
+<FORM ACTION="/wrpr.html" METHOD="GET">
+<INPUT TYPE="TEXT" NAME="url" VALUE="http://x.org/" SIZE="20">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="St">
+W <INPUT TYPE="TEXT" NAME="w" VALUE="1152" SIZE="4">
+K <INPUT TYPE="TEXT" NAME="k" VALUE="" SIZE="4">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Bs">
+<INPUT TYPE="SUBMIT" NAME="Fn" VALUE="Rt">
+<INPUT TYPE="HIDDEN" NAME="kb" VALUE="text">
+</FORM>
+</BODY></HTML>
+EOF
+sed -e 's|/wrpr.html|/wrps.html|' -e 's|NAME="kb" VALUE="text">|&<INPUT TYPE="HIDDEN" NAME="wait" VALUE="2">|' \
+	"$here/data/wrpr.html" >"$here/data/wrps.html"
+printf '%s\n' 'type ab' 'sleep 500' "shot $tmp/w1.pbm" 'sleep 2000' "shot $tmp/w2.pbm" \
+	'sleep 1500' "shot $tmp/w3.pbm" 'type c' 'sleep 2000' 'quit' |
+	"$hl" -v -r 3 -g 640x400 "http://127.0.0.1:$port/wrpr.html" >"$tmp/rf.out" 2>&1
+printf '%s\n' 'type ab' 'sleep 4000' 'quit' |
+	"$hl" -r 0 -g 640x400 "http://127.0.0.1:$port/wrpr.html" >/dev/null 2>&1
+printf '%s\n' 'type a' 'key tab' 'type b' 'sleep 4000' 'quit' |
+	"$hl" -r 3 -g 640x400 "http://127.0.0.1:$port/wrpr.html" >/dev/null 2>&1
+printf '%s\n' 'type a' 'sleep 2000' 'type b' 'sleep 3000' 'quit' |
+	"$hl" -v -r 1 -g 640x400 "http://127.0.0.1:$port/wrps.html" >"$tmp/rs.out" 2>&1
+rm -f "$here/data/wrpr.html" "$here/data/wrps.html"
+if [ "$(grep -c 'GET /wrpr\.html?.*Fn=St' "$tmp/http.log")" = 1 ] &&
+	grep -Eq 'GET /wrpr\.html\?url=http%3A%2F%2Fx\.org%2F&Fn=St&k=&kb=text&w=' "$tmp/http.log" &&
+	awk '/^archaic: Box: ab_$/ && s == 0 { s = 1 } /^archaic: Page:/ && s == 1 { s = 2 }
+		/^archaic: Box: ab_$/ && s == 2 { s = 3 } END { exit s != 3 }' "$tmp/rf.out"; then
+	ok "refresh: one St after 3 s with no keys, the box on the status line again (none: 2 s, -r 0, a password)"
+else
+	bad "refresh: wrong:"
+	grep 'GET /wrpr' "$tmp/http.log"
+	grep '^archaic: [BP]' "$tmp/rf.out" | uniq
+fi
+# The wait bar: a box with 3 blocks of 4 x 7 pixels; its frame is 58 pixels.
+# At 0.5 s: 3 blocks, at 2.5 s: 1, after the new picture: no bar.
+w1=$(magick "$tmp/w1.pbm" -negate -format '%[fx:round(mean*w*h)]' info: 2>/dev/null)
+w2=$(magick "$tmp/w2.pbm" -negate -format '%[fx:round(mean*w*h)]' info: 2>/dev/null)
+w3=$(magick "$tmp/w3.pbm" -negate -format '%[fx:round(mean*w*h)]' info: 2>/dev/null)
+if [ -n "$w1" ] && [ -n "$w2" ] && [ -n "$w3" ] &&
+	[ $((w1 - w3)) = 142 ] && [ $((w2 - w3)) = 86 ]; then
+	ok "refresh: the wait bar has a block for each second left (3 at 0.5 s, 1 at 2.5 s), then goes"
+else
+	bad "refresh, the wait bar: black pixels at 0.5 s, 2.5 s and after: $w1 $w2 $w3"
+fi
+if [ "$(grep -c 'GET /wrps\.html?.*Fn=St' "$tmp/http.log")" = 1 ] &&
+	grep -q '^archaic: The picture took 2 s: no new pictures while you type$' "$tmp/rs.out"; then
+	ok "refresh: a picture slower than -r: no more of them"
+else
+	bad "refresh, slow: wrong:"
+	grep 'GET /wrps' "$tmp/http.log"
+	grep '^archaic: The' "$tmp/rs.out"
 fi
 
 # 8. The tall picture: WRP's picture of a whole page (sl=1), in a frame

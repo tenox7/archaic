@@ -60,7 +60,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 ## Options
 
 ```
-archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-u] [-n] [--version] [url]
+archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-r n] [-u] [-n] [--version] [--help] [url]
 ```
 
 | Option | Meaning |
@@ -74,9 +74,11 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-u] [-n
 | `-v` | status messages also go to stderr |
 | `-o file` | at the end, save the first picture: PBM, or PPM if it has colors |
 | `-s script` | play a script, then quit (see Scripts, in Building in Idris) |
+| `-r n` | typing into the page: WRP's picture again after n seconds with no keys. Default 3, 0 never. Not on the 3B1 and Idris (no clock). A new picture that takes longer than n seconds turns it off for the run (see Typing into the page) |
 | `-u` | update: ask WRP for a newer Archaic and install it, with no window, then quit (see Updates) |
 | `-n` | no updates. Without it, Archaic asks WRP once a run (not with `-t` or `-s`) |
 | `--version` | print the version, then quit: `Archaic v0.9`. A release build also names its system (see Updates): `Archaic v0.9 for aix3` |
+| `--help` | print all the options, a line each, then quit |
 
 ## WRP's form
 
@@ -93,7 +95,13 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-u] [-n
 So WRP's form is one line: the address box, **Go**, WRP's buttons, **Z** (zoom),
 **C** (colors and dither) and **K** (keys).
 The labels Z, C and K are pictures: a magnifying glass, a palette and a keyboard.
+With a WRP that has `kb` in its form, K, ⌫ and ↵ are gone: the keys go straight to the page
+(see Typing into the page).
 On a black and white display, C has only the dither, and its label is a dither pattern (a checkerboard).
+
+The address box is as wide as the line allows: WRP's buttons and menus are at the right end of the line.
+Right of them, in the top right corner, is Archaic's logo: for now a white A in a black box, 19 x 19 pixels.
+A line with no room for the logo (27 pixels with its margins) has none, and the box gets the room that is left.
 
 **C** is one menu for the colors and the dither (WRP 4.12.0 or newer).
 Each line is a number of colors and a letter:
@@ -104,7 +112,8 @@ Each line is a number of colors and a letter:
 | n | no dither: each pixel gets the nearest color. Photos get bands of color. In 2 colors, the smallest pictures |
 | p | only in 2 colors, for reading: only photos are dithered. Text and lines are sharp, and the pictures are about 20% smaller than 2d |
 
-The lines are 256d, 256n, 216n, 216d, 128d, 128n, 64d, 64n, 16d, 16n, 2p, 2d and 2n.
+The lines are 256d, 256n, 216n, 216d, 128d, 128n, 16d, 16n, 2p, 2d and 2n.
+128 is for SunView: its colormap segment has 128 places. (WRP 4.13.0 and older also have 64d and 64n.)
 The first line of each number is WRP's default for it: 216 is sharp (the web colors, see 216 colors: GIP),
 2 dithers only photos, and the other numbers are dithered.
 
@@ -127,10 +136,11 @@ while it has text. Click it: the box is empty, and ready for a new address.
 | stop sign | St | stop loading |
 | ↻ circle arrow | Re | reload |
 | ↑ and ↓ arrows | Up, Dn | scroll the web page one screen up or down. Only an older WRP shows them: see Scrolling |
-| ⌫ | Bs | Backspace, for the web page. With text in K: the text, then Backspace |
-| ↵ | Rt | Return (Enter), for the web page. With text in K: the text, then Return |
+| ⌫ | Bs | Backspace, for the web page. With text in K: the text, then Backspace. Only an older WRP (no `kb`) |
+| ↵ | Rt | Return (Enter), for the web page. With text in K: the text, then Return. Only an older WRP (no `kb`) |
 
-To type into a box on the web page: click the box in the picture, then type in **K**.
+With an older WRP (no `kb` in its form), to type into a box on the web page:
+click the box in the picture, then type in **K**.
 
 - Click ↵: WRP types the text into the page, then presses Return (to search, for example).
 - Or press Return: WRP types only the text. Use this to fill in more boxes before you send the page's form.
@@ -138,9 +148,9 @@ To type into a box on the web page: click the box in the picture, then type in *
 (WRP alone does only the button's key when it gets both a button and keys, so Archaic sends
 the text and the button's key together as keys: `k=text%0D`. This works with every WRP.)
 
-**The window's title** is Archaic's version, then the page's title, like `Archaic v0.9 - Hacker News`.
-Before the first page, it is `Archaic v0.9`. WRP's page title is `WRP` and the page's address:
-there the window says the address, like `Archaic v0.9 - https://en.wikipedia.org/`.
+**The window's title** is the page's title, like `Hacker News`. WRP's page title is `WRP` and the page's address:
+there the window says the address, like `https://en.wikipedia.org/`. Before the first page, it is `Archaic`.
+Archaic's version is at the right end of the status line, like `Archaic v0.10` (see The status line).
 With `-t`, the `title` line is still the page's own title.
 
 ## Colors
@@ -159,7 +169,7 @@ The first status line says what it found, like `Archaic 0.10, millions of colors
 On a display with colors:
 
 - WRP's **C** menu shows. It is set to the display's colors: the first line of the nearest of WRP's
-  numbers (256, 216, 128, 64, 16, 2) that is not more, or of `-c n`.
+  numbers (256, 216, 128, 16, 2) that is not more, or of `-c n`.
   A display of 256 colors (an 8-bit colormap) gets 216n: the web colors, as the old browsers had
   (see 216 colors: GIP). Choose 256d in C for the page's own colors.
 - Choose another line there, and Archaic sends WRP's form at once with St (stop).
@@ -300,13 +310,15 @@ The ABM file format is in `src/pic.c`.
 
 | Key | Does |
 |---|---|
-| Tab | next text field |
-| Return | send the form |
-| Backspace / Delete | delete the last character |
+| Tab | next text field. Typing into the page: the page's next box (in the address box: out of it, to the page) |
+| Return | send the form. Typing into the page: Return for the page, and its new picture |
+| Backspace / Delete | delete the last character (typing into the page: on the page) |
 | Ctrl-U | clear the field |
 | Esc | stop loading (or leave the field) |
-| Space / b | scroll a window down / up (when no field has the keyboard) |
+| Space / b | scroll a window down / up (when no field has the keyboard; typing into the page: and no box on the page) |
 | Ctrl-Q | quit |
+
+See Typing into the page for the keys that go to the web page.
 
 **On the 3B1**, its own keys and the window's frame work too:
 
@@ -343,12 +355,75 @@ scroll a quarter of it. Close in the window manager's menu quits. The scroll bar
 
 On the 3B1, the help line at the bottom of the screen lists the main keys.
 
+## Typing into the page
+
+With a WRP that has `kb` in its form (`keys.go`, WRP 4.14.0 or newer), the keys go straight
+to the web page as you type them. K, ⌫ and ↵ are gone.
+
+- Many pages have a box ready (a search box, a login name). Else click the box in the picture.
+- Letters, Backspace and Tab go to WRP's `/keys`, with no new picture: the page has them at once.
+  Keys typed while a request is out wait, and go in one group after it.
+- The status line shows the end of the box's text, as WRP says it is, and the keys typed since:
+  `Box: archaic browser_`. A password is stars: `Password: ******_`.
+  Keys with no box (shortcuts): `Keys to the page: k_`. After Tab, stars until WRP says which box it is.
+- Return goes with WRP's form, with the keys not sent yet (`k=ab%0D`): WRP presses Return,
+  and the new picture comes.
+- Space and b scroll Archaic's frame while no box on the page has the keyboard
+  and no keys wait. In a box, they are letters.
+- The arrows, Page Up, Page Down, the wheel, Esc and Ctrl-Q stay in Archaic.
+  Ctrl-U, Home, End and the other control keys do not go to the page.
+- The address box is Archaic's: click it to type an address, Return loads the page.
+  Tab, Esc or a click elsewhere: out of it. After a page loads, the keys go to the page.
+- A key that starts a new page (a shortcut, a link): WRP's answer says so, and Archaic gets its picture (St).
+- A click, or a button, sends the keys that wait first.
+- After 3 s with no keys (`-r n`: n s, `-r 0`: never), WRP makes the picture again (St, the page is not
+  loaded again). It shows the typed text, and what the page did with it, like a list of suggestions
+  that you can click. The status line keeps the box's text. On the Mac with Google's page, WRP made
+  it in less than 1 s (a slice of 20 KB in 256 colors).
+- While Archaic waits, a bar beside the box's text on the status line has a block for each second left
+  (10 at most). They go out one at a time, and at 0 the picture comes. Each key fills the bar again.
+- Not in a password box (the picture would show only dots). Not on the 3B1 and Idris: Archaic has
+  no clock there (`g_ms`), and they are the slowest systems.
+- A new picture that takes longer than the pause (`-r`) turns them off for the run:
+  `The picture took 7 s: no new pictures while you type`. So a slow computer or line gets none.
+- Keys typed while it comes wait, and go after it.
+- Letters that are not ASCII go as UTF-8 (WRP reads them so; K sends them as Latin-1, and WRP gets `?`).
+- WRP logs how many keys came, not the keys: they may be a password.
+
+Measured on the Mac with WRP (the time of each request, as WRP's log shows it):
+keys with no new picture take about 0.25 s, most of it WRP's wait for a new page that may come
+(as for a click). The same keys with a new picture (as K and ↵ send them) took 0.6 to 1.1 s on Google's page,
+and the picture was 7 to 14 KB in black and white.
+
+**/keys**, the question and the answer (plain text, a line each):
+
+```
+GET /keys?k=ab
+
+focus text
+value archaic ab
+```
+
+| Line | Means |
+|---|---|
+| `focus` | what has the keyboard on the page now: `text` (a box for text), `password` or `none` |
+| `value` | the box's text, its last 200 letters, in Latin-1 (`?` for the other letters). A password as stars. Not with `none` |
+| `page new` | the keys started a new page: get its picture |
+
+- `k` is the keys in UTF-8, as WRP's `k`: `%08` Backspace, `%09` Tab.
+- WRP's form has `<INPUT TYPE="HIDDEN" NAME="kb" VALUE="text">`: what had the keyboard when WRP
+  made the picture. Its being there says that this WRP takes keys at `/keys`.
+  Other browsers send it back with the form: WRP does not use it.
+- A frame of another site can't be looked into: when it has the keyboard, WRP says `text`.
+
 ## The status line
 
 **The status line** at the bottom of the window says what Archaic does, as it does it.
 While Archaic loads what you asked for, a **spinner** turns at its left end: 8 dots in a circle.
 It stops when the page is done (or stopped). It does not turn for the slices that Archaic gets
 ahead, while you read.
+Archaic's version is at the right end of the status line, like `Archaic v0.10`. The progress bar is left of it.
+In a window less than 4 times as wide as the version, the version is not shown.
 
 | Status line | Means |
 |---|---|
@@ -359,6 +434,7 @@ ahead, while you read.
 | `Picture part 3 of 9: 4 of 7 KB` | a part (a slice) of the page's picture comes, for the frame |
 | `Picture part 4 of 9 (ahead): 2 of 7 KB` | the next part comes, before you scroll to it |
 | `2 s, 45 KB  http://...` | the page is done: the time it took, and how much came |
+| `Box: archaic browser_` and a bar of blocks | keys typed into the page: the box's text, and a block for each second until WRP's new picture (see Typing into the page) |
 
 The bar shows when the server sends the size (WRP does for its pictures).
 The spinner turns 8 steps a second by the display's clock (`g_ms`).
@@ -591,6 +667,9 @@ make test         # sh test/run.sh
 ```
 
 - `make` needs X11 (on macOS: XQuartz in `/opt/X11`).
+- On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix and SunOS, `make` (or `gmake`) runs the system's script in `src`
+  (see each Building section), and moves `archaic` up. `CC` goes to the scripts that take it
+  (`mkaix`, `mkaixps2`, `mkultrix`): `CC=gcc gmake`. SunOS 3: put `/usr/5bin` (its `uname`) on the PATH.
 - `make cocoa` needs only the Xcode command line tools.
 - `make sdl` needs SDL 2: `sdl2-config` on the PATH (`brew install sdl2`).
 - `make headless` needs only a C compiler.
@@ -631,7 +710,7 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
     ./archaic-headless -v -g 800x600 127.0.0.1:8080
 ```
 
-`test/run.sh` checks:
+`test/run.sh` checks `--help` first: a line for each option of the usage line, at most 79 characters each. Then:
 
 1. GIF decoding gives **exactly** the same pixels as ImageMagick.
    ABM pictures give exactly the pixels of the GIF, and a broken ABM is refused.
@@ -641,24 +720,33 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    of the 8-bit way: a full code table with no clear, long runs, and an interlaced GIF (the way before).
 3. HTML: title, entities, fields, menus, hidden fields, buttons, links, comments.
 4. A button click sends the form with the right query.
-5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons and the labels Z, C, D and K are pictures, Go stays text. A new choice in WRP's D menu sends the form at once.
+5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons and the labels Z, C, D and K are pictures, Go stays text.
+   The url field fills its line, up to Archaic's logo: in `-t` the line ends at 609. A new choice in WRP's D menu sends the form at once.
    With colors: C shows, set to the colors (for 100 colors: 64); another choice sends St at once;
    the start page request has WRP's settings.
    WRP's one menu (5c): with colors, C is set to the first line of the nearest number (256d, 216n,
-   64d for 100 colors); a new line sends St at once, and the next page keeps it.
+   16d for 100 colors); a new line sends St at once, and the next page keeps it.
    In black and white, C has only 2p, 2d and 2n, is set to 2p, and its label is the dither pattern.
    Text in K, then ↵ or ⌫: the text and the key go as keys (`k=ab%0D`), with no button.
    The address box's clear button empties it.
+   With `kb` in WRP's form: K, its label, Bs and Rt are gone; each key goes to `/keys`, Return with
+   the form (`k=%0D`); the status line shows the box, a password as stars; Space and b scroll with
+   no box; `page new` gets St at once; Latin-1 goes as UTF-8; Tab takes the keys out of the address box.
    WRP's error (an answer with no form, after a click on the picture): WRP's page stays, the error
    is on the status line, and St goes at once. With no page (no server), Return tries again,
    and the terminal says that WRP is not there.
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
    A color picture on the screen is exactly the GIF's, and the PNG is in colors.
-   A display of 256 colors (`ARCHAIC_COLORS=256`) asks WRP for 216.
+   A display of 256 colors (`ARCHAIC_COLORS=256`) asks WRP for 216, and one of 128 (as SunView) for 128.
    A new width: one St with the new width, once the size stays (none for a new height); typed text stays.
-   No WRP: the box in the middle of the window. The window's title: `Archaic v` and the version, then the page's title;
-   on WRP's page, the address, not WRP.
+   No WRP: the box in the middle of the window. The window's title: `Archaic`, then the page's title;
+   on WRP's page, the address, not WRP. Archaic's version at the right end of the status line:
+   the same pixels at 640 x 400 and 500 x 300. Archaic's logo in the top right corner: the 300 black pixels
+   of its picture.
+   Typing into the page with `-r 3`, then 3 s with no keys: one St, and the status line shows the box again;
+   none after 2 s, with `-r 0` or in a password box. A new picture slower than `-r`: no more of them.
+   The bar beside the box's text: 3 blocks at 0.5 s, 1 at 2.5 s, none after the new picture.
 8. The tall picture, with no WRP: the test server cuts a random 600 x 1500 GIF into slices.
    After a wheel step, a window and a scroll to the end, the frame must show exactly the right rows.
    Also: the next slice comes before it is needed, and a click sends the place on the whole page.
@@ -963,6 +1051,7 @@ Test on a copy of your 3B1 disk.
   Every letter is 9 pixels wide.
 - With this font, WRP's form (WRP 4.12.0) only just fits on one line: it ends at x 680, and 682 is the limit
   (686 less the margin). One more letter or item puts the last button on a second line.
+  So there is no room for Archaic's logo. With a WRP that has `kb` (no K, ⌫ and ↵), the logo fits.
   So the Z and D pictures are narrower than the others (11 and 9 pixels), and the D menu's words have 4 letters.
   WRP's one menu (C) has only 2p, 2d and 2n there, with D's picture: the form still ends at x 680.
   To check a change: in a copy of `main.c`, make `tw()` return `n * 9` and the `-t` window 686 wide,
@@ -975,7 +1064,7 @@ Test on a copy of your 3B1 disk.
 - **SIGWIND** (the window has a new size) goes only to the window's process group.
   Archaic calls `setpgrp()` before it opens the window, then `ioctl(wn, WIOCPGRP, 0)`.
 - `wprompt()` text shows on the screen's prompt line: 72 characters fit.
-- Archaic's status line holds about 74 characters: put the main point of a message first.
+- Archaic's status line holds about 60 characters (Archaic's version is at its right end): put the main point of a message first.
 - Standard error goes to `/dev/null` while the window is open. As 0 and 1, fd 2 was the window,
   and a line on it drew over the page. Archaic's messages are on its status line.
 
@@ -1336,6 +1425,7 @@ The kit has both.
 
    It takes about 25 s in the kit. gcc builds it too (2.7.2.2 in `/usr/local/bin` in the kit):
    `CC=gcc sh mkaix` takes 4 s, and the program is about 180 KB.
+   In a copy of the whole repository, `make` or `gmake` runs `mkaix` in `src`: `CC=gcc gmake` for gcc.
 3. Test. **Test mode, no window needed** (serve this folder from your computer:
    `python3 tools/idris.py 0 serve . 8077`):
 
@@ -1762,10 +1852,16 @@ It also knows the 4010's commands.
 ## Known limits
 
 - One page at a time. No history of its own: use WRP's back button (← arrow).
+- Typing into the page: the picture shows the new text only after Return, a click, or a pause with no keys
+  (`-r`; not on the 3B1 and Idris). The status line shows it meanwhile, from the end of the box's text
+  (the place of the caret is not known).
 - A page over 30 KB of HTML is cut (WRP's pages are about 3 KB).
 - On the 3B1, the font has only ASCII: other letters in WRP's form show as `?`.
 - In SunView, a second window with many colors (another Archaic) can change the colors of the first one,
   until the pointer is in it (see SunOS 4 and SunView: what to know).
+- In SunView, C at 216 shows some wrong colors, like green dots in gray text. The 216 web colors do not fit
+  in its 128 places, and Archaic drops colors of the table, also ones that the picture uses
+  (x11.c takes cells only for the colors that a picture uses). 128d, the default there, and 256d are right.
 - With a WRP before November 2026, C at 216 is WRP's median cut: new colors on each page,
   and on an 8-bit X display almost all of the colormap (see 216 colors: GIP).
 - WRP before commit 3126bc0 (November 2026) could hang for good on back (← arrow),

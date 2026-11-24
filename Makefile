@@ -2,12 +2,15 @@
 # make sdl: with SDL 2 instead of X11 (macOS, Linux ...): archaic-sdl.
 # make cocoa: a Cocoa window on macOS, nothing else needed: archaic-cocoa.
 # make headless: no window, for tests and automation: archaic-headless.
-# The Idris (Atari ST) build is src/mk, run inside Idris.
-# The AT&T UNIX PC (3B1) build is src/mkunixpc, run on the 3B1.
-# The SunOS 3 and 4 build (SunView) is src/mksunview, run on SunOS.
-# The HP-UX 9 build (X11, PA-RISC) is src/mkhpux, run on HP-UX.
+# The old systems have a build script of their own, in src. The Idris
+# (Atari ST) build is src/mk, run inside Idris; the AT&T UNIX PC (3B1)
+# build is src/mkunixpc. On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix and
+# SunOS, make runs the system's script (mkaix, mkaixps2, mkhpux, mkdgux,
+# mkultrix, mksunview) and moves its archaic here: their compilers do not
+# know the flags below. SunOS 3 has its uname in /usr/5bin: put it on the
+# PATH. CC is the compiler, also for the scripts that take one (mkaix,
+# mkaixps2, mkultrix): CC=gcc gmake.
 
-CC = cc
 X11 = /opt/X11
 WARN = -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-non-prototype -Wno-strict-prototypes -Wno-deprecated-declarations
 CFLAGS = -std=c89 -pedantic $(WARN) -O2 -I$(X11)/include
@@ -20,7 +23,21 @@ HDR = src/archaic.h
 FB = src/fb.c src/fb.h src/font6x13.h
 
 archaic: $(CORE) src/x11.c src/nsock.c $(HDR)
-	$(CC) $(CFLAGS) -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS)
+	@m=; case "`uname -s` `uname -r` `uname -m`" in \
+	AIX*i386) m=mkaixps2 ;; \
+	AIX*) m=mkaix ;; \
+	HP-UX*) m=mkhpux ;; \
+	dgux*) m=mkdgux ;; \
+	ULTRIX*) m=mkultrix ;; \
+	SunOS?[34]*) m=mksunview ;; \
+	esac; \
+	if [ -n "$$m" ]; then \
+		echo "cd src && CC=$(CC) sh $$m && mv archaic .."; \
+		cd src && CC="$(CC)" sh $$m && mv archaic ..; \
+	else \
+		echo "$(CC) $(CFLAGS) -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS)"; \
+		$(CC) $(CFLAGS) -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS); \
+	fi
 
 # SDL 2 and Cocoa draw with fb.c, a screen in memory
 archaic-sdl: $(CORE) $(FB) src/sdl.c src/nsock.c $(HDR)

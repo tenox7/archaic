@@ -57,7 +57,7 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 ## Quick start
 
 1. On your computer, start [WRP](https://github.com/tenox7/wrp): `wrp`. It listens on port 8080.
-   Use WRP 4.13.0 or newer. An older WRP works, with fewer features.
+   Use WRP 4.14.0 or newer. An older WRP works, with fewer features.
 2. Copy the binary to the old computer as `archaic`, and make it executable:
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
    - 3B1, SunOS, HP-UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
@@ -85,20 +85,22 @@ WRP's form is one line at the top of the window:
 | ![back](screenshots/icons/bk.png) | back |
 | ![stop](screenshots/icons/st.png) | stop loading |
 | ![reload](screenshots/icons/re.png) | reload |
-| ![Backspace](screenshots/icons/bs.png) ![Return](screenshots/icons/rt.png) | Backspace, Return: for the web page |
+| ![Backspace](screenshots/icons/bs.png) ![Return](screenshots/icons/rt.png) ![keys](screenshots/icons/k.png) | only with an older WRP: Backspace, Return and text for the web page |
 | ![zoom](screenshots/icons/z.png) | zoom |
 | ![colors](screenshots/icons/c.png) | colors, with d (dither) or n (no dither): 256d, 216n ... (only on a display with colors) |
 | ![dither](screenshots/icons/d.png) | dither, in black and white: 2p (only photos: sharp text, the default), 2d (all), 2n (none) |
-| ![keys](screenshots/icons/k.png) | text to type into the web page |
 
-To type into a box on the web page: click the box in the picture, type in ![keys](screenshots/icons/k.png), then click ![Return](screenshots/icons/rt.png).
+To type into the web page, just type: the keys go to its box, and the status line shows the box's text.
+Return sends it. To choose a box, click it in the picture.
+After 3 s with no keys, a new picture shows what you typed (not on the 3B1 and Idris).
+With an older WRP: type in ![keys](screenshots/icons/k.png), then click ![Return](screenshots/icons/rt.png).
 
 | Key | Does |
 |---|---|
-| Return | send the form |
-| Tab | next text field |
+| Return | Return for the web page (in the address box: load the page) |
+| Tab | the web page's next box |
 | Esc | stop loading |
-| Page Up, Page Down, Space, b | scroll a window |
+| Page Up, Page Down, Space, b | scroll a window (Space and b: when no box has the keyboard) |
 | ↑, ↓, mouse wheel | scroll a quarter of a window |
 | right button | scroll: top half of the window up, bottom half down |
 | Ctrl-Q | quit |
@@ -110,7 +112,7 @@ Where the window system has no scroll bar, Archaic draws its own, in the style o
 ![Archaic's own scroll bar at the right, in GEM style: Wikipedia's Atari ST article](screenshots/scrollbar.png)
 
 ```
-archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [-u] [-n] [--version] [url]
+archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [-r n] [-u] [-n] [--version] [--help] [url]
 ```
 
 | Option | Does |
@@ -124,9 +126,11 @@ archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [-u] [
 | `-v` | status messages also to stderr |
 | `-o file` | save the first picture (PBM or PPM) |
 | `-s script` | play a script, then quit |
+| `-r n` | a new picture n seconds after you stop typing into the page (default 3, 0 never) |
 | `-u` | update Archaic now, then quit |
 | `-n` | no updates |
 | `--version` | show the version, then quit |
+| `--help` | show all the options, then quit |
 
 Archaic updates itself through WRP. Once a run it asks WRP for a newer Archaic.
 Started as root, it installs it. Else it says that a newer one is out.
@@ -153,6 +157,9 @@ On the old systems, copy the sources in, then:
 | AIX 3.2 | `sh mkaix` | IBM's XL C 1.3, or gcc 2.7.2 |
 | AIX PS/2 1.3 | `sh mkaixps2` | MetaWare High C R2.2g |
 | Ultrix 4 | `sh mkultrix` | Ultrix's cc, or gcc 3.0.4 |
+
+With the whole repository, `make` runs the right script on AIX, HP-UX, DG/UX, Ultrix and SunOS.
+`CC=gcc make` uses gcc where the script takes it.
 
 Which files to copy and how, the facts of each system, and how to port:
 see [AGENTS.md](AGENTS.md).

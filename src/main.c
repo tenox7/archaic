@@ -1,7 +1,7 @@
 /* main.c - Archaic: the page on the screen, the mouse and the keys.
  *
  *	archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file]
- *		[-s script] [url]
+ *		[-s script] [-r n] [-u] [-n] [--version] [--help] [url]
  *
  * url		WRP's address: host:port or http://host:port/
  *		(default $WRP, else DEFURL)
@@ -21,11 +21,15 @@
  *		Return, @x,y; is a click, % waits 2 seconds. A load that a
  *		key or click starts ends before the script goes on (so do
  *		the slices of the tall picture that a scroll needs).
+ * -r n		keys typed straight into the page: WRP's picture again
+ *		after n seconds with no keys (default RDEF), 0 never
+ *		(refresh). Not where the display has no clock
  * -u		update: ask WRP for a newer Archaic and install it (see
  *		update.c), then quit. No window
  * -n		no updates. Without it, Archaic asks WRP once a run, when
  *		WRP's first page is here (not with -t or -s)
  * --version	print the version (and the system, see SYSID), then quit
+ * --help	print all the options, short (showhelp), then quit
  *
  * Keys: Tab next field, Return sends the form, Backspace, Ctrl-U clears
  * the field, Esc stops a load. Space and b scroll a window when no field
@@ -34,12 +38,24 @@
  * system's scroll bar (g_sbar). Where the system has none, Archaic draws
  * its own (drawbar). Ctrl-Q quits.
  *
- * WRP's K field: its text goes to the web page as keys when the form is
- * sent. WRP's Bs and Rt buttons (Backspace, Return) send that key to the
- * page; with text in K, Archaic sends the text and then the key, as keys
- * (WRP alone would send only the button's key). WRP's url field has a
- * clear button (x) at its right end. While Archaic loads what the user
- * asked for, a spinner turns at the left end of the status line.
+ * Keys straight to the web page: a WRP with kb in its form (what has
+ * the keyboard on the page) takes keys at /keys, as they are typed, with
+ * no new picture. Then K, Bs and Rt are hidden, and the keys that no
+ * field of Archaic's takes go to the page (pagekey): letters, Backspace,
+ * Tab in groups to /keys (sendkeys), Return with WRP's form for the new
+ * picture. The status line shows the box's text (a password as stars).
+ * Space and b scroll while no box on the page has the keyboard. After a
+ * load, the keys go to the page, not to the address box. After -r
+ * seconds with no keys, the picture comes again (refresh). A bar beside
+ * the box's text counts the seconds down.
+ *
+ * With an older WRP, WRP's K field: its text goes to the web page as keys
+ * when the form is sent. WRP's Bs and Rt buttons (Backspace, Return) send
+ * that key to the page; with text in K, Archaic sends the text and then
+ * the key, as keys (WRP alone would send only the button's key). WRP's
+ * url field has a clear button (x) at its right end. While Archaic loads
+ * what the user asked for, a spinner turns at the left end of the status
+ * line.
  *
  * WRP's errors: WRP answers with a page that has its form. An answer
  * from it with no form is an error, like "Unable to find map" (WRP made
@@ -89,6 +105,7 @@ static int nimgs;
 static char base[MAXURL];	/* this page's URL */
 static int winw, winh;		/* the window */
 static int vieww, viewh;	/* its page part: less the scroll bar, the status line */
+static int lgx = -1, lgy;	/* Archaic's logo, right of WRP's form (-1: none) */
 static int fh, fb, cw;		/* font height, baseline, width of "0" */
 static int doch, top;		/* page height, how far scrolled */
 
@@ -204,6 +221,27 @@ static long t0;
 static char u[MAXURL], q[MAXURL];
 static char page[MAXPAGE + 1];
 static char stars[MAXVAL];
+/* Keys straight to the web page, as they are typed: WRP's form has kb
+ * (what has the keyboard on the page), and WRP takes keys at /keys with
+ * no new picture. See pagekey. */
+#define KMAX 120		/* keys that wait for WRP, at most */
+#define F_NONE 0		/* what has the keyboard on the page: nothing */
+#define F_TEXT 1		/* a box for text */
+#define F_PASS 2		/* a password */
+#define F_ANY 3			/* after Tab: WRP says which (as stars meanwhile) */
+static int direct;		/* this WRP takes keys as they are typed */
+static int pfoc;		/* what has the keyboard on the page: F_ */
+static char kbuf[KMAX + 1];	/* keys for the page, not sent yet */
+static int kn;
+static int kbusy;		/* keys on their way to WRP */
+static char kecho[61];		/* the end of the box's text, for the status line */
+#define RDEF 3			/* -r: its default */
+static int rsec = RDEF;		/* -r: the picture again after rsec s with no keys */
+static long klast;		/* g_ms() when the last key went to the page */
+static int rdue;		/* keys went to the page since its last picture */
+static int prefr;		/* the pending load is that new picture */
+static int kwait = -1;		/* the wait bar's blocks (drawwait), -1 none */
+static int wx;			/* its place on the status line */
 static char empty[] = "";
 
 static int len(s)
@@ -287,6 +325,33 @@ int x, y, w, h;
 	fill(x + w - 1, y, 1, h, 1);
 }
 
+/* Archaic's version, at the right end of the status line */
+static char *vers()
+{
+	static char v[24];
+
+	if (!v[0])
+		sprintf(v, "Archaic v%.12s", VERSION);
+	return v;
+}
+
+/* its width, or 0 where the window is less than 4 times as wide */
+static int versw()
+{
+	char *v = vers();
+	int w = tw(v, len(v));
+
+	return w * 4 <= winw ? w : 0;
+}
+
+/* the right end of the status line's text and bars: left of the version */
+static int sright()
+{
+	int w = versw();
+
+	return w > 0 ? winw - 3 * M - w : winw - M;
+}
+
 /* the progress bar at the right of the status line: its width */
 static int pbarw()
 {
@@ -314,7 +379,7 @@ int w;
 static void drawprog(all)
 int all;
 {
-	int w = pbarw(), x = winw - M - w, y = viewh + 3, h = fh - 2, b;
+	int w = pbarw(), x = sright() - w, y = viewh + 3, h = fh - 2, b;
 
 	if (all) {
 		g_fill(x, y, w, h, 1);
@@ -386,9 +451,54 @@ static void spin()
 	g_flush();
 }
 
+/* 1 if WRP's picture comes again after rsec seconds with no keys (-r):
+ * keys went to the page since its last picture, it is not a password
+ * box, and the display has a clock (t: g_ms()) */
+static int refreshon(t)
+long t;
+{
+	return direct && rdue && rsec > 0 && t >= 0 && pfoc != F_PASS;
+}
+
+/* The wait bar, beside the box's text while that picture is due: a block
+ * for each second left (10 at most), in a box. They go out one at a time,
+ * and at 0 the picture comes. */
+static int waitn()
+{
+	return rsec < 10 ? rsec : 10;
+}
+
+/* the blocks left at t (0: the picture is due) */
+static int waitleft(t)
+long t;
+{
+	long all = rsec * 1000L, left = all - (t - klast);
+
+	if (t < klast || left <= 0)	/* t < klast: the clock went round */
+		return 0;
+	return (int)((left * waitn() + all - 1) / all);
+}
+
+/* the bar: all of it, or (all 0) only the blocks */
+static void drawwait(all)
+int all;
+{
+	int n = waitn(), y = viewh + 3, h = fh - 2, j;
+
+	if (headless)
+		return;
+	if (all) {
+		g_fill(wx, y, n * 6 + 2, h, 1);
+		g_fill(wx + 1, y + 1, n * 6, h - 2, 0);
+	}
+	for (j = 0; j < n; ++j)	/* as far apart as the letters */
+		g_fill(wx + 2 + j * 6, y + 2, 4, h - 4, j < kwait);
+}
+
 static void drawstatus()
 {
-	int n, x = M, w = winw - 2 * M;
+	char *v = vers();
+	int n, x = M, w = sright() - M, vw = versw();
 
 	if (headless)
 		return;
@@ -403,11 +513,19 @@ static void drawstatus()
 		drawprog(1);
 		w -= pbarw() + M;
 	}
+	if (kwait >= 0)		/* the wait bar goes right of the text */
+		w -= waitn() * 6 + 2 + 2 * M;
 	n = len(sline);
 	while (n > 0 && tw(sline, n) > w)
 		--n;
 	if (n > 0)
 		g_text(x, viewh + 2, sline, n, 0);
+	if (kwait >= 0) {
+		wx = x + (n > 0 ? tw(sline, n) : 0) + 2 * M;
+		drawwait(1);
+	}
+	if (vw > 0)		/* Archaic's version at the right end */
+		g_text(winw - M - vw, viewh + 2, v, len(v), 0);
 }
 
 /* the spinner starts (on 1) or stops */
@@ -443,6 +561,7 @@ void say(s)
 char *s;
 {
 	plen = 0;
+	kwait = -1;
 	scopy(sline, s, (int)sizeof sline);
 	showstatus();
 }
@@ -476,6 +595,7 @@ long got, n;
 	}
 	pgot = got;
 	plen = n;
+	kwait = -1;
 	scopy(sline, s, (int)sizeof sline);
 	showstatus();
 }
@@ -538,12 +658,12 @@ static char *xicon[] = {
 	"....###...."
 };
 
-/* picture p, w x h (16 x 16 at most), at x, y; upside down if flip */
+/* picture p, w x h (24 x 24 at most), at x, y; upside down if flip */
 static void pict(x, y, p, w, h, flip)
 int x, y, w, h, flip;
 char **p;
 {
-	static unsigned char b[16 * 2];
+	static unsigned char b[24 * 3];
 	int bpl = (w + 7) / 8, r, c;
 	char *s;
 
@@ -593,6 +713,41 @@ int i;
 	text(x + 1 + PAD, y + 1 + PAD, s + n - k, k);
 	if (i == focus)
 		fill(x + 1 + PAD + tw(s + n - k, k), y + 1 + PAD, 1, fh, 1);
+}
+
+/* Archaic's logo, in the top right corner: at the right end of the line
+ * of WRP's form, which the address box fills up to it (stretch). For now
+ * a white A in a black box; a real logo may come in its place. */
+#define LGW 19
+#define LGH 19
+static char *logo[] = {
+	"..###############..",
+	".#################.",
+	"###################",
+	"#########..########",
+	"#########..########",
+	"########.#..#######",
+	"########.#..#######",
+	"########.#..#######",
+	"#######.###..######",
+	"#######.###..######",
+	"######.#####..#####",
+	"######........#####",
+	"######.#####..#####",
+	"#####.#######..####",
+	"#####.#######..####",
+	"###.....###.....###",
+	"###################",
+	".#################.",
+	"..###############.."
+};
+
+static void drawlogo()
+{
+	int y = lgy - top;
+
+	if (lgx >= 0 && y >= 0 && y + LGH <= viewh && lgx + LGW <= vieww)
+		pict(lgx, y, logo, LGW, LGH, 0);
 }
 
 /* WRP's buttons get pictures, like the buttons of a real browser. (WRP
@@ -1244,6 +1399,9 @@ int rx, ry, rw, rh;
 				break;
 			}
 		}
+		if (lgx >= 0 && lgx < r && lgx + LGW > rx && lgy - top < r1 &&
+			lgy - top + LGH > ry)
+			drawlogo();
 		drawnbox();
 		if (popup >= 0 && ry < py + ph && r1 > py && rx < px + pw &&
 			r > px)
@@ -1399,12 +1557,39 @@ Item *it;
 	}
 }
 
+/* The line of items l0 up to i, at y, ends at x. If WRP's url field is
+ * in it, the field gets the room left in the line: the items right of it
+ * go to the right end. Right of them goes Archaic's logo, if it fits.
+ * Returns the line's height (the logo's, if that is more). */
+static int stretch(l0, i, x, y, lh)
+int l0, i, x, y, lh;
+{
+	int j, u, d = vieww - M - x;
+
+	for (u = l0; u < i && !(isurl(&items[u]) && items[u].w > 0); ++u)
+		;
+	if (u >= i || d < 0)
+		return lh;
+	if (d >= LGW + 2 * M) {		/* the logo fits */
+		if (LGH > lh)
+			lh = LGH;
+		lgx = vieww - M - LGW;
+		lgy = y + (lh - LGH) / 2;
+		d -= LGW + 2 * M;
+	}
+	items[u].w += d;
+	for (j = u + 1; j < i; ++j)
+		items[j].x += d;
+	return lh;
+}
+
 /* place the items in lines, left to right, as wide as the window */
 static void place()
 {
 	Item *it;
 	int i, j, x, y, lh, l0, sp, gap;
 
+	lgx = -1;
 	x = y = M;
 	lh = l0 = 0;
 	gap = 1;		/* no gap needed: nothing since the last one */
@@ -1414,6 +1599,7 @@ static void place()
 			size(it);
 		if (!it || it->type == I_BR || it->type == I_PARA) {
 			if (lh > 0) {
+				lh = stretch(l0, i, x, y, lh);
 				for (j = l0; j < i; ++j)
 					items[j].y = y + (lh - items[j].h) / 2;
 				y += lh + 2;
@@ -1437,6 +1623,7 @@ static void place()
 		}
 		sp = it->sp && x > M ? cw : 0;
 		if (x + sp + it->w > vieww - M && x > M) {
+			lh = stretch(l0, i, x, y, lh);
 			for (j = l0; j < i; ++j)
 				items[j].y = y + (lh - items[j].h) / 2;
 			y += lh + 2;
@@ -1579,8 +1766,28 @@ Item *it;
 	it->nopt = n;
 }
 
+/* Is it in WRP's form, with a name? */
+static int wrpitem(it)
+Item *it;
+{
+	return it->form >= 0 && it->form < MAXFORM && wrpf[it->form] &&
+		it->name != 0;
+}
+
+/* WRP's word for what has the keyboard on the page (kb, /keys) */
+static int fkind(s)
+char *s;
+{
+	if (s && strieq(s, "text"))
+		return F_TEXT;
+	if (s && strieq(s, "password"))
+		return F_PASS;
+	return F_NONE;
+}
+
 /* A new page: find WRP's form (it has a url and a w field), and hide
- * the settings Archaic sets, each with its one-letter label. */
+ * the settings Archaic sets, each with its one-letter label. With a WRP
+ * that takes keys as they are typed (kb), also K, Bs and Rt. */
 static void wrpforms()
 {
 	Item *it;
@@ -1610,6 +1817,32 @@ static void wrpforms()
 				only2(&items[i]);
 			setcol(&items[i]);
 		}
+	/* kb: keys go to the page as they are typed. K, Bs and Rt go. */
+	direct = 0;
+	pfoc = F_NONE;
+	kecho[0] = 0;
+	for (i = 0; i < nitems; ++i) {
+		it = &items[i];
+		if (it->type == I_HIDDEN && wrpitem(it) && strieq(it->name, "kb")) {
+			direct = 1;
+			pfoc = fkind(it->val);
+		}
+	}
+	for (i = 0; direct && i < nitems; ++i) {
+		it = &items[i];
+		if (!wrpitem(it))
+			continue;
+		if (it->type == I_FIELD && strieq(it->name, "k")) {
+			it->type = I_HIDDEN;	/* still sent: the keys with Return */
+			if (i > 0 && it[-1].type == I_TEXT &&
+				it[-1].form == it->form && strieq(it[-1].text, "k"))
+				it[-1].type = I_HIDDEN;
+		} else if (it->type == I_BUTTON && strieq(it->name, "Fn") &&
+			it->text && (strieq(it->text, "Bs") || strieq(it->text, "Rt"))) {
+			it->type = I_HIDDEN;
+			it->name = 0;		/* not sent */
+		}
+	}
 }
 
 /* The size of WRP's next picture: as wide as the window, and as high as
@@ -1679,7 +1912,7 @@ static void go(url, post)
 char *url, *post;
 {
 	url_join(base, url, pendurl);
-	pclick = pwide = 0;
+	pclick = pwide = prefr = 0;
 	pendpost = post != 0;
 	if (post)
 		scopy(pendbody, post, MAXURL);
@@ -2005,6 +2238,78 @@ static void tallfix()
 	}
 }
 
+/* the status line while keys go to the page: the end of the box's text,
+ * as WRP said and with the keys typed since (a password as stars) */
+static void showkeys()
+{
+	long t = g_ms();
+
+	sprintf(msg, "%s: %s_", pfoc == F_TEXT ? "Box" : pfoc == F_PASS ?
+		"Password" : "Keys to the page", kecho);
+	plen = 0;
+	kwait = refreshon(t) ? waitleft(t) : -1;
+	scopy(sline, msg, (int)sizeof sline);
+	showstatus();
+}
+
+/* key k is on its way to the page: the status line shows it */
+static void echo(k)
+int k;
+{
+	int i, n = len(kecho);
+
+	if (k == '\r') {		/* the form goes: a new page comes */
+		kecho[0] = 0;
+		return;
+	}
+	if (k == '\t') {		/* the next box: WRP says which */
+		kecho[0] = 0;
+		pfoc = F_ANY;
+	} else if (k == '\b') {
+		if (n > 0)
+			kecho[n - 1] = 0;
+	} else {
+		if (n >= (int)sizeof kecho - 1) {
+			for (i = 1; i < n; ++i)
+				kecho[i - 1] = kecho[i];
+			--n;
+		}
+		kecho[n] = pfoc == F_TEXT || pfoc == F_NONE ? k : '*';
+		kecho[n + 1] = 0;
+	}
+	showkeys();
+}
+
+/* A key for the web page, with a WRP that takes keys as they are typed:
+ * 1 if it goes there. Letters, Backspace and Tab go to WRP's /keys in
+ * groups, with no new picture (sendkeys). Return goes with WRP's form,
+ * for the new picture. Space and b scroll the frame while no box on the
+ * page has the keyboard and no keys wait; the other control keys and
+ * the arrows (E_SCROLL) stay here. */
+static int pagekey(k)
+int k;
+{
+	if (k == '\n')
+		k = '\r';
+	else if (k == 0177)
+		k = '\b';
+	if ((k == ' ' || k == 'b') && pfoc == F_NONE && kn == 0 && !kbusy)
+		return 0;
+	if (k != '\r' && k != '\b' && k != '\t' && (k < ' ' || k > 0377))
+		return 0;
+	if (kn >= KMAX) {
+		say("Too many keys at once: wait for WRP");
+		return 1;
+	}
+	kbuf[kn++] = k;
+	if (k != '\r') {	/* Return: a new picture comes anyway */
+		rdue = 1;
+		klast = g_ms();
+	}
+	echo(k);
+	return 1;
+}
+
 static void key(k)
 int k;
 {
@@ -2027,13 +2332,19 @@ int k;
 			setfocus(-1);
 		return;
 	}
-	if (k == '\t') {
+	if (k == '\t' && direct && focus >= 0) {
+		setfocus(-1);		/* out of the address box: to the page */
+		return;
+	}
+	if (k == '\t' && !direct) {
 		nextfield();
 		return;
 	}
 	if (focus < 0) {
 		if ((k == '\r' || k == '\n') && nitems == 0)
 			go(lurl, (char *)0);	/* no page yet: try again */
+		else if (direct && pagekey(k))
+			;
 		else if (k == ' ' || k == 'F' - 64)
 			scroll(pagestep());
 		else if (k == 'b' || k == 'B' - 64)
@@ -2351,6 +2662,159 @@ static char *openerr()
 
 /* no page, and WRP did not answer: the box in the middle of the window
  * says so, the status line, and the terminal */
+/* the first n keys for the page have gone */
+static void dropkeys(n)
+int n;
+{
+	int i;
+
+	for (i = n; i < kn; ++i)
+		kbuf[i - n] = kbuf[i];
+	kn -= n;
+}
+
+/* n bytes of s (Latin-1) as UTF-8 in d, max bytes with the 0: WRP reads
+ * the keys as UTF-8 */
+static void utf8(d, s, n, max)
+char *d, *s;
+int n, max;
+{
+	int c, i, j = 0;
+
+	for (i = 0; i < n && j < max - 2; ++i) {
+		c = s[i] & 0377;
+		if (c < 0200)
+			d[j++] = c;
+		else {
+			d[j++] = 0300 | c >> 6;
+			d[j++] = 0200 | (c & 077);
+		}
+	}
+	d[j] = 0;
+}
+
+/* WRP's K field in form f (hidden with kb) */
+static Item *kfield(f)
+int f;
+{
+	Item *it;
+	int i;
+
+	for (i = 0; i < nitems; ++i) {
+		it = &items[i];
+		if ((it->type == I_FIELD || it->type == I_HIDDEN) &&
+			it->form == f && it->name && strieq(it->name, "k") && it->val)
+			return it;
+	}
+	return (Item *)0;
+}
+
+/* n keys to WRP's /keys: WRP types them into the page, with no new
+ * picture. Its answer: what has the keyboard now, the box's text, and
+ * "page new" when the keys started a new page (its picture comes: St). */
+static void keysreq(ks, n)
+char *ks;
+int n;
+{
+	static char kv[2 * KMAX + 1], ans[400];
+	char *p, *e;
+	int c, f, m, r, newp = 0, nf = -1;
+
+	utf8(kv, ks, n, (int)sizeof kv);
+	scopy(q, "/keys?k=", MAXURL);
+	url_enc(q, kv);
+	url_join(base, q, u);
+	ui_what("");			/* nothing on the status line */
+	stop = 0;
+	loading = kbusy = 1;
+	r = http_open(u, (char *)0);
+	if (r >= 0) {
+		for (m = 0; m < (int)sizeof ans - 1 && (c = http_getc()) >= 0;)
+			ans[m++] = c;
+		ans[m] = 0;
+		r = http_status;
+		http_close();
+	}
+	loading = kbusy = 0;
+	if (stop) {			/* WRP may have typed them */
+		if (!pending)
+			say("Stopped");
+		return;
+	}
+	if (r < 0) {
+		say(openerr());
+		return;
+	}
+	if (r != 200 || !strnieq(http_type, "text/plain", 10)) {
+		say("WRP did not take the keys");
+		return;
+	}
+	for (p = ans; *p; p = *e ? e + 1 : e) {
+		for (e = p; *e && *e != '\n'; ++e)
+			;
+		m = e - p;
+		if (m > 0 && p[m - 1] == '\r')
+			--m;
+		if (m >= 6 && strnieq(p, "focus ", 6)) {
+			c = p[m];
+			p[m] = 0;
+			nf = fkind(p + 6);
+			p[m] = c;
+		} else if (m >= 6 && strnieq(p, "value ", 6) && kn == 0) {
+			p += 6;		/* the box's text: its end */
+			m -= 6;
+			if (m > (int)sizeof kecho - 1) {
+				p += m - ((int)sizeof kecho - 1);
+				m = (int)sizeof kecho - 1;
+			}
+			for (c = 0; c < m; ++c)
+				kecho[c] = p[c];
+			kecho[m] = 0;
+		} else if (m == 8 && strnieq(p, "page new", 8))
+			newp = 1;
+	}
+	if (nf >= 0)
+		pfoc = nf;
+	f = wrpform();
+	if (newp && f >= 0) {
+		submit(f, stbutton(f));
+		return;
+	}
+	showkeys();
+}
+
+/* Send the keys for the page that wait. Up to a Return: they go with
+ * WRP's form, as its K, for the new picture (k=keys%0D, as K and Rt). If
+ * a load waits, the keys before the Return go first, then that load. */
+static void sendkeys()
+{
+	static char ks[KMAX + 1];
+	Item *it;
+	int f = wrpform(), i, n;
+
+	if (!direct || f < 0) {		/* not WRP's page now */
+		kn = 0;
+		return;
+	}
+	for (n = 0; n < kn && kbuf[n] != '\r'; ++n)
+		;
+	if (n < kn && !pending) {
+		if ((it = kfield(f)) != 0)
+			utf8(it->val, kbuf, n + 1, MAXVAL);
+		dropkeys(n + 1);
+		if (it) {
+			submit(f, -1);
+			it->val[0] = 0;
+		}
+		return;
+	}
+	for (i = 0; i < n; ++i)
+		ks[i] = kbuf[i];
+	dropkeys(n);
+	if (n > 0)
+		keysreq(ks, n);
+}
+
 static void nopage()
 {
 	scopy(nbwhy, stop ? "stopped" : http_err[0] ? http_err :
@@ -2649,6 +3113,42 @@ static int rewide()
 	return 1;
 }
 
+/* Keys went to the page, and then none for rsec seconds (-r): WRP's
+ * picture again (St), so that it shows the typed text and what the page
+ * did with it (a list of suggestions). Not in a password box, and not
+ * where the display has no clock (the 3B1, Idris: the slow ones). load()
+ * sets rsec to 0 when such a picture took longer than rsec. Meanwhile
+ * the wait bar's blocks go out, a block a second. 1 if it asked for it. */
+static int refresh()
+{
+	long t = g_ms();
+	int f = wrpform(), n;
+
+	if (f < 0 || !refreshon(t)) {
+		rdue = 0;
+		if (kwait >= 0) {	/* no new picture: no wait bar */
+			kwait = -1;
+			drawstatus();
+			g_flush();
+		}
+		return 0;
+	}
+	if (kn > 0 || kbusy || pending)
+		return 0;
+	n = waitleft(t);
+	if (kwait >= 0 && n != kwait) {	/* a block goes out */
+		kwait = n;
+		drawwait(0);
+		g_flush();
+	}
+	if (n > 0)
+		return 0;
+	rdue = 0;
+	submit(f, stbutton(f));
+	prefr = 1;
+	return 1;
+}
+
 /* Has the page (n bytes at p) a form? */
 static int hasform(p, n)
 char *p;
@@ -2695,22 +3195,17 @@ int n;
 		scopy(msg + 5, "an answer with no page", (int)sizeof msg - 5);
 }
 
-/* the window's title: Archaic and its version, then the page's title.
- * WRP's page is titled WRP and the page's address: there the window
- * says Archaic v0.9 - and the address. */
+/* the window's title: the page's title. WRP's page is titled WRP and
+ * the page's address: there the window says the address. With no page
+ * (or no title): Archaic. The version is on the status line. */
 static char *wintitle()
 {
-	static char t[MAXTITLE + 32];
 	char *s = title;
 
 	if (wrpform() >= 0 && strnieq(title, "WRP", 3) &&
 		(title[3] == 0 || title[3] == ' '))
 		s = title[3] ? title + 4 : "";
-	if (*s)
-		sprintf(t, "Archaic v%.12s - %.80s", VERSION, s);
-	else
-		sprintf(t, "Archaic v%.12s", VERSION);
-	return t;
+	return *s ? s : "Archaic";
 }
 
 static void load(url, post)
@@ -2720,11 +3215,13 @@ char *url, *post;
 	static char fname[40];
 	static char fval[MAXVAL];
 	int i, n, c, k, nk, fromwrp = wrpform() >= 0, byclick = pclick;
-	int byresize = pwide;
+	int byresize = pwide, byrefr = prefr;
 	char *done = note;	/* the last status line, if not the usual one */
-	long oldh;
+	static char ksave[sizeof kecho];
+	long oldh, tr = g_ms(), t;
 
-	pclick = pwide = 0;
+	pclick = pwide = prefr = 0;
+	rdue = 0;		/* the new picture has the keys typed so far */
 	note = 0;
 	scopy(lurl, url, MAXURL);
 	scopy(nbat, url, 60);	/* until ui_note() has its host and port */
@@ -2812,7 +3309,10 @@ char *url, *post;
 	for (i = 0; i < nitems; ++i)
 		if (items[i].type == I_IMAGE && nimgs < MAXIMG)
 			items[i].img = nimgs++;
+	scopy(ksave, kecho, (int)sizeof ksave);
 	wrpforms();
+	if (byrefr)		/* the same box: its text stays on the status line */
+		scopy(kecho, ksave, (int)sizeof kecho);
 	if (!headless)
 		g_title(wintitle());
 	findtall();
@@ -2828,7 +3328,9 @@ char *url, *post;
 	ssize = 0;
 	sstop = 0;
 	tallfix();
-	for (i = 0; fname[0] && i < nitems; ++i) {
+	/* the field that had the keyboard keeps it. Not with keys straight
+	 * to the page (direct): after Go, the keys go to the new page */
+	for (i = 0; fname[0] && (!direct || byresize) && i < nitems; ++i) {
 		it = &items[i];
 		if (it->type == I_FIELD && it->name && strieq(it->name, fname)) {
 			focus = i;
@@ -2851,11 +3353,20 @@ char *url, *post;
 			say("Stopped");
 		goto out;
 	}
-	if (done)
+	if (byrefr && direct)
+		showkeys();
+	else if (done)
 		say(done);
 	else {
 		sprintf(msg, "%ld s, %s  %.150s", now() - t0, bytes(lbytes), base);
 		say(msg);
+	}
+	/* too slow to come while the user types: no more of them */
+	if (byrefr && tr >= 0 && (t = g_ms()) >= tr && t - tr > rsec * 1000L) {
+		sprintf(msg, "The picture took %ld s: no new pictures while you type",
+			(t - tr + 500) / 1000);
+		say(msg);
+		rsec = 0;
 	}
 out:
 	if (nbox && nbox != NB_FAIL && !pending) {	/* WRP's answer: no page */
@@ -3069,6 +3580,40 @@ static void runscript()
 	}
 }
 
+/* --help: all the options, short. Lines of at most 79 characters. */
+static char rhelp[50];		/* -r's default, as showhelp() prints it */
+static char *helpl[] = {
+	"  =WxH+X+Y     window size and place (also -g WxH+X+Y)",
+	"  -a           also show WRP's M, T and C menus",
+	"  -c n         pictures in n colors, 2 to 256 (default: the display's)",
+	"  -f gif       ask WRP for GIF pictures only (-f abm: the default)",
+	"  -t           test: no window, print the page and its pictures",
+	"  -v           status messages also to stderr",
+	"  -o file      at the end, save the first picture (PBM or PPM)",
+	"  -s script    play a script, then quit (~ Return, @x,y; click, % wait 2 s)",
+	"  -r n         keys typed into the page: a new picture after n s with no",
+	rhelp,
+	"  -u           update Archaic now, then quit",
+	"  -n           no updates",
+	"  --version    print the version, then quit",
+	"  --help       print this help, then quit",
+	0
+};
+
+static void showhelp()
+{
+	int i;
+
+	sprintf(rhelp, "               keys (default %d, 0 never)", RDEF);
+	printf("Archaic v%s: a web browser for old systems, through WRP\n",
+		VERSION);
+	printf("usage: archaic [options] [url]\n");
+	printf("  url          WRP's address (default: $WRP, else %s)\n",
+		DEFURL);
+	for (i = 0; helpl[i]; ++i)
+		printf("%s\n", helpl[i]);
+}
+
 int main(argc, argv)
 int argc;
 char **argv;
@@ -3097,13 +3642,20 @@ char **argv;
 				verbose = 1;
 		} else if (a[0] == '-' && a[1] && !a[2] && i + 1 < argc &&
 			(a[1] == 'o' || a[1] == 's' || a[1] == 'g' || a[1] == 'c' ||
-			a[1] == 'f')) {
+			a[1] == 'f' || a[1] == 'r')) {
 			if (a[1] == 'f') {
 				a = argv[++i];
 				if (strieq(a, "gif"))
 					http_accept = "text/html, image/gif";
 				else if (!strieq(a, "abm")) {
 					fprintf(stderr, "archaic: -f takes gif or abm\n");
+					return 2;
+				}
+			} else if (a[1] == 'r') {
+				a = argv[++i];
+				rsec = atoin(a);
+				if (*a < '0' || *a > '9' || rsec > 3600) {
+					fprintf(stderr, "archaic: -r takes 0 to 3600 seconds\n");
 					return 2;
 				}
 			} else if (a[1] == 'o')
@@ -3125,8 +3677,11 @@ char **argv;
 			printf("Archaic v%s\n", VERSION);
 #endif
 			return 0;
+		} else if (same(a, "--help")) {
+			showhelp();
+			return 0;
 		} else if (a[0] == '-') {
-			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-f gif|abm] [-t] [-v] [-o file] [-s script] [-u] [-n] [--version] [url]\n");
+			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-f gif|abm] [-t] [-v] [-o file] [-s script] [-r secs] [-u] [-n] [--version] [--help] [url]\n");
 			return 2;
 		} else
 			url = a;
@@ -3166,7 +3721,7 @@ char **argv;
 			return 1;
 		}
 		g_font(&fh, &fb);
-		g_title(wintitle());	/* Archaic and its version */
+		g_title(wintitle());	/* Archaic: no page yet */
 	}
 	cw = tw("0", 1);
 	bar = !headless && g_bar;
@@ -3194,6 +3749,11 @@ char **argv;
 		sprintf(u + i + 1, "?m=ismap&t=gif&c=%d&sl=1", ncol);
 	go(u, (char *)0);
 	while (!quit) {
+		/* keys for the page first: they came before the load */
+		if (kn > 0 && !(pending && kbuf[0] == '\r')) {
+			sendkeys();
+			continue;
+		}
 		if (pending) {
 			pending = 0;
 			load(pendurl, pendpost ? pendbody : (char *)0);
@@ -3227,8 +3787,11 @@ char **argv;
 			autoupd();	/* once a run, on WRP's page */
 			continue;
 		}
-		/* a part of the scroll bar held down: wait 1/10 s at most */
-		if (g_event(&e, bpart && bpart != B_DRAG ? 2 : 1))
+		if (rdue && refresh())	/* the typed keys in a new picture */
+			continue;
+		/* a part of the scroll bar held down, or a new picture due:
+		 * wait 1/10 s at most */
+		if (g_event(&e, (bpart && bpart != B_DRAG) || rdue ? 2 : 1))
 			event(&e);
 		else if (bpart)
 			bartick();
