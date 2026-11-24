@@ -57,7 +57,7 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 ## Quick start
 
 1. On your computer, start [WRP](https://github.com/tenox7/wrp): `wrp`. It listens on port 8080.
-   Use WRP 4.12.0 or newer. An older WRP works, with fewer features.
+   Use WRP 4.13.0 or newer. An older WRP works, with fewer features.
 2. Copy the binary to the old computer as `archaic`, and make it executable:
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
    - 3B1, SunOS, HP-UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.

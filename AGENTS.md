@@ -493,7 +493,7 @@ Archaic --HTTP--> WRP, /archaic-update --HTTPS--> GitHub: the newest release of 
 
 A broken file, a full disk or Esc: the old program stays, and no `archaic.PID` stays.
 
-**WRP's side** (`archaic.go` in WRP):
+**WRP's side** (`archaic.go` in WRP 4.13.0 or newer):
 
 - `wrp -archaic URL`: the release, as a GitHub API address. Default:
   `https://api.github.com/repos/tenox7/archaic/releases/latest`. `-archaic ""`: no updates.
@@ -518,7 +518,7 @@ get archaic-update?p=unixpc&f=0.9
 - The `get` line gives the file (`application/octet-stream`). A version that is not the newest gets 404.
 - With no file for the system, WRP sends `note` and why, with no `version`:
   `note no archaic-dgux in release v0.9`. Archaic then says `WRP has no update: no archaic-dgux in release v0.9`.
-- An older WRP sends its page. Archaic then says `This WRP has no updates for Archaic: it is an older WRP`.
+- An older WRP (before 4.13.0) sends its page. Archaic then says `This WRP has no updates for Archaic: it is an older WRP`.
 
 **The marks.** Each program carries 2 strings, for WRP. `what` and `strings` show them too,
 and `archaic --version` says them as `Archaic v0.9 for unixpc`:
