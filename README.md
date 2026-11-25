@@ -48,7 +48,7 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 | AIX 3.2 on an IBM RS/6000 | X11, in color | BSD sockets | release: `archaic-aix3`, or in the AIX kit |
 | AIX PS/2 1.3 on a PC (486) | X11, in color | BSD sockets | release: `archaic-aixps2`, or in the AIX PS/2 kit |
 | Ultrix 4.5 on a DECstation (MIPS) | X11 (DECwindows), in color | BSD sockets | release: `archaic-ultrix4`, or in the DECstation kit |
-| System 6 on a 68k Mac (Mac II) | QuickDraw, in color | MacTCP | `make mac`: a floppy image |
+| Mac OS 6 (System 6) on a 68k Mac (Mac II) | QuickDraw, in color | MacTCP | release: `archaic-macos6.dsk` (a floppy image), or `make mac` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
 | anything with SDL 2 | SDL 2 | BSD sockets | `make sdl` |
@@ -66,7 +66,7 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
    - 3B1, SunOS, HP-UX, DG/UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
    - The kits named in the table have it already. As root, it updates itself.
    - With curl or wget: `curl -O http://HOST:8080/archaic-download/archaic-hpux9`. WRP gets it from the newest release.
-   - Mac: `make mac` makes a floppy image with Archaic: `src/build-mac/Archaic.dsk`.
+   - Mac OS 6: `archaic-macos6.dsk` is a floppy image with Archaic: put it in the floppy drive. For a real Mac: `archaic-macos6.bin` (MacBinary).
 3. Start the window system, then type `archaic` in a shell window:
    - Idris: log in as `root`, then `/usr/X/bin/xstart`.
    - 3B1: Office > UNIX System.
@@ -76,9 +76,9 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
    - AIX: log in as `root` at the xdm login. An aixterm opens.
    - Ultrix: log in as `root` at the DECwindows login, then Applications > DECterm.
      Type `archaic HOST:8080`, with your computer's LAN address: gxemul's network can't reach its 127.0.0.1.
-   - Mac: open Archaic in the Finder. Options go in a file `Archaic Options`, next to it.
+   - Mac OS 6: open Archaic in the Finder. Options go in a file `Archaic Options`, next to it.
 4. Click the address box, type an address, press Return.
-5. **Ctrl-Q** quits. On the 3B1: **Exit**. On the Mac: **Cmd-Q**.
+5. **Ctrl-Q** quits. On the 3B1: **Exit**. On Mac OS 6: **Cmd-Q**.
 
 ## Using it
 
@@ -110,7 +110,7 @@ With an older WRP: type in ![keys](screenshots/icons/k.png), then click ![Return
 | right button | scroll: top half of the window up, bottom half down |
 | Ctrl-Q | quit |
 
-The 3B1's own keys (Exit, Page, Prev) and the window frames of the 3B1, SunView and the Mac work too.
+The 3B1's own keys (Exit, Page, Prev) and the window frames of the 3B1, SunView and Mac OS 6 work too.
 
 Where the window system has no scroll bar, Archaic draws its own, in the style of the Atari ST's GEM:
 
@@ -147,7 +147,7 @@ make              # ./archaic: X11 (on macOS: XQuartz)
 make cocoa        # ./archaic-cocoa: a macOS window
 make sdl          # ./archaic-sdl: SDL 2
 make headless     # ./archaic-headless: no window
-make mac          # src/build-mac/Archaic.dsk: the 68k Mac (Retro68, in Docker)
+make mac          # src/build-mac/Archaic.dsk: Mac OS 6 on a 68k Mac (Retro68, in Docker)
 make test         # the tests (need ImageMagick)
 ```
 

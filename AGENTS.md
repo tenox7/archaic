@@ -48,10 +48,10 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/mkaix` | AIX 3.2 script: compile and link with IBM's XL C (or gcc), for X11 (`x11.c`, `nsock.c`) |
 | `src/mkaixps2` | AIX PS/2 1.3 script: compile and link with MetaWare High C (or the kit's hcc), for X11 (`x11.c`, `nsock.c`) |
 | `src/mkultrix` | Ultrix 4 script: compile and link with Ultrix's cc (or gcc), for X11 (`x11.c`, `nsock.c`) |
-| `src/mac.c` | display for the classic Mac OS (68k, System 6 and 7): a QuickDraw window with the Mac's own scroll bar, and the Mac's `main()` |
-| `src/nmactcp.c` | network for the classic Mac: MacTCP's TCP driver |
-| `src/dnr.c`, `dnr.h` | the classic Mac: MacTCP's name resolver, for host names (from HTTPHead, a MacTCP sample for Snow). C99: only the Mac build compiles it |
-| `src/mkmac`, `CMakeLists.txt`, `archaic.r` | classic Mac: build with Retro68 in Docker, on your computer (`make mac`). `archaic.r`: the SIZE resource |
+| `src/mac.c` | display for Mac OS 6 (System 6) on a 68k Mac: a QuickDraw window with the Mac's own scroll bar, and the Mac's `main()` |
+| `src/nmactcp.c` | network for Mac OS 6: MacTCP's TCP driver |
+| `src/dnr.c`, `dnr.h` | Mac OS 6: MacTCP's name resolver, for host names (from HTTPHead, a MacTCP sample for Snow). C99: only the Mac build compiles it |
+| `src/mkmac`, `CMakeLists.txt`, `archaic.r` | Mac OS 6: build with Retro68 in Docker, on your computer (`make mac`). `archaic.r`: the SIZE resource |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
@@ -69,8 +69,8 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-r n] [
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, SunView, HP-UX, DG/UX and AIX: `10.0.2.2`, other Unix and the classic Mac: `127.0.0.1`). Ultrix in gxemul needs WRP's address: see Running on Ultrix 4 |
-| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`). On the classic Mac: the screen under the menu bar |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, SunView, HP-UX, DG/UX and AIX: `10.0.2.2`, other Unix and Mac OS 6: `127.0.0.1`). Ultrix in gxemul needs WRP's address: see Running on Ultrix 4 |
+| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`). On Mac OS 6: the screen under the menu bar |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
 | `-f fmt` | `gif`: ask WRP for GIFs only. `abm` (as without `-f`): WRP may send its black and white pictures as ABM (see Pictures: GIF and ABM) |
@@ -84,8 +84,8 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-r n] [
 | `--version` | print the version, then quit: `Archaic v0.9`. A release build also names its system (see Updates): `Archaic v0.9 for aix3` |
 | `--help` | print all the options, a line each, then quit |
 
-The classic Mac has no command line: Archaic reads its options from the file `Archaic Options`
-(see Running on the classic Mac OS).
+Mac OS 6 has no command line: Archaic reads its options from the file `Archaic Options`
+(see Running on Mac OS 6).
 
 ## WRP's form
 
@@ -171,7 +171,7 @@ The first status line says what it found, like `Archaic 0.10, millions of colors
 | SunView | a color screen (8 bits, as the cg3): 128, in a colormap segment of Archaic's own. A black and white screen (bw2, as the Sun-3's bwtwo): black and white |
 | X11 | the default visual. Depth 1: black and white. TrueColor: millions. A colormap (8-bit PseudoColor, as on old workstations): its size, like 256 |
 | Cocoa, SDL | the screen's depth: millions |
-| the classic Mac | the main screen's depth, as set in Monitors: 2, 4, 16 or 256; millions with 16 or 32 bits. A Mac with no Color QuickDraw: black and white |
+| Mac OS 6 | the main screen's depth, as set in Monitors: 2, 4, 16 or 256; millions with 16 or 32 bits. A Mac with no Color QuickDraw: black and white |
 | `archaic-headless` | millions, like SDL (`-c 2` for black and white). `ARCHAIC_COLORS=N`: as a display of N colors (for the tests) |
 
 On a display with colors:
@@ -361,7 +361,7 @@ Cocoa has the Mac's own scroll bar; SDL has Archaic's (see Scrolling).
 (on an HP keyboard: Prev and Next; on DEC's LK201: Prev Screen and Next Screen). The up and down arrows and each step of the mouse wheel
 scroll a quarter of it. Close in the window manager's menu quits. The scroll bar is Archaic's.
 
-**On the classic Mac**, its own keys, menus and window parts work too:
+**On Mac OS 6**, its own keys, menus and window parts work too:
 
 | Key or part | Does |
 |---|---|
@@ -494,7 +494,7 @@ Archaic keeps WRP's page and shows the error on the status line, like
 - With BSD sockets (`nsock.c`: Unix, macOS, SunOS, HP-UX, DG/UX, AIX, Ultrix) the connect does not hold up the window:
   it is drawn, Esc stops, and after 20 s with no answer Archaic gives up (an address that
   does not exist on this network, like 10.0.2.2 outside an emulator kit).
-  MacTCP (`nmactcp.c`, the classic Mac) does the same: Cmd-. stops.
+  MacTCP (`nmactcp.c`, Mac OS 6) does the same: Cmd-. stops.
   On the 3B1 (`ntwg.c`) the connect waits as long as the system does.
 - With a page, a failed connect is on the status line:
   `Unable to connect to WRP at 10.0.2.2:8080: connection refused. Ensure WRP is up and running.`
@@ -549,7 +549,7 @@ A system that has scroll bars uses its own. Where it has none, Archaic draws one
 |---|---|
 | Cocoa (macOS) | the Mac's own (NSScroller), always shown. A click in its track scrolls as Page Down or Page Up, or jumps to that place, as set in System Settings (with Option, the other one) |
 | the 3B1 | the window frame's scroll arrows |
-| the classic Mac | the Mac's own (a scroll bar control): see Mouse and keys |
+| Mac OS 6 | the Mac's own (a scroll bar control): see Mouse and keys |
 | SDL, X11, X10 (the Atari ST), headless | Archaic's own, in the style of the Atari ST's GEM |
 
 Archaic's own scroll bar is at the right of the window, 17 pixels wide (`screenshots/scrollbar.png`):
@@ -657,7 +657,7 @@ The release's file is `archaic-` and the system name.
 | AIX PS/2 1.3 | `_AIX`, `ps2` | `aixps2` |
 | Ultrix 4 | `ultrix` | `ultrix4` |
 
-A build with no `SYSID` gets no updates: macOS, Linux, the tests, the classic Mac (for now). For a new port:
+A build with no `SYSID` gets no updates: macOS, Linux, the tests, Mac OS 6 (for now). For a new port:
 `cc -DSYSID='"@(#)Archaic for NAME"'`, or a line in `archaic.h`.
 
 **A first install, with curl or wget.** WRP also gives the release's files as they are
@@ -1699,13 +1699,14 @@ Test on a copy of your Ultrix disk.
   move first, then send `down` and `up`. For Return, send `keys: ["Return"]`: `keyboard` drops control
   characters in `text` (gxemul 1.0.13), so `enter: true` with `text` types nothing.
 
-## Running on the classic Mac OS
+## Running on Mac OS 6
 
 - **System 6.0.8** on a Macintosh IIcx (68030), with MacTCP 2.0.6, in the
   [Snow](https://github.com/twvd/snow) emulator (1.6). Snow emulates a DaynaPORT SCSI Ethernet box,
   with NAT to your computer's network.
-- No release file yet: build it with `make mac` (see Building for the classic Mac).
-  It makes `src/build-mac/Archaic.dsk`, an 800 KB floppy image. Put it in Snow's floppy drive.
+- Release files: `archaic-macos6.dsk`, an 800 KB floppy image with Archaic (put it in Snow's floppy drive),
+  and `archaic-macos6.bin`, the same Archaic as MacBinary, for a real Mac. Or build them: `make mac`
+  (see Building for Mac OS 6). WRP's `/archaic-download` does not give them: it takes only names with no dot.
 - Open Archaic in the Finder: click its icon, then File > Open (Cmd-O). From the floppy it takes about 10 s to start.
   Its window fills the screen under the menu bar.
 - **Cmd-Q** quits (or Ctrl-Q, or the close box).
@@ -1735,7 +1736,7 @@ Test on a copy of your Ultrix disk.
 | the same, 216 colors (GIF, a slice of 13 KB) | 5 s: WRP 2 s, then the Mac about 3 s for the slice |
 | Wikipedia's Apple Inc. article, after a click on its link | 14 s: WRP 10 s |
 
-## Building for the classic Mac
+## Building for Mac OS 6
 
 Archaic for the Mac is built on your computer, with [Retro68](https://github.com/autc04/Retro68)
 (gcc 16.1 for the 68k Mac) in Docker:
@@ -1751,7 +1752,7 @@ make mac        # or: sh src/mkmac
 - `archaic.r` is the SIZE resource, for MultiFinder: 3 MB, at least 1.5 MB.
 - It is not tested on System 7, or on a Mac with no Color QuickDraw (Plus, SE, Classic).
 
-## The classic Mac OS: what to know
+## Mac OS 6: what to know
 
 Test on a copy of your Mac's disk.
 

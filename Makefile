@@ -2,7 +2,7 @@
 # make sdl: with SDL 2 instead of X11 (macOS, Linux ...): archaic-sdl.
 # make cocoa: a Cocoa window on macOS, nothing else needed: archaic-cocoa.
 # make headless: no window, for tests and automation: archaic-headless.
-# make mac: the classic Mac OS (68k, System 6 and 7), with Retro68 in
+# make mac: Mac OS 6 (System 6) on a 68k Mac, with Retro68 in
 # Docker: src/build-mac/Archaic.dsk, a floppy image (see src/mkmac).
 # The old systems have a build script of their own, in src. The Idris
 # (Atari ST) build is src/mk, run inside Idris; the AT&T UNIX PC (3B1)
