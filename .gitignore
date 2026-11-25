@@ -4,6 +4,8 @@ archaic-asan
 archaic-sdl
 archaic-cocoa
 archaic-headless
+# the classic Mac build (src/mkmac)
+src/build-mac/
 *.dSYM/
 *.o
 *.pbm

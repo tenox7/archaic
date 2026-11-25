@@ -2,6 +2,8 @@
 # make sdl: with SDL 2 instead of X11 (macOS, Linux ...): archaic-sdl.
 # make cocoa: a Cocoa window on macOS, nothing else needed: archaic-cocoa.
 # make headless: no window, for tests and automation: archaic-headless.
+# make mac: the classic Mac OS (68k, System 6 and 7), with Retro68 in
+# Docker: src/build-mac/Archaic.dsk, a floppy image (see src/mkmac).
 # The old systems have a build script of their own, in src. The Idris
 # (Atari ST) build is src/mk, run inside Idris; the AT&T UNIX PC (3B1)
 # build is src/mkunixpc. On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix and
@@ -59,6 +61,9 @@ sdl: archaic-sdl
 cocoa: archaic-cocoa
 headless: archaic-headless
 
+mac:
+	sh src/mkmac
+
 # the same, with the address and undefined behaviour sanitizers
 archaic-asan: $(CORE) src/x11.c src/nsock.c $(HDR)
 	$(CC) $(CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS)
@@ -71,6 +76,6 @@ test: archaic-asan archaic-headless
 	sh test/run.sh
 
 clean:
-	rm -rf archaic archaic-asan archaic-asan.dSYM archaic-sdl archaic-cocoa archaic-headless
+	rm -rf archaic archaic-asan archaic-asan.dSYM archaic-sdl archaic-cocoa archaic-headless src/build-mac
 
-.PHONY: sdl cocoa headless knr test clean
+.PHONY: sdl cocoa headless mac knr test clean

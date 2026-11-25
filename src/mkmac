@@ -1,0 +1,12 @@
+#!/bin/sh
+# mkmac - build Archaic for the classic Mac OS (68k, System 6 and 7) with
+# Retro68, in Docker: the image ghcr.io/autc04/retro68 (amd64; on Apple
+# silicon Docker runs it with Rosetta). Run it on the host, not on the Mac.
+# It builds in build-mac: Archaic.bin (MacBinary) and Archaic.dsk (an 800K
+# floppy image with Archaic on it).
+cd "$(dirname "$0")" || exit 1
+docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src \
+	ghcr.io/autc04/retro68:latest sh -c '
+	cmake -S . -B build-mac -DCMAKE_TOOLCHAIN_FILE=/Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake >/dev/null &&
+	cmake --build build-mac' || exit 1
+ls -l build-mac/Archaic.bin build-mac/Archaic.dsk
