@@ -1,9 +1,11 @@
 /* nmactcp.c - Archaic's network for the classic Mac OS: the TCP of
  * MacTCP (its driver, .IPP). Archaic has one connection at a time
  * (http.c), so this has one stream, with a receive buffer from NewPtr
- * once. Each call goes to the driver asynchronously and is waited for
- * with SystemTask, so the desk accessories go on. While the connect
- * waits, the window is drawn and Esc (Cmd-.) stops it (ui_poll).
+ * once. Each call goes to the driver asynchronously. A wait longer than
+ * a tick is spent in mac_wait (WaitNextEvent), so the other programs
+ * run meanwhile, and the Mac sleeps when they have nothing to do. While
+ * the connect waits, the window is drawn and Esc (Cmd-.) stops it
+ * (ui_poll). Open Transport's MacTCP part works the same way.
  * An address such as 10.0.0.1 needs no name server; a name goes to the
  * MacTCP resolver (dnr.c). In the Snow emulator, the Mac's 127.0.0.1
  * is the host's own: WRP on the host is 127.0.0.1:8080.
@@ -54,12 +56,18 @@ int code;
 	return PBControlAsync((ParmBlkPtr)p);
 }
 
-/* wait for call p: 0, or MacTCP's error */
+/* wait for call p: 0, or MacTCP's error. Most calls are done at once;
+ * after 2 ticks the other programs run while it waits. */
 static int twait(p)
 TCPiopb *p;
 {
+	long t = (long)TickCount() + 2;
+
 	while (p->ioResult > 0)
-		SystemTask();
+		if ((long)TickCount() < t)
+			SystemTask();
+		else
+			mac_wait(1L);
 	return p->ioResult;
 }
 
@@ -207,7 +215,7 @@ int port;
 		pb.csParam.open.localPort = (unsigned short)lport;
 		e = tcall(&pb, TCPActiveOpen);
 		while (!e && pb.ioResult > 0) {
-			SystemTask();
+			mac_wait(2L);
 			if (ui_poll()) {
 				release();
 				scopy(err, "stopped", 60);
@@ -247,27 +255,22 @@ long *amt;
 	return s == 0 || s >= 14 ? 0 : -2;
 }
 
-/* wait at most 1/20 s (or not at all), and less when the window has
- * input: so the spinner turns, and a key or a click comes soon */
+/* wait at most 2 ticks (or not at all), and less when an event comes:
+ * so the spinner turns, and a key or a click comes soon. The other
+ * programs run meanwhile (mac_wait). */
 int n_read(h, buf, n, wait)
 int h, n, wait;
 char *buf;
 {
-	static EventRecord ev;
-	long amt = 0, t;
+	long amt = 0;
 	int r, e;
 
 	if (!strm)
 		return -1;
 	r = tstat(&amt);
 	if (r == -2 && wait) {
-		t = (long)TickCount() + 3;
-		while (r == -2 && (long)TickCount() < t && !EventAvail(mDownMask |
-			mUpMask | keyDownMask | autoKeyMask | updateMask |
-			activMask, &ev)) {
-			SystemTask();
-			r = tstat(&amt);
-		}
+		mac_wait(2L);
+		r = tstat(&amt);
 	}
 	if (r != 1)
 		return r;
@@ -327,7 +330,7 @@ int h;
 	if (!tcall(&pb, TCPClose)) {
 		t = (long)TickCount() + CTICKS;
 		while (pb.ioResult > 0 && (long)TickCount() < t)
-			SystemTask();
+			mac_wait(1L);
 	}
 	release();
 }

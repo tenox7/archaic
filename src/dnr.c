@@ -19,6 +19,9 @@
 #include <Traps.h>
 #include "dnr.h"
 
+/* mac.c: the other programs run while Archaic waits (Archaic's change) */
+void mac_wait(long t);
+
 enum { OPENRESOLVER = 1, CLOSERESOLVER = 2, STRTOADDR = 3 };
 
 /* Folder Manager values that Multiversal Interfaces do not name */
@@ -187,7 +190,7 @@ OSErr dnr_lookup(const char *host, unsigned long *addr, long timeoutTicks)
         while (!done) {
             if (TickCount() > end)
                 return commandTimeout;
-            SystemTask();
+            mac_wait(2L);
         }
         err = (OSErr)info.rtnCode;
     } else if (err == noErr) {

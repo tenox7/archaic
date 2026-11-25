@@ -2584,6 +2584,7 @@ int y, n;
 
 	http_pump();
 	progress();
+	YIELD;			/* the Mac: the other programs run too */
 	if (headless)
 		return;
 	for (i = 0; i < nitems; ++i) {

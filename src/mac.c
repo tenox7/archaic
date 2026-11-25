@@ -20,7 +20,19 @@
  * Text is Geneva 9. Archaic's text is Latin-1, the Mac's is Mac Roman:
  * the letters are changed both ways (lat[]). Cmd-. is Esc, Cmd-click
  * the right button (it scrolls), Paste types the clipboard's text.
- * Control and a letter is its control code: Ctrl-U, Ctrl-Q. */
+ * Control and a letter is its control code: Ctrl-U, Ctrl-Q.
+ *
+ * Multitasking (System 7, and MultiFinder): the Mac's programs share the
+ * CPU only when each one asks for its next event. So Archaic waits in
+ * WaitNextEvent with a sleep, never in a loop of its own: g_event, and
+ * mac_wait for the network (nmactcp.c, dnr.c). While a picture decodes
+ * (seconds, in colors on a 68030), YIELD in img_rows lets the others
+ * run each 1/15 s. Events that come meanwhile go to Archaic's queue.
+ * Suspend and resume (archaic.r: acceptSuspendResumeEvents) are the
+ * window's deactivate and activate. Apple events: Quit (the Finder's
+ * Shut Down and Restart send it) quits; Open Application is nothing.
+ * In the background a page goes on loading. On System 7 the window
+ * leaves the desktop's column of disk icons at the right. */
 #include "archaic.h"
 #include <string.h>
 #include <Multiverse.h>
@@ -40,6 +52,10 @@ static ControlHandle sb;	/* the scroll bar */
 static MenuHandle mapple, mfile, medit;
 static int cqd;			/* the Mac has Color QuickDraw */
 static int wne;			/* WaitNextEvent is there (MultiFinder) */
+static int sys7;		/* System 7 or newer */
+static int aeok;		/* Apple events are there (System 7) */
+static int fg = 1;		/* Archaic is the front program */
+static long tyield;		/* ticks: the last WaitNextEvent */
 static int ww, wh;		/* the window's inside */
 static int fasc, fhgt;		/* the font */
 static long smax, sk = 1;	/* g_sbar's max; the scroll bar's step */
@@ -188,7 +204,8 @@ int *w, *h;
 	int i, n[4], k = 0;
 
 	sr = qd.screenBits.bounds;
-	SetRect(&r, 4, GetMBarHeight() + 22, sr.right - 4, sr.bottom - 4);
+	SetRect(&r, 4, GetMBarHeight() + 22, sr.right - (sys7 ? 70 : 4),
+		sr.bottom - 4);
 	/* =WxH+X+Y, or -g WxH+X+Y: the inside's size, and its place */
 	if (geom && *geom == '=')
 		++geom;
@@ -583,9 +600,15 @@ static void about()
 		DrawString(ps(l[i]));
 	}
 	for (;;) {
-		SystemTask();
-		if (!GetNextEvent(mDownMask | keyDownMask | updateMask, &ev))
-			continue;
+		if (wne) {
+			if (!WaitNextEvent(mDownMask | keyDownMask | updateMask, &ev,
+				30L, 0))
+				continue;
+		} else {
+			SystemTask();
+			if (!GetNextEvent(mDownMask | keyDownMask | updateMask, &ev))
+				continue;
+		}
 		if (ev.what == mouseDown || ev.what == keyDown)
 			break;
 		if (ev.what == updateEvt && (WindowPtr)ev.message != a) {
@@ -756,6 +779,17 @@ EventRecord *ev;
 	}
 }
 
+/* the window is active (on), or not: its scroll bar and grow box */
+static void activate(on)
+int on;
+{
+	if (!win || !sb)
+		return;
+	fclip();
+	HiliteControl(sb, on ? 0 : 255);
+	growbox();
+}
+
 static void handle(ev)
 EventRecord *ev;
 {
@@ -807,24 +841,51 @@ EventRecord *ev;
 		q[(qin + NQ - 1) % NQ].h = b.v - a.v;
 		break;
 	case activateEvt:
-		if ((WindowPtr)ev->message != win)
-			break;
-		fclip();
-		HiliteControl(sb, ev->modifiers & activeFlag ? 0 : 255);
-		growbox();
+		if ((WindowPtr)ev->message == win)
+			activate(ev->modifiers & activeFlag);
+		break;
+	case osEvt:		/* suspend (another program is in front), resume */
+		if (((ev->message >> 24) & 0377) == 1) {
+			fg = (int)(ev->message & 1);
+			activate(fg);
+		}
+		break;
+	case kHighLevelEvent:	/* an Apple event: Quit, from Shut Down */
+		if (aeok)
+			AEProcessAppleEvent(ev);
 		break;
 	}
 }
 
-/* the next Mac event; 0 if none came in t ticks */
+/* the next Mac event; 0 if none came in t ticks. The other programs
+ * run meanwhile. */
 static int next(ev, t)
 EventRecord *ev;
 long t;
 {
+	tyield = (long)TickCount();
 	if (wne)
 		return WaitNextEvent(everyEvent, ev, (unsigned long)t, 0);
 	SystemTask();
 	return GetNextEvent(everyEvent, ev);
+}
+
+/* the network waits: the other programs run, at most t ticks. An event
+ * for Archaic goes to the queue, for g_event. */
+void mac_wait(t)
+long t;
+{
+	EventRecord ev;
+
+	if (next(&ev, t))
+		handle(&ev);
+}
+
+/* long work: the other programs run each 1/15 s */
+void mac_yield()
+{
+	if ((long)TickCount() - tyield >= 4)
+		mac_wait(0L);
 }
 
 int g_event(e, wait)
@@ -832,7 +893,7 @@ Event *e;
 int wait;
 {
 	EventRecord ev;
-	long t0 = (long)TickCount();
+	long t0 = (long)TickCount(), s;
 	Event *f;
 
 	for (;;) {
@@ -851,7 +912,16 @@ int wait;
 			hold();
 		if (qout != qin)
 			continue;
-		if (next(&ev, wait == 1 && !trk ? 30L : 0L)) {
+		/* sleep: the Mac and the other programs get the time */
+		s = 0;
+		if (wait == 1)
+			s = trk ? 2 : fg ? 30 : 60;
+		else if (wait == 2) {
+			s = 6 - ((long)TickCount() - t0);
+			if (s < 1)
+				s = 1;
+		}
+		if (next(&ev, s)) {
 			handle(&ev);
 			continue;
 		}
@@ -892,10 +962,29 @@ int max;
 	return ac;
 }
 
+/* Apple events (System 7). The Finder sends Open Application at the
+ * start, and Quit for Shut Down and Restart. */
+static pascal OSErr aeopen(const AppleEvent *e, AppleEvent *r, int32_t k)
+{
+	return noErr;
+}
+
+static pascal OSErr aedocs(const AppleEvent *e, AppleEvent *r, int32_t k)
+{
+	return errAEEventNotHandled;
+}
+
+static pascal OSErr aequit(const AppleEvent *e, AppleEvent *r, int32_t k)
+{
+	put(E_QUIT, 0, 0, 0);
+	return noErr;
+}
+
 int main()
 {
 	static char *av[32];
 	SysEnvRec env;
+	LONGINT g;
 	int i;
 
 	InitGraf(&qd.thePort);
@@ -913,6 +1002,21 @@ int main()
 	cqd = env.hasColorQD;
 	wne = NGetTrapAddress(0xA860, kToolboxTrapType) !=
 		NGetTrapAddress(0xA89F, kToolboxTrapType);
+	if (NGetTrapAddress(0xA1AD, kOSTrapType) !=	/* Gestalt */
+		NGetTrapAddress(0xA89F, kToolboxTrapType)) {
+		sys7 = Gestalt(gestaltSystemVersion, &g) == noErr && g >= 0x700;
+		aeok = Gestalt(gestaltAppleEventsAttr, &g) == noErr && (g & 1);
+	}
+	if (aeok) {
+		AEInstallEventHandler(kCoreEventClass, kAEOpenApplication,
+			NewAEEventHandlerUPP(aeopen), 0, false);
+		AEInstallEventHandler(kCoreEventClass, kAEOpenDocuments,
+			NewAEEventHandlerUPP(aedocs), 0, false);
+		AEInstallEventHandler(kCoreEventClass, kAEPrintDocuments,
+			NewAEEventHandlerUPP(aedocs), 0, false);
+		AEInstallEventHandler(kCoreEventClass, kAEQuitApplication,
+			NewAEEventHandlerUPP(aequit), 0, false);
+	}
 	for (i = 0; i < 128; ++i)
 		if (lat[i])
 			mac[lat[i] - 128] = (unsigned char)(i + 128);

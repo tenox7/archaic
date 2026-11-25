@@ -326,6 +326,18 @@ int g_copy P((int x, int y, int w, int h, int dy));
 void g_flush P((void));
 int g_event P((Event *e, int wait));
 int g_fd P((void));
+/* The Mac (mac.c) has cooperative multitasking: Archaic must give the
+ * other programs their time. mac_wait: they run, at most t ticks (less
+ * when an event comes for Archaic: it goes to g_event's queue).
+ * YIELD in long work (img_rows: a picture decodes): mac_wait(0) each
+ * 1/15 s. Elsewhere YIELD is nothing. */
+#ifdef macintosh
+void mac_wait P((long t));
+void mac_yield P((void));
+#define YIELD mac_yield()
+#else
+#define YIELD
+#endif
 
 /* the network: one of nidris.c (Idris netd), nsock.c (BSD sockets), ...
  * n_read: up to n bytes. wait 1: wait a short time (nsock.c 1/20 s,
