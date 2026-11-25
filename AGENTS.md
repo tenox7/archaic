@@ -1088,16 +1088,17 @@ Test on a copy of your 3B1 disk.
 
 - **SunOS 4.1** with SunView, on a Sun-4 (SPARC). Kit: `sunos414-lemu` (QEMU),
   on osarchive in `os/sunos/Virtual/qemu/SunOS414/`. It has Sun's C compiler.
-- Release binary: `archaic-sun4`. Copy it to SunOS as `/usr/local/bin/archaic`,
+  Archaic is in the kit: `/usr/local/bin/archaic`, and its source in `/usr/local/src/archaic`.
+- Release binary: `archaic-sun4` (the kit's). Copy it to SunOS as `/usr/local/bin/archaic`,
   then `chmod 755 /usr/local/bin/archaic`. Or build it there: see Building on SunOS 4. It takes about 6 s.
 - Log in as `root` at the console and type `sunview`.
-  In the shelltool, type `archaic` (in the folder where you built it: `./archaic`).
+  In the shelltool, type `archaic`.
   It opens a frame a little smaller than the screen, in the middle.
 - **Ctrl-Q** quits, or Quit in the frame's menu.
 - Archaic looks for WRP at `http://10.0.2.2:8080/`: your computer, in QEMU's default user network.
-  The kit has another network: there, run `archaic HOST:8080`, or set `WRP` to `HOST:8080`.
-  HOST is your computer's address in the kit's network.
-  SunOS has no name server there: give addresses as numbers.
+  The kit has another network: there, root's `.cshrc` sets `WRP` to your computer's port 8080 in it.
+  On another network: `archaic HOST:8080`, or set `WRP` to `HOST:8080`.
+  SunOS has no name server in the kit: give addresses as numbers.
 - On a color screen (8 bits, as the cg3) the pictures have up to 128 colors (see Colors).
 - `screenshots/sunview.png`: the SPARCstation's screen (cg3), 1152 x 900:
   `uname -a` in the console, and Wikipedia's SunView article in 128 colors, in 1 s.
@@ -1114,7 +1115,7 @@ Needs Sun's C compiler, `cc` (the kit has it), and SunView's libraries in `/usr/
 2. Build:
 
    ```
-   sh mksunview    # compile and link: archaic, about 106 KB
+   sh mksunview    # compile and link: archaic, about 120 KB
    ```
 
    It takes about 6 s in the kit.
@@ -1188,9 +1189,11 @@ Test on a copy of your SunOS disk.
 
 ## Running on SunOS 3.5 on a Sun-3
 
-- **SunOS 3.5** with SunView, on a Sun-3 (68020). Tested in TME (The Machine Emulator):
+- **SunOS 3.5** with SunView, on a Sun-3 (68020), in TME (The Machine Emulator):
   a Sun-3/160 with the bwtwo screen, and slirp for the network.
-- Release binary: `archaic-sun3`. Copy it to SunOS as `/usr/local/bin/archaic`,
+  Kit: `sun3-sunos35-tme`, on osarchive in `os/sunos/Virtual/tme/`.
+  Archaic is in the kit: `/usr/local/bin/archaic`, and its source in `/usr/local/src/archaic`.
+- Release binary: `archaic-sun3` (the kit's). Copy it to SunOS as `/usr/local/bin/archaic`,
   then `chmod 755 /usr/local/bin/archaic`. Or build it there: see Building on SunOS 3.5.
 - Log in as `root` at the console and type `suntools` (SunOS 3's name for SunView).
   In a shelltool, type `archaic`.
@@ -1206,7 +1209,7 @@ Test on a copy of your SunOS disk.
 The same 10 files and the same script as on SunOS 4 (see Building on SunOS 4), with Sun's `cc`:
 
 ```
-sh mksunview    # compile and link: archaic, about 570 KB
+sh mksunview    # compile and link: archaic, about 580 KB
 ```
 
 It takes about 30 s in TME. The program is large: SunOS 3.5 has no shared libraries.
@@ -1250,7 +1253,8 @@ Test on a copy of your SunOS disk.
 
 - **HP-UX 9.05** with X11 and HP VUE, on an HP 9000/715 (PA-RISC). Kit: `hpux905-715-lemu` (QEMU),
   on osarchive in `os/hpux/Qemu/`. It has HP's C compiler.
-- Release binary: `archaic-hpux9`. Copy it to HP-UX as `/usr/local/bin/archaic`,
+  Archaic is in the kit: `/usr/local/bin/archaic`, and its source in `/usr/local/src/archaic`.
+- Release binary: `archaic-hpux9` (the kit's). Copy it to HP-UX as `/usr/local/bin/archaic`,
   then `chmod 755 /usr/local/bin/archaic`. Or build it there: see Building on HP-UX 9.
 - Log in as `root` at the VUE login (the kit has no password). In a terminal (hpterm), type `archaic`.
   The window is 640 x 400: `archaic -g 860x660+360+120` gives a larger one.
@@ -1271,7 +1275,7 @@ Needs HP's C compiler, `cc` (the kit has HP C A.09.73), and X11R5 (HP-UX 9 has i
 2. Build:
 
    ```
-   sh mkhpux       # compile and link: archaic, about 115 KB
+   sh mkhpux       # compile and link: archaic, about 132 KB
    ```
 
    It takes about 3 s in the kit.
