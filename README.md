@@ -33,7 +33,7 @@ This allows to pre-load and optimize, cache, send only small chunks of the page 
 
 ![Archaic in gxemul: Ultrix 4.5 with DECwindows on a DECstation 5000/200, showing Wikipedia in 216 colors](screenshots/gxemul.png)
 
-![Archaic in Snow: System 6.0.8 on a Macintosh IIcx, showing Wikipedia in 216 colors](screenshots/snow.png)
+![Archaic in Snow: System 6.0.8 on a Macintosh IIcx, showing Wikipedia](screenshots/snow.png)
 
 ## Platforms
 
