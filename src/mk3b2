@@ -1,0 +1,17 @@
+: mk3b2 - build Archaic on the AT+T 3B2 with UNIX System V Release 3.2,
+: for a DMD 5620 terminal in layers. First the part that runs in the
+: terminal, archaic.m from dmdterm.c, with the DMD compiler. bin2c makes
+: a C table of it, dmdm.h, and that goes into archaic with dmd.c.
+: It needs the C compiler, WIN/3B with its libnet.a and libnsl_s.a, and
+: the DMD software in /usr/dmd, with dmdcc and 32ld.
+: -K fpe: the program needs no math unit. Without it, cc on a 3B2 that
+: has the MAU makes a program for a 3B2 with a MAU only.
+: No ampersand, quote or bracket in these lines: the shell reads them.
+DMD=${DMD-/usr/dmd}
+export DMD
+cc -o bin2c bin2c.c &&
+$DMD/bin/dmdcc -O -o archaic.m dmdterm.c &&
+./bin2c < archaic.m > dmdm.h &&
+cc -O -K fpe -DNOPROTO -DREMOTE -c main.c html.c http.c gif.c pic.c update.c dmd.c ntwg.c &&
+cc -K fpe -o archaic main.o html.o http.o gif.o pic.o update.o dmd.o ntwg.o -lnet -lnsl_s &&
+ls -l archaic

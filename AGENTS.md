@@ -40,8 +40,11 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/fetch`, `mkinc`, `mk`, `lka` | Idris scripts: get the sources, headers, compile, link |
 | `src/heap.c` | Idris tool: sets how much memory a program file asks for. `lka` links with a copy of the linker that asks for more |
 | `src/unixpc.c` | display for the AT&T UNIX PC (3B1) window system |
-| `src/ntwg.c` | network for the 3B1: the BSD sockets of WIN/TCP (TWG) |
+| `src/ntwg.c` | network for the 3B1: the BSD sockets of WIN/TCP (TWG). Also for the 3B2: WIN/3B |
 | `src/mkunixpc` | 3B1 script: compile and link with gcc |
+| `src/dmd.c` | display for the AT&T DMD 5620 terminal (the Blit) in layers, from a 3B2: commands to Archaic's part in the terminal. It keeps a copy of the screen, so that only what changes goes down the line (see The 3B2 and the DMD 5620: what to know) |
+| `src/dmdterm.c` | Archaic's part in the DMD 5620: it draws, it keeps and decodes the page's slices (ABM, ABM3), it scrolls. Built with the DMD's compiler |
+| `src/mk3b2`, `bin2c.c` | 3B2 script: compile and link with the 3B2's cc and `dmdcc`. `bin2c` puts the terminal's part into `archaic` as a C table (`dmdm.h`) |
 | `src/sunview.c` | display for SunView (SunOS 3 and 4) |
 | `src/mksunview` | SunOS 3 and 4 script: compile and link with Sun's cc |
 | `src/mkhpux` | HP-UX 9 script: compile and link with HP's cc, for X11 (`x11.c`, `nsock.c`) |
@@ -57,6 +60,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `tools/slowline.py` | host tool: a TCP proxy that is a slow line (bytes a second), to try Archaic on a slow line with WRP |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
+| `tools/dmdlog.py` | host tool for the DMD 5620 port: decodes a log of the bytes that Archaic sent to the terminal (`ARCHAICLOG`), a command a line, and draws the screen they make |
 | `test/run.sh` | tests: GIF decoder, HTML, forms, WRP, the headless display |
 | `test/xshot.sh` | test: run the X11 build and take a screenshot |
 | `test/data/` | GIFs saved from WRP, for the tests; two of them also as ABM and ABM3 (`.ab3`), two as AB8. `full.gif`, `runs.gif` and `ilace.gif` are made for the 8-bit way: a full code table with no clear, long runs, interlaced. `dith` is noise in 8 colors: smaller as a GIF than as AB8. WRP makes the `.ab3` and `.ab8` files from the GIFs: `WRP_SAMPLES=dir go test -run TestSamples` |
@@ -71,8 +75,8 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f type] [-t] [-v] [-o file] [-s script] [-r n] 
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, SunView, HP-UX, DG/UX and AIX: `10.0.2.2`, other Unix and the classic Mac OS: `127.0.0.1`). Ultrix in gxemul and Mac OS 7.5 in Snow need WRP's address: see Running on Ultrix 4 and Running on Mac OS 7.5 |
-| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`). On the classic Mac OS: the screen under the menu bar (on System 7, less the column of disk icons at the right) |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, the 3B2, SunView, HP-UX, DG/UX and AIX: `10.0.2.2`, other Unix and the classic Mac OS: `127.0.0.1`). Ultrix in gxemul and Mac OS 7.5 in Snow need WRP's address: see Running on Ultrix 4 and Running on Mac OS 7.5 |
+| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`). On the classic Mac OS: the screen under the menu bar (on System 7, less the column of disk icons at the right). On the DMD 5620: the layer as it is (Reshape in the layers menu changes it) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
 | `-f type` | ask WRP for one type of pictures, with no choice. `gif`: GIFs only. `abm`: ABM, and GIFs in colors (as Archaic 0.11). `abm3`: ABM3. `ab8`: AB8, and ABM. `small`: for each picture the smallest type. Without `-f`, Archaic times its pictures and asks for the kind that is faster here (see Pictures: GIF, ABM, ABM3 and AB8) |
@@ -80,7 +84,7 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f type] [-t] [-v] [-o file] [-s script] [-r n] 
 | `-v` | status messages also go to stderr, and the times of each trial of the picture types |
 | `-o file` | at the end, save the first picture: PBM, or PPM if it has colors |
 | `-s script` | play a script, then quit (see Scripts, in Building in Idris) |
-| `-r n` | typing into the page: WRP's picture again after n seconds with no keys. Default 3, 0 never. Not on the 3B1 and Idris (no clock). A new picture that takes longer than n seconds turns it off for the run (see Typing into the page) |
+| `-r n` | typing into the page: WRP's picture again after n seconds with no keys. Default 3, 0 never. Not on the 3B1, Idris and the DMD 5620 (no clock). A new picture that takes longer than n seconds turns it off for the run (see Typing into the page) |
 | `-u` | update: ask WRP for a newer Archaic and install it, with no window, then quit (see Updates) |
 | `-n` | no updates. Without it, Archaic asks WRP once a run (not with `-t` or `-s`) |
 | `--version` | print the version, then quit: `Archaic v0.9`. A release build also names its system (see Updates): `Archaic v0.9 for aix3` |
@@ -169,7 +173,7 @@ The first status line says what it found, like `Archaic 0.10, millions of colors
 
 | Display | Colors |
 |---|---|
-| 3B1, Idris (X10) | black and white (they are) |
+| 3B1, Idris (X10), DMD 5620 | black and white (they are) |
 | SunView | a color screen (8 bits, as the cg3): 128, in a colormap segment of Archaic's own. A black and white screen (bw2, as the Sun-3's bwtwo): black and white |
 | X11 | the default visual. Depth 1: black and white. TrueColor: millions. A colormap (8-bit PseudoColor, as on old workstations): its size, like 256 |
 | Cocoa, SDL | the screen's depth: millions |
@@ -276,6 +280,9 @@ Seconds to decode one slice of 632 x 351 pixels (CPU time, no network; mean size
   and is not interlaced (WRP's GIFs do). Other GIFs are decoded a pixel at a time.
 
 The file formats are in `src/pic.c`, and in WRP's `abm.go`, `abm3.go` and `ab8.go`.
+
+On the DMD 5620, the terminal decodes ABM and ABM3 itself (`dmdterm.c`): the 3B2 passes WRP's file on
+as it comes. A decoded picture would be 6 times as many bytes on a line of 450 bytes a second.
 
 ### The automatic choice
 
@@ -459,6 +466,19 @@ See Typing into the page for the keys that go to the web page.
 | Rfrsh, Clear | draw the window again |
 | the resize box | a new window size. A new width: WRP makes the picture again, as wide (see A new window size) |
 
+**On the DMD 5620**, in a window of layers:
+
+| Key or button | Does |
+|---|---|
+| button 1 | click |
+| button 2 | as the right button: scroll a window. Top half of the window = up, bottom half = down |
+| button 3 | the menu of layers: New, Reshape, Move, Top, Bottom, Current, Delete, Exit |
+| ↑ / ↓ | scroll a quarter of the window up / down |
+| Space / b | scroll a window down / up (when no box has the keyboard) |
+| the scroll bar at the right | Archaic's own (see The scroll bar). The elevator follows the pointer while button 1 is down |
+| Reshape in the layers menu | a new window size (see A new window size) |
+| Ctrl-Q | quit: the layer is a terminal again |
+
 **In SunView**, the Sun keyboard's keys and SunView's frame work too:
 
 | Key or frame part | Does |
@@ -530,8 +550,8 @@ to the web page as you type them. K, ⌫ and ↵ are gone.
   it in less than 1 s (a slice of 20 KB in 256 colors).
 - While Archaic waits, a bar beside the box's text on the status line has a block for each second left
   (10 at most). They go out one at a time, and at 0 the picture comes. Each key fills the bar again.
-- Not in a password box (the picture would show only dots). Not on the 3B1 and Idris: Archaic has
-  no clock there (`g_ms`), and they are the slowest systems.
+- Not in a password box (the picture would show only dots). Not on the 3B1, Idris and the DMD 5620:
+  Archaic has no clock there (`g_ms`), and they are the slowest systems.
 - A new picture that takes longer than the pause (`-r`) turns them off for the run:
   `The picture took 7 s: no new pictures while you type`. So a slow computer or line gets none.
 - Keys typed while it comes wait, and go after it.
@@ -591,6 +611,8 @@ The bar shows when the server sends the size (WRP does for its pictures).
 The spinner turns 8 steps a second by the display's clock (`g_ms`).
 The 3B1 and Idris displays have no clock: there it steps each time the network waits
 (1/10 s on the 3B1, up to 1 s on Idris).
+On the DMD 5620 the terminal turns the spinner and draws the bar itself, with its own clock:
+they cost no bytes on the line. The status line there has no count of the bytes that came.
 With `-v`, each status line also goes to standard error (`status:` lines to standard output with `-t`).
 
 ## When WRP has an error
@@ -634,7 +656,7 @@ takes a new picture. The frame keeps its place on the page, in proportion
 (a narrower page is longer). Text you typed in a box stays.
 
 A new height alone needs no new picture: the frame gets taller or shorter.
-On the 3B1 and Idris (no clock), the new picture is asked for at once.
+On the 3B1, Idris and the DMD 5620 (no clock), the new picture is asked for at once.
 
 ## Scrolling: the whole page in slices
 
@@ -664,6 +686,8 @@ X11, and the screen in memory of Cocoa, SDL and headless), the pixels on the scr
 and Archaic draws only the rows that come in. X11 moves them with XCopyArea; when a part of the
 window is covered (the server then sends GraphicsExpose), Archaic draws all of the frame again.
 The 3B1, Idris (X10) and SunView draw all of the frame again for each scroll.
+On the DMD 5620 the terminal has the slices: it moves its own pixels and draws the new rows itself.
+A scroll is about 40 bytes on the line.
 
 An older WRP ignores `sl=1`: then the picture fills the window, and WRP's Up and Dn buttons scroll the page.
 
@@ -676,7 +700,7 @@ A system that has scroll bars uses its own. Where it has none, Archaic draws one
 | Cocoa (macOS) | the Mac's own (NSScroller), always shown. A click in its track scrolls as Page Down or Page Up, or jumps to that place, as set in System Settings (with Option, the other one) |
 | the 3B1 | the window frame's scroll arrows |
 | Mac OS 6 and 7.5 | the Mac's own (a scroll bar control): see Mouse and keys |
-| SDL, X11, X10 (the Atari ST), headless | Archaic's own, in the style of the Atari ST's GEM |
+| SDL, X11, X10 (the Atari ST), the DMD 5620, headless | Archaic's own, in the style of the Atari ST's GEM |
 
 Archaic's own scroll bar is at the right of the window, 17 pixels wide (`screenshots/scrollbar.png`):
 
@@ -688,6 +712,10 @@ Archaic's own scroll bar is at the right of the window, 17 pixels wide (`screens
 
 On X10 the elevator moves when the button is let go (as in GEM), and held parts do not repeat:
 X10 has no events for the mouse moving with a button down, and can't wait for a time.
+
+On the DMD 5620 the bar costs few bytes: the dotted shaft goes down the line as a pattern (4 rows),
+and only the part of the bar that changed is drawn again. While a part of the bar is held down,
+Archaic gets no new slice (one takes 10 s and more there): it comes when the button is let go.
 
 ## Updates
 
@@ -719,7 +747,7 @@ Archaic --HTTP--> WRP, /archaic-update --HTTPS--> GitHub: the newest release of 
    Else it writes the new file into the same folder, as `archaic.PID` (13 letters at most: old file systems take 14).
 3. It reads the file again, and checks its size and CRC-32 against WRP's answer.
 4. It makes the file executable (755). The old program stays as `archaic.old`.
-5. It puts the new file in the place of the old one, with `rename()`. Idris and the 3B1 have no `rename()`
+5. It puts the new file in the place of the old one, with `rename()`. Idris, the 3B1 and the 3B2 have no `rename()`
    (`NORENAME` in `archaic.h`): there it is `unlink()`, then `link()`, and only if `archaic.old` was made.
    If `link()` fails, `archaic.old` goes back.
 
@@ -775,6 +803,7 @@ The release's file is `archaic-` and the system name.
 |---|---|---|
 | Idris (Atari ST) | `_WSLAS` | `idris` |
 | AT&T UNIX PC (3B1) | `unixpc` | `unixpc` |
+| AT&T 3B2 (with a DMD 5620) | `u3b2` | `3b2` |
 | SunOS 4 (Sun-4) | `SUNVIEW` (mksunview), `sparc` | `sun4` |
 | SunOS 3.5 (Sun-3) | `SUNVIEW` (mksunview), `mc68020` | `sun3` |
 | HP-UX 9 | `__hpux` | `hpux9` |
@@ -818,7 +847,7 @@ make cocoa        # ./archaic-cocoa, a macOS window
 make sdl          # ./archaic-sdl, SDL 2
 make headless     # ./archaic-headless, no window: for tests and automation
 make archaic-asan # X11 with address and undefined-behaviour checks
-make knr          # syntax check as a pre-ANSI compiler sees it (-DNOPROTO)
+make knr          # syntax check as a pre-ANSI compiler sees it (-DNOPROTO), also main.c with -DREMOTE
 make test         # sh test/run.sh
 ```
 
@@ -1252,6 +1281,184 @@ Test on a copy of your 3B1 disk.
 - `select()` takes bit masks (a `long`), not `fd_set`, and waits as long as asked: 0.1 s works.
   Archaic waits on the network in 0.1 s steps and reads the window's keys between them.
 - No DNS: `gethostbyname()` reads only `/etc/hosts`. Archaic tries `inet_addr()` first.
+
+## Running on the AT&T 3B2 with a DMD 5620
+
+- **UNIX System V Release 3.2** on an AT&T 3B2/400, with a **DMD 5620** terminal (the Blit) in **layers**.
+  Kit: `att3b2-400-svr32-simh` (Open SIMH, with the dmd5620 emulator), on osarchive in `os/att/3b2/`.
+- It needs WIN/3B (the 3B2's TCP/IP) and the DMD software (`/usr/dmd`: layers and `32ld`). The kit has both.
+- Release binary: `archaic-3b2`. Copy it to the 3B2 as `/usr/local/bin/archaic`,
+  then `chmod 755 /usr/local/bin/archaic`. It is one file: Archaic's part for the terminal is inside it.
+- At the DMD, log in as `root` and type `layers`. Make a window: button 3, New, then drag a rectangle with button 3.
+  In the window, type `/usr/local/bin/archaic`.
+- Archaic first loads its part into the terminal: the pointer is a coffee cup, for about 25 s.
+  **Do not type or click while it loads.** Then WRP's form comes, and a short picture test (10 s).
+- The window is the layer. Reshape in the layers menu (button 3) gives it another size.
+  A small window is faster: its pictures are smaller.
+- **Ctrl-Q** quits: the layer is a terminal again.
+- In the kit, your computer is `10.0.2.2` for the 3B2. So Archaic looks for WRP at `http://10.0.2.2:8080/`.
+  On another network: `archaic HOST:8080`, or set `WRP` to `HOST:8080`. The kit has a name server.
+- The screen is black and white. White is a lit pixel, so a page is a bright window.
+- `screenshots/dmd5620.png`: the terminal's screen, 800 x 1024: `uname -a` in a layer,
+  and Archaic in a second layer with Wikipedia's Blit article.
+
+## Building on the AT&T 3B2
+
+Needs the 3B2's C compiler, `cc` (C Issue 4.2 in the kit), WIN/3B, and the DMD software with `dmdcc`.
+
+1. Copy these 12 files (259 KB) into a folder on the 3B2, with ftp or rsh:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `dmd.c`, `dmdterm.c`, `ntwg.c`,
+   `bin2c.c` and `mk3b2`.
+   The kit lets root in with rsh, on port 3514 of your computer (rcp does not work there).
+   The kit's own `tools/rshpipe.py` copies a file: `python3 tools/rshpipe.py FILE 'cat > /usr/tmp/an/FILE'`.
+2. Build:
+
+   ```
+   sh mk3b2        # compile and link: archaic, about 408 KB (357 KB after strip)
+   ```
+
+   It takes about 2 minutes in the kit. It makes the terminal's part first (`archaic.m`, with `dmdcc`),
+   then puts it into `archaic` (`bin2c` makes `dmdm.h` of it).
+3. Test. **Test mode, no terminal needed** (serve this folder from your computer:
+   `python3 tools/idris.py 0 serve . 8077`):
+
+   ```
+   ./archaic -t http://10.0.2.2:8077/test/data/hn2.gif
+   ```
+
+   The last line ends with `sum ae2b58f3`: the same as on the other systems.
+   With `hn2.abm` or `hn2.ab3` in the place of `hn2.gif`, it checks the ABM and ABM3 decoders: the same sum.
+   (These are the 3B2's decoders. The terminal has its own: see below.)
+
+   **With the window:** `./archaic` in a window of layers.
+
+**Measured in the kit**, with WRP on the same computer. SIMH runs the 3B2 as fast as the host can,
+and the DMD is an emulator: on real machines the times are longer. The line (19200 baud, layers) is the slow part.
+
+| What | Time |
+|---|---|
+| Archaic's part goes into the terminal (11 KB) | about 25 s |
+| WRP's form on the screen, the first time (2 KB of commands) | 5 s |
+| the picture test: two pictures of a quarter of the frame | 10 s |
+| a slice of 608 x 400 as ABM3 (5 KB) | 14 s |
+| a slice of 480 x 668 as ABM3 (6 KB) | 15 s |
+| the same kind of slice as ABM (10 KB) | 27 s |
+| a slice of 768 x 860 as ABM3 (9 KB) | 22 s |
+| a scroll to rows that the terminal has | at once (40 bytes, and about 60 for the scroll bar) |
+| a letter typed into the address box | 32 bytes |
+
+The frame on the terminal's screen was compared with the GIF of the same rows from WRP:
+no pixel differs, for ABM3 and for ABM, also after many scrolls.
+
+## The AT&T 3B2 and the DMD 5620: what to know
+
+Test on a copy of your 3B2 disk.
+
+### The system
+
+| Thing | The kit |
+|---|---|
+| Computer | AT&T 3B2/400 in Open SIMH: WE32100, 4 MB. SIMH runs it as fast as the host can |
+| Terminal | DMD 5620 (the dmd5620 emulator): a WE32100 of its own, 1 MB, 800 x 1024, black and white (green) |
+| Line | the 3B2's second console port (`contty`), 19200 baud. In layers (the xt protocol) a program gets about 450 bytes a second |
+| Window system | layers: each window (layer) is a channel on the line. `32ld` loads a program into a layer's terminal |
+| Network | NI Ethernet, WIN/3B: BSD sockets in `/usr/lib/libnet.a`. SIMH NAT: the 3B2 10.0.2.15, **your computer 10.0.2.2**, name server 10.0.2.3 |
+| File names | 14 characters at most. No symbolic links |
+
+### Two parts
+
+The line is the slow part: 450 bytes a second. A decoded slice of 608 x 400 is 30 KB: more than a minute.
+So Archaic is two programs.
+
+- **On the 3B2**: Archaic's core, with `dmd.c` as its display. It has the network, the HTML and WRP's form.
+- **In the terminal**: `dmdterm.c`, which `dmd.c` loads with `32ld`. It draws, and it has the page's picture.
+- **The picture stays packed on the line.** The 3B2 passes WRP's ABM or ABM3 file on as it comes
+  (`g_slice`), and the terminal decodes it into its own memory, and shows the rows as they come.
+  The terminal keeps the 4 slices; to scroll, the 3B2 says only which page row is at the frame's top (`g_view`).
+- **The picture's width is a multiple of 32** (`picsize()` in `main.c`): the decoded rows are then the
+  terminal's own bitmap, as they are. So up to 31 pixels at the right of the window stay white.
+- **Only what changes goes down the line.** `dmd.c` draws into a copy of the screen in the 3B2's memory, and keeps
+  a list of what was drawn. `flush()` compares the copy with the screen as the terminal has it, and sends the
+  list again only for the parts that are not the same: the terminal clips to such a part.
+  A new page with the same form costs a few bytes.
+- The copy does not have the terminal's pixels: the 3B2 does not have the terminal's font. A letter is a pattern
+  of its own in its 9 x 14 cell, and a row of the frame is a number made from its page row.
+  It only has to be different where the screen is.
+- **While the line is busy, nothing new waits in its queue.** What Archaic draws meanwhile goes as one change
+  when there is room. Type fast, and only the last state of the address box goes.
+- The spinner and the bar (how much of a slice has come) are the terminal's own: they cost no bytes.
+- The scroll bar is Archaic's own, drawn through the same list. A picture whose rows repeat (the shaft's dots)
+  goes as a pattern: its first 1, 2 or 4 rows.
+- While a button is down, the terminal says where the pointer is when it moves (10 times a second at most),
+  and only the last place waits in Archaic's queue: the elevator follows the pointer.
+- In `main.c`, this is `REMOTE` (`mk3b2` sets it): the slices are not in Archaic's memory, `drawtall()` only
+  calls `g_view`, a picture that fits in the window is a slice too, the picture test uses a quarter of the frame,
+  and a long text in a field moves 8 letters at a time (so most keys change one letter on the screen).
+- The commands of the two parts are in `dmd.c`, at its top.
+
+### The C compilers
+
+- `cc` is AT&T's C Issue 4.2: K&R C, with `void`. It defines `u3b2`: `archaic.h` uses that
+  for the WRP address and the system name. `mk3b2` gives it `-DNOPROTO -DREMOTE`.
+- `dmdcc` is the same compiler for the terminal, with the DMD's headers and library.
+  `dmd.h` makes macros of many common names (`min`, `max`, `sw`, `add`, `point`, `string`):
+  `dmdterm.c` keeps away from them. `dmdcc -E` shows what a line becomes.
+- In a program for the terminal, a table with values is in its data, and goes down the line at each start.
+  Tables with no values are in bss: they cost nothing. `dmdterm.c` is 11 KB on the line.
+- `Rect()`, `Pt()`, `rectf()`, `bitblt()` and `string()` are calls into the terminal's ROM, through a table.
+  `string()` draws into a bitmap from `balloc()` too: `dmdterm.c` draws a text there first, then clips it.
+- libc has no `atexit`, `memmove`, `strcasecmp` or `bcopy`. It has `memcpy`, `memset` and `memcmp`.
+- `/usr/gnu/bin/gcc` (2.7.2.3) is in the kit. Archaic does not need it (not tested with it).
+- `mk3b2` gives `cc` the option `-K fpe`: the program then needs no math unit (MAU, WE32106).
+  Without it, `cc` on a 3B2 that has a MAU (as the kit's) makes a program that runs only with one
+  (`file archaic` says `mau hardware required`). Archaic has no floating point of its own.
+
+### WIN/3B
+
+- BSD sockets, as on the 3B1: `ntwg.c` is for both. On the 3B2 `struct sockaddr_in` is in `<sys/in.h>`.
+- Link with `-lnet -lnsl_s`: `libnet.a` uses the TLI functions (`t_open` ...) of the shared `libnsl_s`.
+- `times()` counts 1/100 s: Archaic's clock for the pictures' times (`nowms()` in `http.c`).
+  The display has no clock (`g_ms`).
+
+### The layer's line
+
+- `ioctl(0, JMPX, 0)` says if this is a window of layers. If not, Archaic says so and stops.
+- The tty must be raw before `32ld`, with 8 bits and no output processing: else bytes of the program change.
+  `VMIN` 0 and `VTIME` 0: a read does not wait. `poll()` with no files waits (30 ms steps).
+- On an xt channel, `TCSETAW` can wait for ever. To put the modes back: `TCFLSH`, then `TCSETA`.
+- **Flow.** The xt driver of this UNIX stops for good when a program writes more than about 130 bytes
+  that the terminal has not read. So the terminal sends `a` for each 64 bytes it has read,
+  and `dmd.c` keeps at most 128 bytes on the way.
+- **Standard error is the layer too.** A message on it would be commands for the terminal.
+  `dmd.c` sends it to `/dev/null` while the window is open. With `-v`, give it a file: `archaic -v 2>log`.
+- Keys or clicks while `32ld` loads the program break the download (the emulator stopped with a CPU error).
+- If Archaic is killed, the layer stays raw. Type `stty sane` and Ctrl-J. A shell that reads from a tty
+  with `VMIN` 0 can end at once: then make a new window.
+- A layer keeps its pixels when another one covers it, and when it moves. After Reshape it is empty:
+  the terminal says its new size, and Archaic draws all of it again.
+
+### The terminal
+
+- A lit pixel is 1. Archaic makes white lit, so pictures are not negatives.
+  The decoders in `dmdterm.c` store the pictures' bytes inverted (in ABM, 1 is black).
+- Memory: 4 slices of the page, and one for the picture test. A slice of 608 x 400 is 30 KB;
+  a window of the whole screen needs 4 x 90 KB. With no memory for a slice, Archaic says
+  `Picture: the terminal has no memory for it. Make the window smaller`.
+- The font is the terminal's own, 9 x 14, ASCII only. WRP's form needs a window about 690 pixels wide
+  to be one line. In a narrower window it is two lines.
+- The arrow keys come as `ESC [ A` to `D`, all at once: the terminal's part makes one code of them.
+- Buttons 1 and 2 are the program's. Button 3 is the menu of layers.
+
+### For tests
+
+- `ARCHAICLOG=file archaic ...` writes all the bytes for the terminal to a file.
+  On your computer, `python3 tools/dmdlog.py file W H` prints its commands and draws the screen they make.
+- `ARCHAICM=file.m archaic ...` loads another program into the terminal (a `dmdterm.c` that you changed),
+  not the one inside `archaic`.
+- The 3B2's shell tools are old: no `head`, no `strings`; `grep` has no `\|` (use `egrep`);
+  `od -b` adds a 0 byte to a file with an odd size.
+- With the dmd5620 emulator's MCP tools (`dmd5620 --headless --name NAME`), a test can type, click
+  and take the terminal's screen. Wait for the program to load before the first key.
 
 ## Running on SunOS 4 with SunView
 
@@ -2028,6 +2235,18 @@ A port is **one display file** and **one network file**.
 | `g_bar` | a variable: 0 if the system has scroll bars (Archaic then calls `g_sbar`), 1 if Archaic must draw its own |
 | `g_sbar(pos, max, vis)` | show the page's place in the system's scroll bar: pos, 0 up to max; vis pixels show. Empty where `g_bar` is 1. The scroll bar sends `E_SCROLL` (`S_TO` for its knob) |
 
+**A display on a slow line** (`REMOTE`, as `dmd.c`: a terminal with a CPU of its own) keeps the page's
+slices itself. It has these functions too, and `main.c` then keeps no pixels of the page:
+
+| Function | Does |
+|---|---|
+| `g_slice(s, y0, im)` | pass the picture that comes now on to the display, for its slot s: the slice at page row y0. Fills `im`'s size and kind. 0: the display has it; -1 stopped or short; -2 not a type it takes; -3 it has no memory |
+| `g_view(x, y, w, h, oy, a, b)` | the frame is at x, y, w x h, and its top row is page row oy: the display draws its rows a up to b - 1 again |
+| `g_drop(s)` | slot s is free |
+| `g_spin(on, x, y)` | the display turns the spinner at x, y itself, or takes it away |
+| `g_gauge(x, y, w, h)` | for the next `g_slice`: the display shows how much has come, in a bar there |
+| `g_hole(x, y, w, h)` | an open list is there: the display shows no rows of a slice that comes in that part. w 0: no hole |
+
 **Network (`n_` functions)**
 
 | Function | Does |
@@ -2060,7 +2279,7 @@ Each port is a display file, plus a network file if the system has no BSD socket
 | Target | What it is | Systems |
 |---|---|---|
 | MGR | a window system on a terminal line | SunOS, Coherent, Xenix, Minix, OS-9, VSTa |
-| Blit, DMD 5620 | a graphics terminal on a serial line | Research Unix, System V (AT&T 3B2) |
+| Blit, DMD 5620 | a graphics terminal on a serial line | Research Unix (System V on the AT&T 3B2, with layers: done) |
 | QNX Windows | QNX's window system before Photon | QNX 2 |
 | SunWindows, SunView | Sun's window system before X11 | SunOS 1 to 4, on Sun-1 to Sun-3 (SunOS 4 on a Sun-4, SunOS 3.5 on a Sun-3: done) |
 | VWS, EWS | DEC's window systems before X11 | VAX/VMS (VWS), VAXELN (EWS) |
@@ -2098,8 +2317,12 @@ AT&T and Teletype sold it as the **DMD 5620** (1984): a WE 32100 CPU, 800 x 1024
 It connects to a Unix host on a serial line, and the host loads programs into it.
 Its window system is mpx or mux (Research Unix), or layers (System V Release 3).
 
-- Plan: Archaic in two parts. On the host: the network, HTML and GIF, as now.
-  In the terminal: a small program that shows the pictures and reads the mouse.
+- Done: the DMD 5620 in layers, on the AT&T 3B2 with UNIX System V Release 3.2
+  (`dmd.c`, `dmdterm.c`: see Running on the AT&T 3B2 with a DMD 5620). Archaic is in two parts.
+  On the host: the network, the HTML and WRP's form. In the terminal: a program that draws,
+  keeps and decodes the page's picture, and reads the mouse.
+- Next: mpx or mux on Research Unix (V8, V9, V10), with the Blit or the DMD 5620. The terminal's part
+  needs their library, and the host's part their tty.
 - Emulators: the Blit in 9front, with mux on Research Unix v8 (SIMH).
   For the DMD 5620: [Seth Morabito's emulator](https://loomcom.com/3b2/dmd5620_emulator.html),
   made for the AT&T 3B2/400 in SIMH. It also works with mux on Research Unix V8, V9 and V10 (firmware 8;7;3).
@@ -2197,10 +2420,16 @@ It also knows the 4010's commands.
 
 - One page at a time. No history of its own: use WRP's back button (← arrow).
 - Typing into the page: the picture shows the new text only after Return, a click, or a pause with no keys
-  (`-r`; not on the 3B1 and Idris). The status line shows it meanwhile, from the end of the box's text
+  (`-r`; not on the 3B1, Idris and the DMD 5620). The status line shows it meanwhile, from the end of the box's text
   (the place of the caret is not known).
 - A page over 30 KB of HTML is cut (WRP's pages are about 3 KB).
-- On the 3B1, the font has only ASCII: other letters in WRP's form show as `?`.
+- On the 3B1 and the DMD 5620, the font has only ASCII: other letters in WRP's form show as `?`.
+- On the DMD 5620 the line is slow (about 450 bytes a second): a screen of a page takes 10 to 30 s,
+  and Archaic's part goes into the terminal at each start (25 s). A small window is faster.
+- On the DMD 5620, WRP's page picture must be ABM or ABM3 (WRP 4.11.0 or newer).
+  The terminal has no GIF decoder: with an older WRP there is no picture.
+  Other pictures of a page (not WRP's) go as bits, 1 for each pixel: slow.
+- On the DMD 5620 there is no new picture of the page while you type into it.
 - In SunView, a second window with many colors (another Archaic) can change the colors of the first one,
   until the pointer is in it (see SunOS 4 and SunView: what to know).
 - In SunView, C at 216 shows some wrong colors, like green dots in gray text. The 216 web colors do not fit

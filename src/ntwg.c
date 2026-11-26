@@ -1,5 +1,7 @@
 /* ntwg.c - Archaic's network for WIN/TCP of The Wollongong Group (TWG),
- * the TCP/IP of the AT&T UNIX PC (3B1). It has BSD sockets, as in 4.2BSD:
+ * the TCP/IP of the AT&T UNIX PC (3B1), and for WIN/3B, the same on the
+ * AT&T 3B2 (headers in /usr/include, sys/in.h). It has BSD sockets, as in
+ * 4.2BSD:
  * - the headers are in /usr/ethernet/include and the library is -lnet.
  *   TWG's READ_ME: compile with -DSYSTEM5 -DSHORT_IDENT
  * - select() takes bit masks, not fd_set. It cannot wait for the window
@@ -11,7 +13,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#ifdef u3b2
+#include <sys/in.h>		/* WIN/3B on the 3B2 has it here */
+#else
 #include <netinet/in.h>
+#endif
 #include <netdb.h>
 
 unsigned long inet_addr();

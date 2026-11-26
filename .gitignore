@@ -13,3 +13,7 @@ src/build-mac/
 .DS_Store
 # the program before an update (see Updates in AGENTS.md)
 archaic.old
+# the 3B2 build (src/mk3b2): the terminal part, its C table, the tool
+archaic.m
+dmdm.h
+bin2c

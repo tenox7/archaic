@@ -71,6 +71,7 @@ archaic-asan: $(CORE) src/x11.c src/nsock.c $(HDR)
 # K&R mode: no prototypes at all, as an old compiler would see it
 knr: $(CORE) src/x11.c src/nsock.c $(HDR)
 	$(CC) $(CFLAGS) -DNOPROTO -fsyntax-only $(CORE)
+	$(CC) $(CFLAGS) -DNOPROTO -DREMOTE -fsyntax-only src/main.c
 
 test: archaic-asan archaic-headless
 	sh test/run.sh

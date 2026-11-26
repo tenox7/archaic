@@ -12,6 +12,12 @@
 #ifdef unixpc
 #include <sys/types.h>		/* time_t: the 3B1's time.h does not have it */
 #include <sys/times.h>		/* times(), for nowms() */
+#define TICKMS(t) ((t) * 50 / 3)	/* 60 ticks a second */
+#endif
+#ifdef u3b2
+#include <sys/types.h>
+#include <sys/times.h>
+#define TICKMS(t) ((t) * 10)		/* the 3B2: 100 ticks a second */
 #endif
 #ifdef sun
 #include <sys/types.h>		/* nor SunOS 3's */
@@ -56,20 +62,20 @@ long now()
 
 /* A clock in ms, from any start, for a display that has none (g_ms):
  * main.c times the pictures with it. *res: how far off it can be. It is
- * the seconds of time(); on the 3B1, times() counts 1/60 s. */
+ * the seconds of time(); on the 3B1 and the 3B2, the ticks of times(). */
 long nowms(res)
 long *res;
 {
 	static long t0;
 	long t;
-#ifdef unixpc
+#ifdef TICKMS
 	static struct tms tb;
 
 	t = (long)times(&tb);
 	if (!t0)
 		t0 = t - 1;
 	*res = 20;
-	return (t - t0) * 50 / 3;
+	return TICKMS(t - t0);
 #else
 	t = now();
 	if (!t0)

@@ -25,6 +25,8 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 
 ![Archaic in FreeBee: the AT&T UNIX PC (3B1), showing Wikipedia](screenshots/freebee.png)
 
+![Archaic on a DMD 5620 terminal (the Blit) in layers, on an AT&T 3B2 with UNIX System V Release 3.2, showing Wikipedia](screenshots/dmd5620.png)
+
 ![Archaic in LEMU (QEMU): SunOS 4.1.4 with SunView on a SPARCstation 5, showing Wikipedia in color](screenshots/lemu.png)
 
 ![Archaic in TME: SunOS 3.5 with SunView on a Sun-3/160, showing Wikipedia](screenshots/tme.png)
@@ -49,6 +51,7 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 |---|---|---|---|
 | Whitesmiths Idris 3.14 on the Atari ST | X10 | TCP/IP over SLIP | release: `archaic-idris`, or in the Idris kit |
 | AT&T UNIX PC (3B1, PC 7300) | its own | WIN/TCP on its Ethernet board | release: `archaic-unixpc`, or in the 3B1 kit |
+| UNIX System V Release 3.2 on an AT&T 3B2 | layers, on a DMD 5620 terminal (the Blit) | WIN/3B on its Ethernet board | release: `archaic-3b2` |
 | SunOS 4.1 on a Sun-4 (SPARC) | SunView, in color | BSD sockets | release: `archaic-sun4`, or in the SunOS 4 kit |
 | SunOS 3.5 on a Sun-3 (68020) | SunView | BSD sockets | release: `archaic-sun3`, or in the Sun-3 kit |
 | HP-UX 9 on an HP 9000/700 (PA-RISC) | X11, in color | BSD sockets | release: `archaic-hpux9`, or in the HP-UX kit |
@@ -69,16 +72,18 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 ## Quick start
 
 1. On your computer, start [WRP](https://github.com/tenox7/wrp): `wrp`. It listens on port 8080.
-   Use WRP 4.14.1 or newer. An older WRP works, with fewer features.
+   Use WRP 4.14.2 or newer. An older WRP works, with fewer features.
 2. Copy the binary to the old computer as `archaic`, and make it executable:
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
-   - 3B1, SunOS, HP-UX, DG/UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
+   - 3B1, 3B2, SunOS, HP-UX, DG/UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
    - The kits named in the table have it already. As root, it updates itself.
    - With curl or wget: `curl -O http://HOST:8080/archaic-download/archaic-hpux9`. WRP gets it from the newest release.
    - Mac OS 6 and 7.5: `archaic-macos6.dsk` and `archaic-macos7.dsk` are floppy images with Archaic: put one in the floppy drive. For a real Mac: the `.bin` file (MacBinary).
 3. Start the window system, then type `archaic` in a shell window:
    - Idris: log in as `root`, then `/usr/X/bin/xstart`.
    - 3B1: Office > UNIX System.
+   - 3B2: at the DMD 5620, log in as `root`, then `layers`. Make a window: right button, New, then drag.
+     Archaic loads its part into the terminal first (25 s): do not type until WRP's form shows.
    - SunOS: log in as `root` at the console, then `sunview` (SunOS 3: `suntools`).
    - HP-UX: log in at the VUE login, then open a terminal.
    - DG/UX: log in as `root` at the X login. An xterm opens.
@@ -107,7 +112,7 @@ WRP's form is one line at the top of the window:
 
 To type into the web page, just type: the keys go to its box, and the status line shows the box's text.
 Return sends it. To choose a box, click it in the picture.
-After 3 s with no keys, a new picture shows what you typed (not on the 3B1 and Idris).
+After 3 s with no keys, a new picture shows what you typed (not on the 3B1, Idris and the DMD 5620).
 With an older WRP: type in ![keys](screenshots/icons/k.png), then click ![Return](screenshots/icons/rt.png).
 
 | Key | Does |
@@ -117,7 +122,7 @@ With an older WRP: type in ![keys](screenshots/icons/k.png), then click ![Return
 | Esc | stop loading |
 | Page Up, Page Down, Space, b | scroll a window (Space and b: when no box has the keyboard) |
 | ↑, ↓, mouse wheel | scroll a quarter of a window |
-| right button | scroll: top half of the window up, bottom half down |
+| right button (DMD 5620: the middle one) | scroll: top half of the window up, bottom half down |
 | Ctrl-Q | quit |
 
 The 3B1's own keys (Exit, Page, Prev) and the window frames of the 3B1, SunView and the Mac work too.
@@ -167,6 +172,7 @@ On the old systems, copy the sources in, then:
 |---|---|---|
 | Idris | `sh mkinc`, then `sh mk` | Whitesmiths C 3.2 |
 | 3B1 | `sh mkunixpc` | gcc 2.5.8 |
+| 3B2 with a DMD 5620 | `sh mk3b2` | AT&T's cc (C Issue 4.2), and `dmdcc` for the terminal |
 | SunOS 3 and 4 | `sh mksunview` | Sun's cc |
 | HP-UX 9 | `sh mkhpux` | HP's cc |
 | DG/UX R4.20 | `sh mkdgux` | DG/UX's cc (GCC 2.7.2) |
@@ -182,7 +188,7 @@ see [AGENTS.md](AGENTS.md).
 
 ## Roadmap
 
-MGR, the Blit and DMD 5620, QNX Windows on QNX 2,
+MGR, the Blit with mux on Research Unix, QNX Windows on QNX 2,
 SunView on the Sun-2, SunWindows on SunOS 1, VWS and EWS on the VAX,
 NeWS and Display PostScript, Windows 1 and 2, OS/2 1.x,
 Tektronix 4010, 4014 and 4105 terminals. Plan 9 RIO.

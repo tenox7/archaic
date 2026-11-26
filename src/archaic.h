@@ -56,6 +56,9 @@ extern char ident[];
 #ifdef unixpc
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
+#ifdef u3b2
+#define DEFURL "http://10.0.2.2:8080/"
+#endif
 #ifdef SUNVIEW
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
@@ -90,6 +93,11 @@ extern char ident[];
 #endif
 #ifdef unixpc
 #define SYSID "@(#)Archaic for unixpc"
+#define NORENAME
+#define NOUNISTD
+#endif
+#ifdef u3b2
+#define SYSID "@(#)Archaic for 3b2"
 #define NORENAME
 #define NOUNISTD
 #endif
@@ -316,6 +324,26 @@ typedef struct event {
  * A system with none (SDL, X11 with no toolkit, X10) sets g_bar to 1:
  * Archaic draws its own at the right of the window, in the style of the
  * Atari ST's GEM, and uses E_UP and E_MOVE to drag it. */
+/* REMOTE (dmd.c, a terminal on a slow line): the display keeps the
+ * slices of the page's picture itself. g_slice passes the body that
+ * comes on to it, for its slot s (the slice at page row y0), and fills
+ * im's size and kind: 0 when the display has all of it, -1 if it was
+ * stopped or came short, -2 if the display can't take this picture type,
+ * -3 if it has no memory for it. g_view: the
+ * frame is at x, y, w x h and its top row is page row oy: the display
+ * draws its rows a up to b - 1 again. g_drop: slot s is free. g_spin:
+ * the display turns the spinner at x, y itself (on), or takes it away.
+ * g_gauge: for the next g_slice, the display shows how much of it has
+ * come in a bar at x, y, w x h. g_hole: the display shows no rows of a
+ * slice that comes at x, y, w x h (an open list is there); w 0: none. */
+#ifdef REMOTE
+int g_slice P((int s, long y0, Image *im));
+void g_view P((int x, int y, int w, int h, long oy, int a, int b));
+void g_drop P((int s));
+void g_spin P((int on, int x, int y));
+void g_gauge P((int x, int y, int w, int h));
+void g_hole P((int x, int y, int w, int h));
+#endif
 extern int g_bar;
 void g_sbar P((long pos, long max, long vis));
 int g_open P((char *geom, int *w, int *h));

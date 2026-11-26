@@ -130,6 +130,7 @@ static long sbase, ssize;	/* where the slices start, how high */
 static int sdir = 1;		/* the last scroll: 1 down, -1 up */
 static int sstop;		/* Esc or an error: no slices until a scroll */
 static int quiet;		/* getting a slice the user did not ask for */
+static int rbar;		/* REMOTE: the display draws the progress bar */
 static char surl[MAXURL];	/* a slice's address */
 static char spage[MAXURL];	/* the address WRP showed before */
 static char ssave[200];		/* the status line before a slice */
@@ -180,10 +181,12 @@ static char sline[200];		/* status line */
 static long pgot, plen;		/* its progress bar: pgot of plen bytes, 0 none */
 static int pdone;		/* the bar's black part, as drawn */
 #define SPW 13			/* the spinner: SPW x SPW, left of the status */
+#ifndef REMOTE			/* (REMOTE: the display has it and turns it) */
 static int spx[] = { 6, 9, 10, 9, 6, 3, 2, 3 };	/* its 8 dots, clockwise */
 static int spy[] = { 2, 3, 6, 9, 10, 9, 6, 3 };
-static int spinon;		/* it turns: a load the user asked for runs */
 static int spinf;		/* its step, 0 to 7: the dot that leads */
+#endif
+static int spinon;		/* it turns: a load the user asked for runs */
 static char what[60];		/* what is coming: "Page", "Picture 1 of 2" ... */
 static int phase;		/* what http_open() does with it (H_), 0 none */
 static long tphase, tshown;	/* when the phase began; the second shown */
@@ -436,6 +439,19 @@ int all;
 	pdone = b;
 }
 
+#ifdef REMOTE
+/* the spinner at the left end of the status line: the display draws it
+ * and turns it */
+static void drawspin()
+{
+	if (!headless)
+		g_spin(spinon, M, viewh + 2 + (fh - SPW) / 2);
+}
+
+static void spin()
+{
+}
+#else
 static void dot(b, x, y)
 unsigned char *b;
 int x, y;
@@ -492,6 +508,7 @@ static void spin()
 	drawspin();
 	g_flush();
 }
+#endif
 
 /* 1 if WRP's picture comes again after rsec seconds with no keys (-r):
  * keys went to the page since its last picture, it is not a password
@@ -544,6 +561,10 @@ static void drawstatus()
 
 	if (headless)
 		return;
+#ifdef REMOTE
+	if (!spinon)		/* the display takes its own dot away */
+		g_spin(0, 0, 0);
+#endif
 	g_fill(0, viewh, winw, winh - viewh, 0);
 	g_fill(0, viewh, winw, 1, 1);
 	if (spinon) {		/* the text goes right of it */
@@ -554,7 +575,8 @@ static void drawstatus()
 	if (plen > 0) {
 		drawprog(1);
 		w -= pbarw() + M;
-	}
+	} else if (rbar)	/* REMOTE: the display's own bar is there */
+		w -= pbarw() + M;
 	if (kwait >= 0)		/* the wait bar goes right of the text */
 		w -= waitn() * 6 + 2 + 2 * M;
 	n = len(sline);
@@ -695,6 +717,15 @@ static void progress()
 		sprintf(lab + k - 1, ", %s)", t);
 	else if (t[0])
 		sprintf(lab + k, " (%s)", t);
+#ifdef REMOTE
+	/* a picture goes on to the terminal, which shows its rows as they
+	 * come: the line is too slow for a count of its bytes */
+	if (!headless && strnieq(lab, "Picture", 7)) {
+		sprintf(msg, "%s: %s", lab, bytes(n > 0 ? n : g));
+		sayp(msg, 0L, 0L);
+		return;
+	}
+#endif
 	if (n > 0 && n < 1024)
 		sprintf(msg, "%s: %ld of %ld bytes", lab, g, n);
 	else if (n > 0)
@@ -787,6 +818,14 @@ int i;
 	}
 	for (k = n; k > 0 && tw(s + n - k, k) > room; --k)
 		;
+#ifdef REMOTE
+	/* a slow line: a text that is too long moves 8 letters at a time,
+	 * so that most keys change one letter on the screen, not all */
+	if (k < n)
+		k = n - (n - k + 7) / 8 * 8;
+	if (k < 0)
+		k = 0;
+#endif
 	text(x + 1 + PAD, y + 1 + PAD, s + n - k, k);
 	if (i == focus)
 		fill(x + 1 + PAD + tw(s + n - k, k), y + 1 + PAD, 1, fh, 1);
@@ -1114,6 +1153,13 @@ int r0, r1;
 	fw = it->x + it->w > vieww ? vieww - it->x : it->w;
 	if (fw <= 0)
 		return;
+#ifdef REMOTE
+	if (!headless) {	/* the display has the slices: it draws them */
+		if (a < b)
+			g_view(it->x, y, fw, it->h, oy, a, b);
+		return;
+	}
+#endif
 	while (a < b) {
 		/* the slice at row a; or else, where the next one starts */
 		q = b;
@@ -1177,6 +1223,9 @@ static void drawpop()
 	Opt *o;
 	int j, n, ty;
 
+#ifdef REMOTE
+	g_hole(px, py, pw, ph);	/* no rows of a slice that comes show here */
+#endif
 	fill(px, py, pw, ph, 0);
 	box(px, py, pw, ph);
 	for (j = 0; j < it->nopt && 1 + (j + 1) * prow < ph; ++j) {
@@ -1442,6 +1491,10 @@ int rx, ry, rw, rh;
 
 	if (headless)
 		return;
+#ifdef REMOTE
+	if (popup < 0)		/* the list is gone: see drawpop */
+		g_hole(0, 0, 0, 0);
+#endif
 	if (r > vieww)
 		r = vieww;
 	if (ry < viewh && rx < r) {
@@ -1939,6 +1992,9 @@ int *w, *h;
 			break;
 		}
 	*w = vieww - 2 * M;
+#ifdef REMOTE
+	*w &= ~31;		/* whole 32-bit words: the terminal's bitmap */
+#endif
 	*h = viewh - y - M;
 	if (*h < 50)
 		*h = 50;
@@ -2744,6 +2800,10 @@ Image *im;
 		free((char *)im->pal);
 	if (rim == im)
 		rim = 0;
+#ifdef REMOTE
+	if (!headless && im >= &slices[0].im && im <= &slices[NSLICE - 1].im && im->w)
+		g_drop((int)((Slice *)im - slices));	/* im is its first member */
+#endif
 	im->bits = im->pal = 0;
 	im->w = im->h = 0;
 	im->kind = 0;
@@ -3317,6 +3377,27 @@ int i, k, n;
 	}
 }
 
+#ifdef REMOTE
+/* The picture that comes goes on to the display, for its slot s (the
+ * slice at page row y0): the display decodes it, shows its rows, and
+ * counts its bytes in a bar of its own. The status line names it. */
+static int rslice(s, y0, im)
+int s;
+long y0;
+Image *im;
+{
+	int r;
+
+	rbar = http_len > 0;
+	progress();
+	if (rbar)
+		g_gauge(sright() - pbarw(), viewh + 3, pbarw(), fh - 2);
+	r = g_slice(s, y0, im);
+	rbar = 0;
+	return r;
+}
+#endif
+
 /* the slice k of the tall picture: page rows *a up to *b; 0 if none */
 static int srows(k, a, b)
 long k, *a, *b;
@@ -3399,6 +3480,11 @@ long a, b;
 			rdrawn = 0;
 			r = -1;
 			if (http_status == 200) {
+#ifdef REMOTE
+				if (!headless)
+					r = rslice(i, a, &s->im);
+				else
+#endif
 				r = pic_load(&s->im);
 				picdone(&s->im, r, t0);
 				ms = ptime(&res) - t0;
@@ -3407,7 +3493,13 @@ long a, b;
 			if (http_status != 200) {
 				sprintf(msg, "Picture: HTTP %d", http_status);
 				say(msg);
-			} else if (r < 0) {
+			} else if (r == -2) {		/* REMOTE: see g_slice */
+				sprintf(msg, "Picture: this display takes only ABM, not %.40s. Use a newer WRP",
+					http_type);
+				say(msg);
+			} else if (r == -3)
+				say("Picture: the terminal has no memory for it. Make the window smaller");
+			else if (r < 0) {
 				if (!stop)
 					say("Picture: can't show the slice");
 			} else if (s->im.h != b - a)	/* the server ignored y and h */
@@ -3781,6 +3873,11 @@ char *url, *post;
 		g_title(wintitle());
 	findtall();
 	layout();
+#ifdef REMOTE
+	/* the display keeps the picture, and gets it as slices: also a
+	 * picture that fits */
+	if (headless)
+#endif
 	if (tall >= 0 && items[tall].ih <= items[tall].h) {
 		tall = -1;	/* it fits: an ordinary picture */
 		layout();
@@ -4042,6 +4139,9 @@ static void pictest()
 	c = &chs[k];
 	was = c->small;
 	picsize(&w, &h);
+#ifdef REMOTE
+	h = h / 4 > 64 ? h / 4 : 64;	/* a slow line: a small test picture */
+#endif
 	if (cval[0])
 		sprintf(cs, "%.7s", cval);
 	else
@@ -4068,7 +4168,11 @@ static void pictest()
 		else {
 			t0 = ptime(&res);
 			tim.depth = idepth;
+#ifdef REMOTE
+			r = rslice(NSLICE, 0L, &tim);	/* the display's test slot */
+#else
 			r = pic_load(&tim);
+#endif
 			http_sync();
 			if (r != 0 || stop || http_len <= 0 || http_got + 16 < http_len)
 				r = -1;
@@ -4080,6 +4184,9 @@ static void pictest()
 				same = tim.kind == P_ABM || tim.kind == P_AB8;
 			progress();
 			imfree(&tim);
+#ifdef REMOTE
+			g_drop(NSLICE);
+#endif
 		}
 		http_close();
 		if (r != 0)
@@ -4369,6 +4476,12 @@ char **argv;
 				event(&e);
 			continue;
 		}
+#ifdef REMOTE
+		/* on that slow line a slice takes 10 s and more: none while a
+		 * part of the scroll bar is held. It comes when the button is
+		 * let go, for the place where the page then is */
+		if (!bpart)
+#endif
 		if (slicework(1))	/* the frame's slices, then the next ones */
 			continue;
 		if (ptest > 0 && fopt == F_AUTO && nitems > 0 && wrpform() >= 0) {
