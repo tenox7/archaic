@@ -10,8 +10,10 @@ WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
 ## Performance
 
 Archaic provides ultra fast and smooth browsing experience on vintage computers.
-Unlike Netscape or Mosaic, Archaic is tightly integrated with WRP and provides the window size, scroll bar position and display properties.
-This allows to pre-load and optimize, cache, send only small chunks of the page as you scroll.
+Unlike Netscape, Mosaic or any other 3rd party browser, Archaic is tightly integrated with WRP.
+It provides the window size, scroll bar position and display properties. It does small performance test
+to determine download and decoding speed. This allows to negotiate encoding properties, optimize, 
+pre-load, cache, send only small chunks of the page as you scroll.
 
 ## Screenshots
 
