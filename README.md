@@ -1,19 +1,23 @@
-# Archaic
-
-Small and ultra fast web browser for very old computers. 
-
-Archaic is a dedicated client of **[WRP, the Web Rendering Proxy](https://github.com/tenox7/wrp)**.
-WRP runs a modern browser on a modern computer. It sends each web page as a picture
-with a click map, plus a small form. Archaic shows them, and sends your clicks and keys back.
-WRP does all the hard parts: HTTPS, JavaScript, CSS, fonts.
-
-## Performance
+# Archaic Web Browser
 
 Archaic provides ultra fast and smooth browsing experience on vintage computers.
-Unlike Netscape, Mosaic or any other 3rd party browser, Archaic is tightly integrated with WRP.
-It provides the window size, scroll bar position and display properties. It does small performance test
-to determine download and decoding speed. This allows to negotiate encoding properties, optimize, 
-pre-load, cache, send only small chunks of the page as you scroll.
+
+Archaic is a dedicated client of **[WRP, the Web Rendering Proxy](https://github.com/tenox7/wrp)**.
+WRP is a proxy server that runs on a modern computer. It renders each web page as a picture
+with a click map, plus a small form. Archaic shows them, and sends your clicks and keys back.
+WRP does all the hard parts: HTTPS, JavaScript, Page Layout, CSS, fonts.
+
+## Why is Archaic better than other browsers?
+
+Unlike Netscape, Mosaic or any other 3rd party browser, Archaic is very tightly integrated with WRP.
+It's a dedicated client rather than generic browser. It's able to provide WRP with the window size,
+scroll bar position and display properties. This allows smooth scroling and encoding and downloading
+smaller chunks on demand.
+
+Archaic runs a performance test to determines download and image decoding speeds. It automatically
+negotiates the most optimal image encoding format and compression based on the machine and link speed.
+
+In addition, Archaic is very small and simple and can be built for platforms that never had any browser.
 
 ## Screenshots
 
