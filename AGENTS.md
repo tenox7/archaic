@@ -15,7 +15,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | text fields, password fields | JavaScript, CSS, HTTPS (WRP does all that) |
 | buttons, drop-down menus (SELECT) | check boxes, radio buttons, TEXTAREA |
 | links, page title, line breaks | tables, fonts, colors |
-| GIF and ABM pictures, clickable (ISMAP) | PNG, JPEG (Archaic asks WRP for GIF or ABM) |
+| GIF, ABM and AB8 pictures, clickable (ISMAP) | PNG, JPEG (Archaic asks WRP for GIF, ABM or AB8) |
 
 ## Files
 
@@ -25,8 +25,8 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/main.c` | the page on the screen: layout, drawing, mouse, keys, forms |
 | `src/html.c` | HTML reader: forms, menus, links, images, text |
 | `src/http.c` | URLs and HTTP/1.0, with a 16 KB read buffer |
-| `src/gif.c` | GIF decoder: the colors, or black and white with a 4x4 dither. WRP's black and white GIFs go a fast way, and its pictures in colors the 8-bit way (see Pictures: GIF and ABM) |
-| `src/pic.c` | pictures: looks at what came (GIF or ABM); the ABM decoder |
+| `src/gif.c` | GIF decoder: the colors, or black and white with a 4x4 dither. WRP's black and white GIFs go a fast way, and its pictures in colors the 8-bit way (see Pictures: GIF, ABM, ABM3 and AB8) |
+| `src/pic.c` | pictures: looks at what came (GIF, ABM or AB8); the ABM, ABM3 and AB8 decoders |
 | `src/update.c` | updates: asks WRP for a newer Archaic, and puts it in the place of the program (see Updates) |
 | `src/x10.c` | display for X10 (Idris) |
 | `src/nidris.c` | network for Idris: TCP through netd |
@@ -38,6 +38,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/font6x13.h` | the X11 6x13 font (public domain), for `fb.c` |
 | `src/nsock.c` | network for BSD sockets (Unix, macOS) |
 | `src/fetch`, `mkinc`, `mk`, `lka` | Idris scripts: get the sources, headers, compile, link |
+| `src/heap.c` | Idris tool: sets how much memory a program file asks for. `lka` links with a copy of the linker that asks for more |
 | `src/unixpc.c` | display for the AT&T UNIX PC (3B1) window system |
 | `src/ntwg.c` | network for the 3B1: the BSD sockets of WIN/TCP (TWG) |
 | `src/mkunixpc` | 3B1 script: compile and link with gcc |
@@ -54,17 +55,18 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/mkmac`, `CMakeLists.txt`, `archaic.r` | the classic Mac OS: build with Retro68 in Docker, on your computer (`make mac`). `archaic.r`: the SIZE resource, with the multitasking flags |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
+| `tools/slowline.py` | host tool: a TCP proxy that is a slow line (bytes a second), to try Archaic on a slow line with WRP |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
 | `test/run.sh` | tests: GIF decoder, HTML, forms, WRP, the headless display |
 | `test/xshot.sh` | test: run the X11 build and take a screenshot |
-| `test/data/` | GIFs saved from WRP, for the tests; two of them also as ABM. `full.gif`, `runs.gif` and `ilace.gif` are made for the 8-bit way: a full code table with no clear, long runs, interlaced |
+| `test/data/` | GIFs saved from WRP, for the tests; two of them also as ABM and ABM3 (`.ab3`), two as AB8. `full.gif`, `runs.gif` and `ilace.gif` are made for the 8-bit way: a full code table with no clear, long runs, interlaced. `dith` is noise in 8 colors: smaller as a GIF than as AB8. WRP makes the `.ab3` and `.ab8` files from the GIFs: `WRP_SAMPLES=dir go test -run TestSamples` |
 | `test/cfacts.c`, `cfacts2.c` | probe for a new port: what its C compiler and linker do (name length, case, struct copies) |
 | `screenshots/` | the pictures in README.md: the emulators' windows, the scroll bar, and WRP's buttons and labels in `icons/` (drawn from the pictures in `main.c`, as `drawbutton()` draws them, at their real size). Also each system's own screen, for this file (see each Running section) |
 
 ## Options
 
 ```
-archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-r n] [-u] [-n] [--version] [--help] [url]
+archaic [=WxH+X+Y] [-a] [-c n] [-f type] [-t] [-v] [-o file] [-s script] [-r n] [-u] [-n] [--version] [--help] [url]
 ```
 
 | Option | Meaning |
@@ -73,9 +75,9 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f fmt] [-t] [-v] [-o file] [-s script] [-r n] [
 | `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`). On the classic Mac OS: the screen under the menu bar (on System 7, less the column of disk icons at the right) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
-| `-f fmt` | `gif`: ask WRP for GIFs only. `abm` (as without `-f`): WRP may send its black and white pictures as ABM (see Pictures: GIF and ABM) |
-| `-t` | test mode: no window. Prints the page items, and for each picture what it came as (`gif`, `abm`) and a checksum |
-| `-v` | status messages also go to stderr |
+| `-f type` | ask WRP for one type of pictures, with no choice. `gif`: GIFs only. `abm`: ABM, and GIFs in colors (as Archaic 0.11). `abm3`: ABM3. `ab8`: AB8, and ABM. `small`: for each picture the smallest type. Without `-f`, Archaic times its pictures and asks for the kind that is faster here (see Pictures: GIF, ABM, ABM3 and AB8) |
+| `-t` | test mode: no window. Prints the page items, and for each picture what it came as (`gif`, `abm`, `abm3`, `ab8`) and a checksum |
+| `-v` | status messages also go to stderr, and the times of each trial of the picture types |
 | `-o file` | at the end, save the first picture: PBM, or PPM if it has colors |
 | `-s script` | play a script, then quit (see Scripts, in Building in Idris) |
 | `-r n` | typing into the page: WRP's picture again after n seconds with no keys. Default 3, 0 never. Not on the 3B1 and Idris (no clock). A new picture that takes longer than n seconds turns it off for the run (see Typing into the page) |
@@ -95,7 +97,7 @@ The classic Mac OS has no command line: Archaic reads its options from the file 
 |---|---|
 | W, H | the window's size: the picture fills the window. Always, also with `-a` |
 | M (mode) | ISMAP |
-| T (picture type) | GIF. WRP sends its black and white pictures (2 colors) as ABM in its place (see Pictures: GIF and ABM) |
+| T (picture type) | GIF. WRP sends its pictures as ABM, ABM3 or AB8 in its place, as Archaic asks (see Pictures: GIF, ABM, ABM3 and AB8) |
 | C (colors) | a display with colors: the menu shows (see Colors). Black and white: WRP's one menu shows its lines of 2 (see below); with an older WRP, or with `-c n`, Archaic sends 2 (or n), and C is not shown |
 | SL (slices) | 1: the whole page, in slices (see Scrolling). An older WRP ignores it |
 
@@ -233,25 +235,146 @@ took 72 cells with GIP, and all showed the right colors. Before Archaic took cel
 used colors, one window took all 183, with GIP too. With median cut, the windows after the first
 had no free cells, and their photos lost their colors.
 
-## Pictures: GIF and ABM
+## Pictures: GIF, ABM, ABM3 and AB8
 
 A GIF has a code for every few pixels. An old CPU needs a long time for that:
 a 10 MHz 68010 needs about 8 seconds for one picture of 551 x 310 pixels.
 That was most of the time of a page, also on a slow line.
 
-**ABM** is WRP's black and white picture for 1-bit displays. It is the display's own bytes
-(1 bit a pixel), packed with a byte LZ. Archaic decodes it in whole bytes, with no work for each pixel.
+WRP has three picture types of its own for Archaic:
 
-- Archaic's requests have `Accept: image/x-abm`.
-- A WRP that knows ABM (it has `abm.go`) then sends its black and white pictures (2 colors) as ABM,
-  and pictures with more colors as GIFs. An older WRP sends only GIFs.
+| Type | Pictures | What it is | Size | To decode |
+|---|---|---|---|---|
+| **ABM** | black and white | the display's own bytes (1 bit a pixel), packed with a byte LZ | 10 to 20% less than the GIF | very fast: no work for each pixel |
+| **ABM3** | black and white | the same pixels, from an arithmetic coder that learns the page | about 39% less than ABM | slow: work for each coded byte and pixel |
+| **AB8** | colors | a byte for each pixel, packed with a byte LZ | most often less than the GIF. With a dither to the 216 web colors: about 20% more | fast: 3 times as fast as the GIF |
+
+Seconds to decode one slice of 632 x 351 pixels (CPU time, no network; mean sizes of 152 slices from 15 web pages):
+
+| Type | Size | 3B1 (10 MHz 68010) | Atari ST (8 MHz 68000) | Mac IIcx (16 MHz 68030) |
+|---|---|---|---|---|
+| GIF, 2 colors (the fast way) | 8.2 KB | 1.55 | 2.97 | 0.53 |
+| ABM | 6.7 KB | 0.20 | 0.30 | 0.05 |
+| ABM3 | 4.1 KB | 2.75 | 4.52 | 1.02 |
+| GIF, 256 colors (the 8-bit way) | 40 KB | | | 1.30 |
+| AB8, 256 colors | 36 KB | | | 0.43 |
+
+- Archaic's requests name the types it takes: `Accept: text/html, image/x-abm, image/x-abm3;q=0.5, image/x-ab8, image/gif;q=0.5`.
+  A type with `q=0.5` is one that Archaic takes, but does not want now.
+- WRP (with `picfmt.go`) makes the picture in each type that Archaic likes best, and sends the smallest one.
+  For a black and white picture (2 colors) the types are ABM and ABM3; for more colors, AB8 and the GIF.
+- When WRP chose between two types, its answer has `X-Fast-Length`: the picture's size in the type
+  that decodes fastest (ABM, AB8).
+- An older WRP knows only `image/x-abm`: it sends ABM for black and white, and GIFs for colors. A WRP before ABM sends only GIFs.
 - On a display with colors, an ABM picture shows as it is: black and white (C set to 2).
-- `-f gif` makes Archaic ask for GIFs only. Use it to compare the two on your computer:
-  `archaic -t -f gif ...`, then `archaic -t ...`. The last status line has the time.
+  Archaic asks for AB8 only on a display with colors.
+- `-f` asks for one type, with no choice (see Options). Use it to compare the types on your computer:
+  `archaic -t -f gif ...`, then `archaic -t -f abm ...`. The last status line has the time.
 - WRP's black and white GIF (2 colors in its color table) goes a fast way in the GIF decoder too:
   about 5 times faster than before.
 - A GIF in colors, on a display with colors, goes the 8-bit way (`lzw8`), if it fills its screen
   and is not interlaced (WRP's GIFs do). Other GIFs are decoded a pixel at a time.
+
+The file formats are in `src/pic.c`, and in WRP's `abm.go`, `abm3.go` and `ab8.go`.
+
+### The automatic choice
+
+Which type is on the screen first depends on the CPU and on the line.
+On a fast line the CPU is the slow part, and the type that is fast to decode is best.
+On a slow line the bytes are the slow part, and the small type is best.
+Seconds for a page of 6 typical slices in black and white (`-t`, at the computer's real speed):
+
+| Computer | Line | GIF | ABM | ABM3 |
+|---|---|---|---|---|
+| Mac IIcx | 9600 baud | 52 | 42 | 26 |
+| | 19200 baud | 27 | 22 | 14 |
+| | 38400 baud | 14 | 11 | 11 |
+| | Ethernet | 7.7 | 4.5 | 10 |
+| 3B1 | 9600 baud | 54 | 44 | 29 |
+| | 19200 baud | 28 | 23 | 23 |
+| | 38400 baud | 17 | 13 | 24 |
+| | Ethernet | 14 | 4.7 | 21 |
+| Atari ST (SLIP, netd) | 19200 baud | 45 | 25 | 42 |
+
+Archaic does not know its CPU's speed (an emulator can run it 10 times as fast) or its line's.
+So it measures. First with a test:
+
+- **The picture test.** Once a run, when WRP's first page is here and Archaic has nothing to do,
+  it gets a test picture from WRP: once in the fast kind, once in the small kind, and times the two.
+  The picture is a part of a sample page, as large as the frame, in the colors in use (`/archaic-test`).
+- The status line shows the test: `Picture test 1 of 2 (ABM): 3 of 8 KB` with the progress bar,
+  `Picture test 2 of 2 (ABM3): 2 of 5 KB`, then the result, which stays:
+  `Picture test: ABM3 is used (2.5 s, ABM 4.3 s)`. The small kind is used if it took 10% less.
+- WRP's log has the test too: `Archaic: picture test starts: ABM, then ABM3 (615x349, 2)`,
+  a `Picture test:` line for each picture, and `Archaic: picture test: ABM3 is used (2.5 s, ABM 4.3 s)`.
+- A click or a key stops the test: it comes again later (3 times at most). Esc stops it for the run.
+  No test with `-f`, `-t` or `-s`, or with a WRP that has none (4.14.1 and older).
+
+Then with the pictures of the pages, so that the choice can change later:
+
+- It times each picture, from the answer's header until the last row is there. The time before
+  the header (the connect, the request, WRP's work) is the same for both types, and is not counted:
+  for a small picture it would be most of the time.
+- Only pictures that are not drawn while they come are counted: of a page's slices, the ones that
+  come ahead. Drawing takes time that the others do not have. (With `-t`, all are counted.)
+- There are two kinds: **fast** (ABM; in colors AB8) and **small** (the smaller one of ABM3 and ABM;
+  in colors of the GIF and AB8). Archaic asks for a kind through the `q` of the types (see above).
+- After the test, Archaic goes on with the kind that the test chose. With no test (an older WRP, `-s`, `-t`),
+  the first 2 pictures that count are of the fast kind, and the next 2 of the small kind: the first trial.
+- A trial: the other kind is tried for 2 pictures, and takes over if its time for a byte is 10% less.
+  Pictures of the two kinds are not the same pictures: the time counts for a byte of the fast type,
+  which `X-Fast-Length` gives for a small picture.
+- The next trial comes after 8 pictures, and after twice as many each time, up to 64.
+  If the other kind took 2 times as long, the next trial comes after 64 pictures at once.
+- Older pictures count less: at 16 pictures of a kind, their sums are halved.
+- A kind whose pictures take less than 1/10 s stays: there is nothing to win.
+- Black and white pictures and pictures in colors have a choice each.
+- The clock is the display's (`g_ms`). The 3B1's is `times()` (1/60 s), Idris's the seconds of `time()`
+  (`nowms()` in `http.c`). A clock that coarse can't tell after 2 pictures: then the trial goes on,
+  for 6 pictures at most.
+- The status line shows each slice that came, with its type, size, time and speed:
+  `Picture part 3 of 9: ABM3, 5 KB in 2.7 s, 1.9 KB/s`. So a new type shows there. The line of a picture
+  that comes names its type too (`Picture part 3 of 9 (ABM3): 4 of 7 KB`), and so does the page's last line
+  (`2 s, 45 KB, ABM3  http://...`).
+- A trial is not on the status line: it is in WRP's log, and with `-v` on stderr.
+- With `-v`, each trial's sums also go to stderr:
+  `archaic: pictures in black and white: fast 5798 ms for 10 KB, small 5206 ms for 15 KB`.
+- WRP's log gets each trial too: `Archaic: pictures in black and white: trial of ABM3 starts (ABM is in use)`,
+  then `Archaic: pictures in black and white: now ABM3 (2.1 s for 10 KB, ABM 3.4 s); fast ...` (or `still ABM`).
+  The times are each kind's time for 10 KB of the fast type; in colors the small kind is `GIF or AB8`.
+  Archaic sends these notes in the request header `X-Archaic-Note`.
+
+To try a slow line on your computer: `python3 tools/slowline.py 8098 8080 1920` is a line of 19200 baud
+to the WRP on port 8080. Start Archaic with `-v` and port 8098 (in an emulator kit: `archaic -v 10.0.2.2:8098`).
+
+Measured with WRP and a long page (Wikipedia's Unix article, 18 slices, a scroll every 2 s), in Archaic's
+window on the 3B1 at its real speed (10 MHz), started with `-s` (so with no test at the start: the choice
+came from the first trial). Seconds from the first slice to the last one:
+
+| Line | Archaic chose | With the choice | `-f abm` | `-f abm3` |
+|---|---|---|---|---|
+| 9600 baud | ABM3 | 101 | 128 | 98 |
+| 19200 baud | ABM | 85 | | |
+| 38400 baud | ABM | 70 | | |
+| Ethernet | ABM | 65 | | |
+
+On the Atari ST in X (Idris, SLIP) Archaic chose ABM: a page and 10 scrolls took 95 s with `-f abm`
+and 122 s with `-f abm3`. On the Mac IIcx in 216 colors on Ethernet it chose AB8.
+
+### Rows on the screen
+
+A call that draws has a fixed cost. On a 68030 Mac it is about 15 ms (CopyBits), and the status line
+takes 7 ms more: 44 calls for a slice (8 rows each) took longer than its pixels.
+So new rows wait, and go to the screen at most 5 times a second, with the progress (`img_rows` in `main.c`).
+On Idris (a clock in seconds) they go once a second.
+
+| Measured | Before | Now |
+|---|---|---|
+| Mac IIcx, 216 colors: the slice on the screen (609 x 384) | 2.53 s (GIF, 13 KB) | 1.18 s (AB8, 12 KB) |
+| Mac IIcx, 216 colors: the next slice, not on the screen | 1.76 s (GIF, 20 KB) | 0.79 s (AB8, 19 KB) |
+| 3B1 in its window, Ethernet: a page and 10 scrolls, ABM | 28 s | 23 s |
+
+### ABM against GIF, and other formats
 
 Measured with `-t`: one page with 6 pictures of 551 x 310 pixels (42 KB as GIF, 37 KB as ABM):
 
@@ -303,8 +426,6 @@ Measured on the 3B1 (10 MHz 68010, CPU time for one 632 x 351 slice from WRP, no
 
 On the Mac it is 2 to 3 times faster than before. Wuffs, the fastest GIF decoder found,
 keeps up to 8 pixels for each code; it is C99, and Archaic's compilers are older.
-
-The ABM file format is in `src/pic.c`.
 
 ## Mouse and keys
 
@@ -457,10 +578,13 @@ In a window less than 4 times as wide as the version, the version is not shown.
 | `Page: connecting to 127.0.0.1 port 8080` | Archaic connects to WRP |
 | `Page: waiting for 127.0.0.1, 3 s` | the request went out, and WRP makes the page. The seconds count up |
 | `Page: 2 KB` | the page comes |
-| `Picture 1 of 2: 12 of 31 KB` | a picture comes. The bar at the right shows how much has come |
-| `Picture part 3 of 9: 4 of 7 KB` | a part (a slice) of the page's picture comes, for the frame |
-| `Picture part 4 of 9 (ahead): 2 of 7 KB` | the next part comes, before you scroll to it |
-| `2 s, 45 KB  http://...` | the page is done: the time it took, and how much came |
+| `Picture 1 of 2 (GIF): 12 of 31 KB` | a picture comes, and its type (GIF, ABM, ABM3, AB8). The bar at the right shows how much has come |
+| `Picture part 3 of 9 (ABM3): 4 of 7 KB` | a part (a slice) of the page's picture comes, for the frame |
+| `Picture part 4 of 9 (ahead, ABM3): 2 of 7 KB` | the next part comes, before you scroll to it |
+| `Picture test 1 of 2 (ABM): 3 of 8 KB` | the picture test at the start: a test picture comes, first in the fast type, then in the small one (see The automatic choice) |
+| `Picture test: ABM3 is used (2.5 s, ABM 4.3 s)` | the test's result: the type from now on, and the time of each one |
+| `Picture part 3 of 9: ABM3, 5 KB in 2.7 s, 1.9 KB/s` | a slice has come: its type, its size, the time from the answer's header to its last row, and the speed that makes. It stays until the next slice or page. (While you type into the page, the box's line stays.) |
+| `2 s, 45 KB, AB8  http://...` | the page is done: the time it took, how much came, and the type of its pictures (GIF, ABM, ABM3, AB8) |
 | `Box: archaic browser_` and a bar of blocks | keys typed into the page: the box's text, and a block for each second until WRP's new picture (see Typing into the page) |
 
 The bar shows when the server sends the size (WRP does for its pictures).
@@ -745,11 +869,21 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 `test/run.sh` checks `--help` first: a line for each option of the usage line, at most 79 characters each. Then:
 
 1. GIF decoding gives **exactly** the same pixels as ImageMagick.
-   ABM pictures give exactly the pixels of the GIF, and a broken ABM is refused.
-   Archaic asks for ABM and GIF, and with `-f gif` only for GIF.
+   ABM and ABM3 pictures give exactly the pixels of the GIF. A broken ABM is refused,
+   and an ABM3 that was cut shows the rows that came.
+   What Archaic asks for (its `Accept`): the fast types, and the others with `q=0.5`; AB8 only with colors;
+   one type with `-f`.
+   The automatic choice (1d): pages of 8 pictures from the test server, which sends the pictures of one kind
+   some time after their header. The slower kind is tried for 2 pictures, and again after 8 pictures;
+   the faster kind takes over, also in colors. The status line says how a trial ended, and names the type
+   of each picture that comes. None with `-f`.
+   The picture test (7a, with the headless display): both kinds come and show, the faster one is used,
+   and WRP gets the start and the result as notes. None with `-f` or an older WRP.
 2. Gray and color GIFs decode at the right size.
    With colors (`-c 256`), the colors are **exactly** ImageMagick's. Also in the hard cases
    of the 8-bit way: a full code table with no clear, long runs, and an interlaced GIF (the way before).
+   AB8 pictures give exactly the colors of the GIF. Not on a black and white display;
+   a broken one is refused.
 3. HTML: title, entities, fields, menus, hidden fields, buttons, links, comments.
 4. A button click sends the form with the right query.
 5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons and the labels Z, C, D and K are pictures, Go stays text.
@@ -855,13 +989,13 @@ hget 10.0.2.2 8077 /src/fetch fetch
 sh fetch
 ```
 
-All 12 files (153 KB) take about 2 minutes.
+All 13 files (197 KB) take about 2 minutes.
 
 ### 2. Build
 
 ```
 sh mkinc     # once per folder: the X10 headers
-sh mk        # compile and link: archaic, about 147 KB
+sh mk        # compile and link: archaic, about 160 KB
 ```
 
 With Hatari's fast-forward on, `sh mk` takes about 4 minutes.
@@ -880,7 +1014,7 @@ To relink only: `sh lka`.
 
 The last line ends with `sum ae2b58f3`: the same as on Unix.
 That checks HTTP, netd and the GIF decoder in one go.
-With `hn2.abm` in the place of `hn2.gif`, it checks the ABM decoder: the same sum.
+With `hn2.abm` or `hn2.ab3` in the place of `hn2.gif`, it checks the ABM and ABM3 decoders: the same sum.
 
 **With X:** start X, then run `./archaic` in an xterm (or from a telnet login).
 
@@ -951,6 +1085,10 @@ Test on a copy of your Idris disk.
   (one slice of a long page). `lka` adds `-b0x30000`: 192 KB for the heap
   and the stack. The 4-byte field at offset 16 of the program file holds
   this size.
+- The linker itself (`/etc/bin/link`) asks for 128 KB. That is too little to link Archaic
+  with the ABM3 and AB8 decoders: it says `no memory`, and writes a broken program. So `lka` links with a copy of
+  the linker that asks for 512 KB: `heap` (from `heap.c`, which `mk` builds) sets the field in the copy.
+- There is no `times()`: the only clock is `time()`, in seconds.
 - `XCloseDisplay` pulls in `sigsetmask`, which no library has. Archaic does not call it.
 
 ### The shell
@@ -1016,13 +1154,13 @@ Test on a copy of your Idris disk.
 
 Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
 
-1. Copy these 10 files (155 KB) into a folder on the 3B1, with ftp, rcp or a floppy:
+1. Copy these 10 files (197 KB) into a folder on the 3B1, with ftp, rcp or a floppy:
    `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `unixpc.c`, `ntwg.c` and `mkunixpc`.
    The FreeBee kit forwards the 3B1's ftp to port 35121 on your computer, and rsh to 35514.
 2. Build:
 
    ```
-   sh mkunixpc     # compile and link: archaic, about 79 KB
+   sh mkunixpc     # compile and link: archaic, about 88 KB
    ```
 
    It takes about 1 minute in FreeBee at turbo 10.
@@ -1034,8 +1172,8 @@ Needs **gcc** (2.5.8 in `/usr/local/bin`: the FreeBee kit has it) and WIN/TCP.
    ```
 
    The last line ends with `sum ae2b58f3`: the same as on Unix and on Idris.
-   With `hn2.abm` in the place of `hn2.gif`, it checks the ABM decoder: the same sum.
-   The server must send it as `image/x-abm`, as WRP and `idris.py serve` do.
+   With `hn2.abm` or `hn2.ab3` in the place of `hn2.gif`, it checks the ABM and ABM3 decoders: the same sum.
+   The server must send them as `image/x-abm` and `image/x-abm3`, as WRP and `idris.py serve` do.
    `python3 -m http.server` sends `application/octet-stream`, and Archaic does not show it.
 
    **With the window:** `./archaic` in a shell window.
@@ -1072,6 +1210,8 @@ Test on a copy of your 3B1 disk.
   Archaic uses that for the default address.
 - `-shlib` links the shared library: libc and tam.
 - `<time.h>` has no `time_t`: it is in `<sys/types.h>`.
+- `times()` gives the time since the start of UNIX in 1/60 s: Archaic's clock for the pictures' times
+  and for the rows on the screen (`nowms()` in `http.c`). The display still has no clock (`g_ms`).
 - `/bin/cc`, the 1985 compiler, stops at the `#sccs` line of each header on the kit's disk. Archaic does not use it.
 - SysV cannot replace a program that runs: quit Archaic before you link it again.
 
@@ -1137,7 +1277,7 @@ Test on a copy of your 3B1 disk.
 Needs Sun's C compiler, `cc` (the kit has it), and SunView's libraries in `/usr/lib`:
 `libsuntool`, `libsunwindow`, `libpixrect` (SunOS has them with SunView).
 
-1. Copy these 10 files (165 KB) into a folder on SunOS, with ftp, rcp or a CD
+1. Copy these 10 files (206 KB) into a folder on SunOS, with ftp, rcp or a CD
    (the kit: `CD=file.iso ./run.sh`, then `mount -rt hsfs /dev/sr0 /cdrom`):
    `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `sunview.c` and `mksunview`.
    The kit lets root in with rsh, on port 41414 of your computer.
@@ -1299,7 +1439,7 @@ Test on a copy of your SunOS disk.
 
 Needs HP's C compiler, `cc` (the kit has HP C A.09.73), and X11R5 (HP-UX 9 has it).
 
-1. Copy these 10 files (159 KB) into a folder on HP-UX, with ftp, rcp or NFS:
+1. Copy these 10 files (200 KB) into a folder on HP-UX, with ftp, rcp or NFS:
    `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkhpux`.
 2. Build:
 
@@ -1381,7 +1521,7 @@ Test on a copy of your HP-UX disk.
 Needs DG/UX's C compiler, `cc` (in the SDK, `/usr/opt/sdk`), and X11 (DG/UX has X11R6).
 The kit has both.
 
-1. Copy these 10 files (159 KB) into a folder on DG/UX, with ftp, rcp or NFS:
+1. Copy these 10 files (200 KB) into a folder on DG/UX, with ftp, rcp or NFS:
    `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkdgux`.
 2. Build:
 
@@ -1458,7 +1598,7 @@ Test on a copy of your DG/UX disk.
 Needs IBM's C compiler, `cc` (XL C 1.3 in the kit), and X11R5 (AIX 3.2 has it in AIXwindows).
 The kit has both.
 
-1. Copy these 10 files (159 KB) into a folder on AIX, with ftp, rcp or NFS:
+1. Copy these 10 files (200 KB) into a folder on AIX, with ftp, rcp or NFS:
    `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkaix`.
 2. Build:
 
@@ -1543,7 +1683,7 @@ Test on a copy of your AIX disk.
 Needs the MetaWare High C compiler, `cc` (R2.2g), and X11 (AIX PS/2 has it in X Windows).
 The kit has both.
 
-1. Copy these 10 files (159 KB) into a folder on AIX PS/2, with ftp, rcp or NFS:
+1. Copy these 10 files (200 KB) into a folder on AIX PS/2, with ftp, rcp or NFS:
    `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkaixps2`.
 2. Build:
 
@@ -1636,7 +1776,7 @@ Test on a copy of your AIX PS/2 disk.
 
 Needs Ultrix's C compiler, `cc`, and X11 (the UWS subsets: DECwindows). The kit has both.
 
-1. Copy these 10 files (159 KB) into a folder on Ultrix, with ftp, rcp or NFS:
+1. Copy these 10 files (200 KB) into a folder on Ultrix, with ftp, rcp or NFS:
    `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `x11.c` and `mkultrix`.
    The kit lets root in with rsh, on port 45514 of your computer.
 2. Build:
@@ -1735,7 +1875,7 @@ Test on a copy of your Ultrix disk.
 |---|---|
 | WRP start page | 3 s |
 | Wikipedia's Macintosh IIcx article, black and white (ABM, a slice of 4 KB) | 2 s, WRP's 2 s included |
-| the same, 216 colors (GIF, a slice of 13 KB) | 5 s: WRP 2 s, then the Mac about 3 s for the slice |
+| the same, 216 colors (AB8, a slice of 12 KB) | 3 s: WRP 2 s, then the Mac 1.2 s for the slice (Archaic 0.11, as a GIF: 2.5 s) |
 | Wikipedia's Apple Inc. article, after a click on its link | 14 s: WRP 10 s |
 
 ## Building for the classic Mac OS
@@ -1907,8 +2047,8 @@ A port is **one display file** and **one network file**.
   `update.c` also needs open, creat, read, write, close, access, chmod, link, unlink, getpid, getuid,
   and rename (or `NORENAME`).
 
-**Memory note for 16-bit systems:** the static data is about 145 KB
-(page 30 KB, items 50 KB, read buffer 16 KB, GIF tables 32 KB).
+**Memory note for 16-bit systems:** the static data is about 165 KB
+(page 30 KB, items 50 KB, read buffer 16 KB, GIF tables 32 KB, ABM3's contexts and tables 19 KB).
 On a display with colors, the GIF decoder also takes 16 KB from malloc, once.
 On DOS or Win16, use the large memory model, or make these smaller in `archaic.h`.
 
@@ -2073,5 +2213,10 @@ It also knows the 4010's commands.
 - With a WRP before 4.14.1, a very long page with the dither (like reddit) could time out:
   WRP made the colors of the whole page before it answered. Use a newer WRP.
 - With slices, a link to a place on the same page (`#name`) does not scroll the frame there.
-- Only WRP's black and white pictures come as ABM. Pictures with colors are GIFs: a 10 MHz 68010
-  needs 2 to 3 s for one 632 x 351 slice, also the 8-bit way (see Pictures: GIF and ABM).
+- With a WRP that has no `picfmt.go` (4.14.1 and older), there is no ABM3 and no AB8: black and white
+  pictures come as ABM, and pictures in colors as GIFs. A 16 MHz 68030 needs 1.3 s for one 632 x 351
+  slice as a GIF, and 0.4 s as AB8 (see Pictures: GIF, ABM, ABM3 and AB8).
+- The picture test takes time at each start: two pictures as large as the frame. On a line of 19200 baud
+  that is about 7 s in black and white. A key or a click stops it.
+- Later, 2 pictures from time to time are of the kind that is slower here (a trial). The clock on Idris counts
+  seconds: there a trial takes up to 6 pictures.

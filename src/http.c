@@ -11,6 +11,7 @@
 #include "archaic.h"
 #ifdef unixpc
 #include <sys/types.h>		/* time_t: the 3B1's time.h does not have it */
+#include <sys/times.h>		/* times(), for nowms() */
 #endif
 #ifdef sun
 #include <sys/types.h>		/* nor SunOS 3's */
@@ -22,6 +23,7 @@ char http_type[64];
 char http_err[160];
 long http_len;
 long http_got;
+long http_fast;
 int http_status;
 
 static int conn = -1;
@@ -32,13 +34,17 @@ static unsigned char *wbase;	/* where http_p was at the last http_sync() */
 #define RING 16384		/* a power of 2 */
 static char ring[RING];
 static long rin, rout;		/* bytes put in, taken out */
-static char req[2 * MAXURL + 300];
+static char req[2 * MAXURL + 600];
+static char nline[240];		/* the request's X-Archaic-Note line, or "" */
 static char line[MAXURL + 40];
 static char loc[MAXURL];
 char http_host[128];		/* the server of the last http_open() */
-/* what Archaic takes, for the server: pages, GIFs, and WRP's black and
- * white picture (ABM: see pic.c). With -f gif, main.c leaves ABM out. */
+/* what Archaic takes, for the server: pages, GIFs, and WRP's own
+ * pictures (ABM, ABM3, AB8: see pic.c). main.c sets it: see setaccept(). */
 char *http_accept = "text/html, image/x-abm, image/gif";
+/* A note for WRP's log (what Archaic's picture test does): it goes in
+ * the next request, as X-Archaic-Note, once. 0: none. */
+char *http_note;
 int http_port;
 int http_noconn;		/* 1: the last http_open() could not connect */
 static char path[MAXURL];
@@ -46,6 +52,31 @@ static char path[MAXURL];
 long now()
 {
 	return (long)time((time_t *)0);
+}
+
+/* A clock in ms, from any start, for a display that has none (g_ms):
+ * main.c times the pictures with it. *res: how far off it can be. It is
+ * the seconds of time(); on the 3B1, times() counts 1/60 s. */
+long nowms(res)
+long *res;
+{
+	static long t0;
+	long t;
+#ifdef unixpc
+	static struct tms tb;
+
+	t = (long)times(&tb);
+	if (!t0)
+		t0 = t - 1;
+	*res = 20;
+	return (t - t0) * 50 / 3;
+#else
+	t = now();
+	if (!t0)
+		t0 = t - 1;
+	*res = 1000;
+	return (t - t0) * 1000;
+#endif
 }
 
 int lc(c)
@@ -334,6 +365,7 @@ char *url, *post;
 		http_type[0] = 0;
 		http_len = -1;
 		http_got = 0;
+		http_fast = 0;
 		http_status = 0;
 		loc[0] = 0;
 		if (url_split(http_url) < 0) {
@@ -354,12 +386,16 @@ char *url, *post;
 			sprintf(line, "%s", http_host);
 		else
 			sprintf(line, "%s:%d", http_host, http_port);
+		nline[0] = 0;
+		if (http_note && http_note[0])
+			sprintf(nline, "X-Archaic-Note: %.200s\r\n", http_note);
+		http_note = 0;
 		if (post)
-			sprintf(req, "POST %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s",
-				path, line, VERSION, http_accept, slen(post), post);
+			sprintf(req, "POST %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: %s\r\n%sContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s",
+				path, line, VERSION, http_accept, nline, slen(post), post);
 		else
-			sprintf(req, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: %s\r\n\r\n",
-				path, line, VERSION, http_accept);
+			sprintf(req, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Archaic/%s\r\nAccept: %s\r\n%s\r\n",
+				path, line, VERSION, http_accept, nline);
 		if (n_write(conn, req, slen(req)) < 0) {
 			sprintf(http_err, "can't send to %s", http_host);
 			http_close();
@@ -395,6 +431,10 @@ char *url, *post;
 					i < (int)sizeof http_type - 1; ++i)
 					http_type[i] = lc(p[i]);
 				http_type[i] = 0;
+			} else if (strnieq(line, "x-fast-length:", 14)) {
+				http_fast = 0;
+				for (p = hval(14); *p >= '0' && *p <= '9'; ++p)
+					http_fast = http_fast * 10 + *p - '0';
 			} else if (strnieq(line, "location:", 9))
 				url_join(http_url, hval(9), loc);
 		}

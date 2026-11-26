@@ -122,8 +122,9 @@ def put(port, d, files):
 
 
 def serve(d, hport, addr="127.0.0.1"):
-    # ABM as WRP sends it: Archaic shows only image/ types
-    http.server.SimpleHTTPRequestHandler.extensions_map[".abm"] = "image/x-abm"
+    # WRP's own pictures as WRP sends them: Archaic shows only image/ types
+    http.server.SimpleHTTPRequestHandler.extensions_map.update(
+        {".abm": "image/x-abm", ".ab3": "image/x-abm3", ".ab8": "image/x-ab8"})
     h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=d)
     http.server.ThreadingHTTPServer.allow_reuse_address = True
     srv = http.server.ThreadingHTTPServer((addr, hport), h)

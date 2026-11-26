@@ -352,7 +352,7 @@ void g_bits(x, y, w, h, bits, bpl)
 int x, y, w, h, bpl;
 unsigned char *bits;
 {
-	int k, n, i, j;
+	int k, n, i;
 	unsigned char *s, *d;
 
 	if (w <= 0 || h <= 0)
@@ -368,8 +368,7 @@ unsigned char *bits;
 		for (i = 0; i < n; ++i) {
 			s = bits + (long)(k + i) * bpl;
 			d = eb + (long)i * (bpl + 1);
-			for (j = 0; j < bpl; ++j)
-				d[j] = s[j];
+			BlockMove((Ptr)s, (Ptr)d, (long)bpl);
 		}
 		bits1(x, y + k, w, n, eb, bpl + 1);
 	}
@@ -452,7 +451,7 @@ void g_pix(x, y, w, h, pix, bpl, pal)
 int x, y, w, h, bpl;
 unsigned char *pix, *pal;
 {
-	int k, n, i, j;
+	int k, n, i;
 	unsigned char *s, *d;
 
 	if (!cqd || w <= 0 || h <= 0)
@@ -471,8 +470,7 @@ unsigned char *pix, *pal;
 		for (i = 0; i < n; ++i) {
 			s = pix + (long)(k + i) * bpl;
 			d = eb + (long)i * (bpl + 1);
-			for (j = 0; j < bpl; ++j)
-				d[j] = s[j];
+			BlockMove((Ptr)s, (Ptr)d, (long)bpl);
 		}
 		pix1(x, y + k, w, n, eb, bpl + 1);
 	}

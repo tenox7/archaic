@@ -185,7 +185,7 @@ typedef struct image {
 				 * left. 8 bits: a color number each */
 	unsigned char *pal;	/* 8 bits: 256 colors, 3 bytes each (red,
 				 * green, blue 0 to 255); 1 bit: 0 */
-	int kind;		/* what it came as: P_GIF or P_ABM (pic_load) */
+	int kind;		/* what it came as: P_GIF, P_ABM ... (pic_load) */
 } Image;
 
 /* html.c: the page */
@@ -209,6 +209,10 @@ extern char http_host[];	/* the server of the last http_open() */
 extern int http_port;
 extern int http_noconn;		/* 1: http_open could not connect (http_err: why) */
 extern char *http_accept;	/* the request's Accept: what Archaic takes */
+extern char *http_note;		/* a note for WRP's log, for the next request */
+extern long http_fast;		/* X-Fast-Length: the body's size in the type
+				 * that decodes fastest, when the server
+				 * chose among more than one; else 0 */
 int http_open P((char *url, char *post));
 int http_getc P((void));
 /* the body's bytes with no call for each: see http.c */
@@ -219,6 +223,7 @@ void http_sync P((void));
 void http_close P((void));
 void http_pump P((void));	/* take what the network has, without waiting */
 long now P((void));		/* seconds */
+long nowms P((long *res));	/* a clock in ms, off by *res at most */
 void url_join P((char *base, char *ref, char *out));
 void url_enc P((char *out, char *s));
 int lc P((int c));
@@ -230,10 +235,14 @@ void scopy P((char *d, char *s, int max));
  * (set it before). WRP's ABM: 1 bit. 0 ok, -1 not a picture or broken */
 int pic_load P((Image *im));
 #define P_GIF 1			/* Image's kind: a GIF, */
-#define P_ABM 2			/*  WRP's ABM; 0: not a picture */
+#define P_ABM 2			/*  WRP's ABM, */
+#define P_AB3 3			/*  ABM packed for a slow line (ABM3), */
+#define P_AB8 4			/*  WRP's AB8 (colors); 0: not a picture */
 void pic_rows P((Image *im, int y, int n));	/* http_sync(), then img_rows() */
 void pic_fill P((unsigned char *p, long n, int c));	/* n bytes to c */
 #define pic_wipe(p, n) pic_fill(p, n, 0)		/* n bytes to 0 */
+/* n bytes from s to d, the first one first (d after s: they may overlap) */
+void pic_copy P((unsigned char *d, unsigned char *s, long n));
 /* gif.c: a GIF, after its first 2 bytes "GI" */
 int gif_load P((Image *im));
 

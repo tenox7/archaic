@@ -16,20 +16,48 @@ ver=$(sed -n 's/^#define IDENT "@(#)Archaic \(.*\)"$/\1/p' "$here/../src/archaic
 # The web server for the tests: python's, and GIFs cut into slices for
 # ?y=Y&h=H, as WRP does for the tall picture (with ImageMagick). ?wait=S:
 # the answer comes after S seconds, as when WRP makes a page.
-# NAME.pic is NAME.abm for a request whose Accept has image/x-abm, as WRP
-# does for a black and white picture, else NAME.gif; the log gets an
-# "accept" line. /keys answers as WRP: a box that takes the keys (Tab: a
+# NAME.pic is the picture NAME in the type that the request's Accept asks
+# for, as WRP sends it: of NAME.abm and NAME.ab3 (a black and white
+# picture), or of NAME.ab8 and NAME.gif, the smallest one of those with
+# the highest q; X-Fast-Length when it chose between two. With no such
+# type in Accept: NAME.gif. ?dfast=S, ?dsmall=S: the picture comes S
+# seconds after its header when it is the type that is fast to decode
+# (.abm, .ab8), or the other one. ?dopen=S: the header comes S seconds
+# late. The log gets an "accept" line. /archaic-test is WRP's test
+# picture (hn2 for 2 colors, else dith), after /set?test=1 (with dfast
+# and dsmall for its delays); else it is not there, as in an older WRP.
+# A request's X-Archaic-Note goes to the log as a "note" line. /keys answers as WRP: a box that takes the keys (Tab: a
 # password box; ! a new page); a new wrpk*, wrpr* or wrps* page starts
 # with an empty box.
 cat >"$tmp/srv.py" <<'EOF'
-import functools, http.server, subprocess, sys, time, urllib.parse
+import functools, http.server, os, subprocess, sys, time, urllib.parse
 box = {'kind': 'text', 'val': ''}
+cfg = {}        # /set?test=1&dfast=S&dsmall=S: the picture test is on, with these delays
 class H(http.server.SimpleHTTPRequestHandler):
     extensions_map = dict(http.server.SimpleHTTPRequestHandler.extensions_map,
-        **{'.abm': 'image/x-abm'})
+        **{'.abm': 'image/x-abm', '.ab3': 'image/x-abm3', '.ab8': 'image/x-ab8'})
     def do_GET(self):
         u = urllib.parse.urlsplit(self.path)
         q = urllib.parse.parse_qs(u.query)
+        if self.headers.get('X-Archaic-Note'):
+            sys.stderr.write('note %s\n' % self.headers.get('X-Archaic-Note'))
+        if u.path == '/set':
+            cfg.clear()
+            cfg.update({k: v[0] for k, v in q.items()})
+            self.send_response(200)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+        if u.path == '/archaic-test' and cfg.get('test'):   # as WRP: the test picture, or a note alone
+            if 'w' not in q:
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/plain')
+                self.send_header('Content-Length', '3')
+                self.end_headers()
+                self.wfile.write(b'ok\n')
+                return
+            u = u._replace(path='/hn2.pic' if q.get('c', [''])[0][:1] == '2' and q.get('c', [''])[0][:2] not in ('21', '25') else '/dith.pic')
+            q.update({k: [cfg[k]] for k in ('dfast', 'dsmall') if k in cfg})
         if u.path[:5] in ('/wrpk', '/wrpr', '/wrps'):
             box['kind'], box['val'] = 'text', ''
         if u.path == '/keys':
@@ -57,13 +85,27 @@ class H(http.server.SimpleHTTPRequestHandler):
             time.sleep(float(q['wait'][0]))
         if u.path.endswith('.pic'):
             acc = [t.strip() for t in self.headers.get('Accept', '').split(',')]
-            ext = '.abm' if 'image/x-abm' in acc else '.gif'
+            qs = {}
+            for t in acc:
+                name, _, par = t.partition(';')
+                qs[name.strip()] = float(par.partition('q=')[2] or 1)
+            stem = self.translate_path(u.path)[:-4]
+            fast = ['.abm', '.ab8'][not os.path.exists(stem + '.abm')]
+            all = [fast, '.ab3'] if fast == '.abm' else ['.ab8'] + ['.gif'] * ('image/gif' in qs)
+            qe = lambda e: qs.get(self.extensions_map.get(e, 'image/gif'), 0)
+            best = max(qe(e) for e in all)
+            exts = [e for e in all if qe(e) == best and best > 0] or ['.gif']
+            b, ext = min(((open(stem + e, 'rb').read(), e) for e in exts), key=lambda d: len(d[0]))
             sys.stderr.write('accept %s %s: %s\n' % (u.path, ext, ' '.join(acc)))
-            b = open(self.translate_path(u.path)[:-4] + ext, 'rb').read()
+            time.sleep(float(q.get('dopen', ['0'])[0]))
             self.send_response(200)
             self.send_header('Content-Type', self.extensions_map.get(ext, 'image/gif'))
             self.send_header('Content-Length', str(len(b)))
+            if len(exts) > 1:
+                self.send_header('X-Fast-Length', str(os.path.getsize(stem + fast)))
             self.end_headers()
+            self.wfile.flush()
+            time.sleep(float(q.get('dfast' if ext == fast else 'dsmall', ['0'])[0]))
             self.wfile.write(b)
             return
         if u.path == '/archaic-update':     # as WRP: upd.txt, the file upd.bin
@@ -145,6 +187,30 @@ for f in hn2 wiki2; do
 		tail -2 "$tmp/$f-abm.out"
 	fi
 done
+# ABM3, the ABM for a slow line: the same pixels. A file that was cut:
+# the rows that came, and no more is read.
+for f in hn2 wiki2; do
+	"$bin" -t -o "$tmp/$f-ab3.pbm" "http://127.0.0.1:$port/$f.ab3" >"$tmp/$f-ab3.out" 2>&1
+	if cmp -s "$tmp/$f-ab3.pbm" "$tmp/$f-ref.pbm" &&
+		grep -q ' got [0-9]*x[0-9]* abm3 sum [0-9a-f]*$' "$tmp/$f-ab3.out"; then
+		ok "$f.ab3 (ABM3) decodes exactly as the GIF"
+	else
+		bad "$f.ab3 differs from the GIF:"
+		tail -2 "$tmp/$f-ab3.out"
+	fi
+done
+head -c 3000 "$here/data/hn2.ab3" >"$here/data/cut.ab3"
+"$bin" -t -o "$tmp/cut.pbm" "http://127.0.0.1:$port/cut.ab3" >"$tmp/cut.out" 2>&1
+magick "$tmp/cut.pbm" -crop 632x100+0+0 +repage "$tmp/cut-top.pbm" 2>/dev/null
+magick "$tmp/hn2-ref.pbm" -crop 632x100+0+0 +repage "$tmp/cut-ref.pbm"
+if grep -q ' got 632x330 abm3 sum ' "$tmp/cut.out" && cmp -s "$tmp/cut-top.pbm" "$tmp/cut-ref.pbm" &&
+	! cmp -s "$tmp/cut.pbm" "$tmp/hn2-ref.pbm"; then
+	ok "an ABM3 that was cut shows the rows that came"
+else
+	bad "an ABM3 that was cut:"
+	tail -2 "$tmp/cut.out"
+fi
+rm -f "$here/data/cut.ab3"
 # a broken ABM (bytes from before the picture's start) is refused
 printf 'ABM1\000\020\000\020\001\000\377\377\377' >"$here/data/bad.abm"
 "$bin" -t -v "http://127.0.0.1:$port/bad.abm" >"$tmp/bad.out" 2>&1
@@ -156,23 +222,134 @@ else
 fi
 rm -f "$here/data/bad.abm"
 
-# 1c. What Archaic asks for: ABM and GIF; with -f gif, only GIF. ABM is
-#     1 bit a pixel also on a display with colors.
+# 1c. What Archaic asks for (its Accept): the types that are fast to
+#     decode, and the others with q=0.5 (see 1d). AB8 only with colors.
+#     -f sets one type. ABM is 1 bit a pixel also on a display with colors.
 want() {	# $1: Archaic's options, $2: what must come, $3: the Accept
 	"$bin" -t $1 "http://127.0.0.1:$port/hn2.pic" >"$tmp/want.out" 2>&1
 	acc=$(grep '^accept /hn2.pic' "$tmp/http.log" | tail -1)
 	grep -q " got 632x330 $2\$" "$tmp/want.out" && [ "${acc#*: }" = "$3" ]
 }
-if want "" "abm sum ae2b58f3" "text/html image/x-abm image/gif" &&
-	want "-c 256" "abm sum ae2b58f3" "text/html image/x-abm image/gif" &&
+if want "-v" "abm sum ae2b58f3" "text/html image/x-abm image/x-abm3;q=0.5 image/gif" &&
+	grep -q '^status: Picture (ABM): 9 of 9 KB$' "$tmp/want.out" &&
+	want "-c 256" "abm sum ae2b58f3" "text/html image/x-abm image/x-abm3;q=0.5 image/x-ab8 image/gif;q=0.5" &&
 	want "-f abm" "abm sum ae2b58f3" "text/html image/x-abm image/gif" &&
+	want "-f abm -c 256" "abm sum ae2b58f3" "text/html image/x-abm image/gif" &&
+	want "-v -f abm3" "abm3 sum ae2b58f3" "text/html image/x-abm3 image/gif" &&
+	grep -q '^status: Picture (ABM3): 6 of 6 KB$' "$tmp/want.out" &&
+	want "-f small" "abm3 sum ae2b58f3" "text/html image/x-abm image/x-abm3 image/gif" &&
+	want "-f small -c 256" "abm3 sum ae2b58f3" "text/html image/x-abm image/x-abm3 image/x-ab8 image/gif" &&
+	want "-f ab8" "abm sum ae2b58f3" "text/html image/x-abm image/gif" &&
+	want "-f ab8 -c 256" "abm sum ae2b58f3" "text/html image/x-abm image/x-ab8 image/gif;q=0.5" &&
 	want "-f gif" "gif sum ae2b58f3" "text/html image/gif" &&
 	want "-f gif -c 256" "gif sum [0-9a-f]* colors" "text/html image/gif"; then
-	ok "asks for ABM and GIF; -f gif: only for GIF; ABM is 1 bit also with colors"
+	ok "asks for the fast types, and the others with q=0.5; -f: one type; ABM is 1 bit also with colors; the status line names the type"
 else
 	bad "what Archaic asks for: $acc"
 	tail -2 "$tmp/want.out"
 fi
+"$bin" -t -f png "http://127.0.0.1:$port/hn2.pic" >"$tmp/want.out" 2>&1
+if [ $? = 2 ] && grep -q '^archaic: -f takes gif, abm, abm3, ab8 or small$' "$tmp/want.out"; then
+	ok "-f with a type Archaic does not know: an error"
+else
+	bad "-f png: $(tail -1 "$tmp/want.out")"
+fi
+
+# 1d. The automatic choice. Archaic times its pictures: 2 of the kind
+#     that is fast to decode, then 2 of the small kind. The kind that is
+#     faster stays; the other one is tried again after 8 pictures (after
+#     64 if it took 2 times as long). The time counts from the answer's
+#     header. 3 pages of 8 pictures; the server sends the pictures of
+#     a kind some time after their header. Each trial sends WRP notes for
+#     its log (its start, how it ended), and a page's last status line
+#     names its pictures' type.
+pics() {	# $1: the picture, $2: the server's delay
+	for n in 1 2 3; do
+		{
+			echo "<HTML><BODY><A HREF=\"ch$((n % 3 + 1)).html\">next</A><BR>"
+			for k in 1 2 3 4 5 6 7 8; do
+				echo "<IMG SRC=\"$1.pic?$2&k=$n$k\" WIDTH=\"40\" HEIGHT=\"20\">"
+			done
+			echo "</BODY></HTML>"
+		} >"$here/data/ch$n.html"
+	done
+}
+came() {	# $1: Archaic's options: what the server sent, as "abm abm ab3 ..."
+		# (its log for this run: ch.log)
+	n0=$(wc -l <"$tmp/http.log")
+	"$bin" -t -v $1 -s "@$lx,$ly;@$lx,$ly;" "http://127.0.0.1:$port/ch1.html" >"$tmp/ch.out" 2>"$tmp/ch.err"
+	tail -n +$((n0 + 1)) "$tmp/http.log" >"$tmp/ch.log"
+	grep '^accept /' "$tmp/ch.log" | sed 's/^accept [^ ]* \.\([a-z0-9]*\):.*/\1/' | tr '\n' ' ' | sed 's/ $//'
+}
+pics hn2 "dfast=0.12&dsmall=0.3"
+"$bin" -t "http://127.0.0.1:$port/ch1.html" >"$tmp/ch0.out" 2>&1
+set -- $(grep '"next"' "$tmp/ch0.out" | head -1)
+lx=$(($3 + 2)); ly=$(($4 + 2))
+got=$(came "")
+if [ "$got" = "abm abm ab3 ab3 abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm" ] &&
+	! grep -q '^status: Pictures' "$tmp/ch.out" &&
+	[ "$(grep -c '^note pictures in black and white: trial of ABM3 starts (ABM is in use)$' "$tmp/ch.log")" = 1 ] &&
+	[ "$(grep -c '^note pictures in black and white: still ABM (.* for 10 KB, ABM3 .*); fast [0-9]* ms for [0-9]* KB, small [0-9]* ms for [0-9]* KB$' "$tmp/ch.log")" = 1 ]; then
+	ok "the choice: the small kind is slower here: ABM stays, and ABM3 is not tried soon; the notes for WRP's log say so"
+else
+	bad "the choice, ABM3 comes late: $got"
+fi
+pics hn2 dfast=0.25
+got=$(came "")
+if [ "$got" = "abm abm ab3 ab3 ab3 ab3 ab3 ab3 ab3 ab3 ab3 ab3 abm abm ab3 ab3 ab3 ab3 ab3 ab3 ab3 ab3 ab3 ab3" ] &&
+	[ "$(grep -c "^note pictures in black and white: now ABM3 ([a-z0-9. ]* for 10 KB, ABM [0-9.]* m*s); fast " "$tmp/ch.log")" = 1 ] &&
+	[ "$(grep -c "^note pictures in black and white: still ABM3 ([a-z0-9. ]* for 10 KB, ABM [0-9.]* m*s); fast " "$tmp/ch.log")" = 1 ] &&
+	grep -q '^status: [0-9]* s, [0-9]* KB, ABM3  http' "$tmp/ch.out" &&
+	[ "$(grep -c '^archaic: pictures in black and white: fast [0-9]* ms for [0-9]* KB, small [0-9]* ms for [0-9]* KB$' "$tmp/ch.err")" = 2 ]; then
+	ok "the choice: the fast kind is slower here: ABM3 takes over, ABM is tried again after 8 pictures"
+else
+	bad "the choice, ABM comes late: $got"
+	grep 'pictures in' "$tmp/ch.log" "$tmp/ch.err"
+fi
+got=$(came "-f abm")
+if [ "$got" = "abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm" ]; then
+	ok "the choice: none with -f"
+else
+	bad "the choice with -f abm: $got"
+fi
+# the time before the header (the connect, WRP's work) is the same for
+# both kinds: it does not count
+pics hn2 "dopen=0.15&dsmall=0.1"
+got=$(came "")
+if [ "$got" = "abm abm ab3 ab3 abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm abm" ]; then
+	ok "the choice: the same when the answer's header comes late"
+else
+	bad "the choice, a late header: $got"
+fi
+# in colors: dith is smaller as a GIF than as AB8, hn216 is not: the
+# small kind is then AB8 too, and the two kinds are the same pictures
+pics dith dfast=0.25
+got=$(came "-c 256")
+if [ "$got" = "ab8 ab8 gif gif gif gif gif gif gif gif gif gif ab8 ab8 gif gif gif gif gif gif gif gif gif gif" ] &&
+	[ "$(grep -c "^note pictures in colors: now GIF or AB8 ([a-z0-9. ]* for 10 KB, AB8 [0-9.]* m*s); fast " "$tmp/ch.log")" = 1 ] &&
+	grep -q '^accept /dith.pic .gif: text/html image/x-abm image/x-abm3;q=0.5 image/x-ab8 image/gif$' "$tmp/ch.log"; then
+	ok "the choice in colors: AB8 comes late: the GIF takes over where it is smaller"
+else
+	bad "the choice in colors, AB8 comes late: $got"
+fi
+got=$(came "")		# a black and white display: no AB8
+if [ "$got" = "gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif gif" ] &&
+	! grep -q 'x-ab8' "$tmp/ch.log"; then
+	ok "the choice: a black and white display does not ask for AB8"
+else
+	bad "a black and white display and a picture in colors: $got"
+fi
+pics hn216 dsmall=0
+got=$(came "-c 256")
+if [ "$got" = "ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8 ab8" ] &&
+	[ "$(grep -c 'image/x-ab8 image/gif$' "$tmp/ch.log")" = 4 ] &&
+	[ "$(grep -c "^note pictures in colors: still AB8 ([a-z0-9. ]* for 10 KB, GIF or AB8 [a-z0-9. ]*); fast " "$tmp/ch.log")" = 2 ] &&
+	grep -q '^status: [0-9]* s, [0-9]* KB, AB8  http' "$tmp/ch.out"; then
+	ok "the choice in colors: AB8 is the smaller one: it comes in both kinds; the page's status line names the type"
+else
+	bad "the choice in colors, AB8 is the smaller one: $got"
+fi
+rm -f "$here/data/ch1.html" "$here/data/ch2.html" "$here/data/ch3.html"
 
 # 2. Gray and color GIFs (dithered): the size must be right.
 for f in hn216 ex16 full runs ilace; do
@@ -202,6 +379,36 @@ for f in hn216 ex16 hn2 full runs ilace; do
 		bad "$f.gif: its colors differ from ImageMagick's"
 	fi
 done
+
+# 2c. AB8, WRP's picture in colors for a slow CPU: exactly the colors of
+#     the GIF. Not on a black and white display. A broken one (bytes from
+#     before the picture's start) is refused.
+for f in hn216 ex16 dith; do
+	"$bin" -t -c 256 -o "$tmp/$f-ab8.ppm" "http://127.0.0.1:$port/$f.ab8" >"$tmp/$f-ab8.out" 2>&1
+	magick "$here/data/$f.gif[0]" -depth 8 "$tmp/$f-ref.ppm"
+	if grep -q ' got [0-9]*x[0-9]* ab8 sum [0-9a-f]* colors$' "$tmp/$f-ab8.out" &&
+		[ "$(head -c 2 "$tmp/$f-ab8.ppm")" = P6 ] &&
+		magick compare -metric AE "$tmp/$f-ab8.ppm" "$tmp/$f-ref.ppm" null: 2>/dev/null; then
+		ok "$f.ab8 decodes exactly as the GIF, in its colors"
+	else
+		bad "$f.ab8 differs from the GIF:"
+		tail -2 "$tmp/$f-ab8.out"
+	fi
+done
+"$bin" -t -v "http://127.0.0.1:$port/ex16.ab8" >"$tmp/ab8bw.out" 2>&1
+printf 'AB81\000\020\000\020\000\377\377\377\340\377\377' >"$here/data/bad.ab8"
+"$bin" -t -v -c 256 "http://127.0.0.1:$port/bad.ab8" >"$tmp/bad8.out" 2>&1
+head -c 5000 "$here/data/ex16.ab8" >"$here/data/cut.ab8"
+"$bin" -t -c 256 "http://127.0.0.1:$port/cut.ab8" >"$tmp/cut8.out" 2>&1
+rm -f "$here/data/bad.ab8" "$here/data/cut.ab8"
+if grep -q "^status: Picture: can't show image/x-ab8" "$tmp/ab8bw.out" &&
+	grep -q "^status: Picture: can't show image/x-ab8" "$tmp/bad8.out" &&
+	grep -q ' got [0-9]*x[0-9]* ab8 sum [0-9a-f]* colors$' "$tmp/cut8.out"; then
+	ok "AB8: not on a black and white display; a broken one is refused; one that was cut shows"
+else
+	bad "AB8 on a black and white display, a broken one, one that was cut:"
+	tail -1 "$tmp/ab8bw.out" "$tmp/bad8.out" "$tmp/cut8.out"
+fi
 
 # 3. HTML: forms, menus, links, entities, comments.
 cat >"$tmp/t.html" <<'EOF'
@@ -664,7 +871,60 @@ if [ -x "$hl" ]; then
 	# Archaic's logo in the top right corner, right of WRP's form: at 760, 4
 	# (the page part is 783 wide), the 300 black pixels of its picture.
 	# (At 640, this old form's line with C has no room for it.)
+	# 7a. The picture test: on WRP's page, with nothing to do, Archaic
+	#     gets WRP's test picture in the fast kind and in the small one,
+	#     shows each as it comes and then the result, and sends WRP notes
+	#     for its log. The kind that took 10% less is used. An older WRP
+	#     (no /archaic-test) and -f: no test.
 	cp "$tmp/wrp.html" "$here/data/wrp.html"
+	ptest() {	# $1: the server's settings, $2: Archaic's options
+		curl -s "http://127.0.0.1:$port/set?$1" >/dev/null
+		n0=$(wc -l <"$tmp/http.log")
+		printf '%s\n' 'sleep 300' 'quit' |
+			"$hl" -v -n $2 -g 800x400 "http://127.0.0.1:$port/wrp.html" >"$tmp/pt.out" 2>"$tmp/pt.err"
+		tail -n +$((n0 + 1)) "$tmp/http.log" >"$tmp/pt.log"
+	}
+	ptest "test=1&dfast=0.12&dsmall=0.3" "-c 2"
+	if grep -q '^archaic: Picture test 1 of 2 (ABM): 9 of 9 KB$' "$tmp/pt.err" &&
+		grep -q '^archaic: Picture test 2 of 2 (ABM3): 6 of 6 KB$' "$tmp/pt.err" &&
+		grep -q '^archaic: Picture test: ABM is used ([0-9]* ms, ABM3 [0-9]* ms)$' "$tmp/pt.err" &&
+		grep -q '^note picture test starts: ABM, then ABM3 ([0-9]*x[0-9]*, 2)$' "$tmp/pt.log" &&
+		grep -q '^note picture test: ABM is used ([0-9]* ms, ABM3 [0-9]* ms)$' "$tmp/pt.log" &&
+		[ "$(grep -c '^accept /hn2.pic' "$tmp/pt.log")" = 2 ] &&
+		grep -q '^accept /hn2.pic .ab3: .* image/x-abm image/x-abm3 ' "$tmp/pt.log"; then
+		ok "picture test: both kinds come and show, ABM is used when ABM3 is slower; WRP gets the start and the result"
+	else
+		bad "picture test, ABM3 comes late:"
+		grep 'Picture test\|^note\|^accept' "$tmp/pt.err" "$tmp/pt.log" | tail -8
+	fi
+	ptest "test=1&dfast=0.3" "-c 2"
+	if grep -q '^archaic: Picture test: ABM3 is used ([a-z0-9 ]*, ABM [0-9]* ms)$' "$tmp/pt.err" &&
+		grep -q '^note picture test: ABM3 is used (' "$tmp/pt.log"; then
+		ok "picture test: ABM3 is used when ABM is slower"
+	else
+		bad "picture test, ABM comes late:"
+		grep 'Picture test\|^note' "$tmp/pt.err" "$tmp/pt.log" | tail -5
+	fi
+	ptest "test=1&dfast=0.3" ""
+	if grep -q '^archaic: Picture test 1 of 2 (AB8): ' "$tmp/pt.err" &&
+		grep -q '^archaic: Picture test: GIF is used ([a-z0-9 ]*, AB8 [0-9]* ms)$' "$tmp/pt.err" &&
+		grep -q '^note picture test starts: AB8, then GIF (' "$tmp/pt.log"; then
+		ok "picture test in colors: AB8, then the GIF where it is smaller"
+	else
+		bad "picture test in colors:"
+		grep 'Picture test\|^note' "$tmp/pt.err" "$tmp/pt.log" | tail -5
+	fi
+	ptest "test=1&dfast=0.3" "-c 2 -f abm"
+	t1=$(grep -c 'archaic-test' "$tmp/pt.log")
+	ptest "" "-c 2"
+	if [ "$t1" = 0 ] && [ "$(grep -c 'GET /archaic-test' "$tmp/pt.log")" = 1 ] &&
+		! grep -q 'Picture test: \|Stopped' "$tmp/pt.err"; then
+		ok "picture test: none with -f; an older WRP has none, and Archaic says nothing"
+	else
+		bad "picture test with -f ($t1 requests), or with an older WRP:"
+		grep 'Picture test\|archaic-test' "$tmp/pt.err" "$tmp/pt.log" | tail -5
+	fi
+	curl -s "http://127.0.0.1:$port/set" >/dev/null
 	printf '%s\n' "shot $tmp/lg.pbm" quit |
 		"$hl" -g 800x400 "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
 	rm -f "$here/data/wrp.html"
@@ -874,6 +1134,17 @@ EOF
 		"shot $tmp/t2.png" 'pixels 5000' "shot $tmp/t3.png" \
 		"click $((fx + 10)) $((fy + 20))" quit |
 		"$hl" -g 640x400 "http://127.0.0.1:$port/tall.html" >"$tmp/th.out" 2>&1
+	# a slice that has come: its type, size, time and speed on the status line
+	printf '%s\n' 'sleep 300' 'scroll down' 'sleep 300' quit |
+		"$hl" -v -n -g 640x400 "http://127.0.0.1:$port/tall.html" >/dev/null 2>"$tmp/sl.err"
+	if grep -Eq '^archaic: Picture part 2 of [0-9]+: GIF, [0-9]+ (KB|bytes) in (under 1 ms|[0-9.]+ m?s)(, [0-9.]+ (bytes|KB|MB)/s)?$' "$tmp/sl.err" &&
+		grep -Eq '^archaic: Picture part 3 of [0-9]+: GIF, ' "$tmp/sl.err" &&
+		grep -Eq '^archaic: [0-9]+ s, [0-9]+ KB, GIF  http' "$tmp/sl.err"; then
+		ok "tall: the status line shows each slice that came: its type, size, time and speed"
+	else
+		bad "tall: the slice's status line:"
+		grep 'Picture part [0-9]* of [0-9]*: \| s, ' "$tmp/sl.err" | tail -4
+	fi
 	n=0
 	for s in "t0 0" "t1 $q" "t2 $((q + p))" "t3 $last"; do
 		set -- $s
@@ -957,8 +1228,8 @@ EOF
 	n=0
 	for w in "Page: connecting to 127.0.0.1 port $port" \
 		"Page: waiting for 127.0.0.1" "Page: waiting for 127.0.0.1, 1 s" \
-		"Page: $sz of $sz bytes" "Picture part 1 of $parts: 0 of [0-9]+ KB" \
-		"[0-9]+ s, [0-9]+ KB  http://127.0.0.1:$port/tall.html[?]wait=2"; do
+		"Page: $sz of $sz bytes" "Picture part 1 of $parts [(]GIF[)]: 0 of [0-9]+ KB" \
+		"[0-9]+ s, [0-9]+ KB, GIF  http://127.0.0.1:$port/tall.html[?]wait=2"; do
 		if grep -q -E "^status: $w\$" "$tmp/st.out"; then
 			n=$((n + 1))
 		else
@@ -966,8 +1237,8 @@ EOF
 		fi
 	done
 	# the last line of the part: all of it
-	if grep "^status: Picture part 1 of $parts: " "$tmp/st.out" | tail -1 |
-		awk '{ if ($7 == $9 && $7 > 0) ok = 1 } END { exit !ok }'; then
+	if grep "^status: Picture part 1 of $parts (GIF): " "$tmp/st.out" | tail -1 |
+		awk '{ if ($8 == $10 && $8 > 0) ok = 1 } END { exit !ok }'; then
 		n=$((n + 1))
 	else
 		bad "status line: the part does not end at its size:"

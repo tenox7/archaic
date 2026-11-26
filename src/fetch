@@ -11,6 +11,7 @@ hget 10.0.2.2 8077 /src/pic.c pic.c
 hget 10.0.2.2 8077 /src/update.c update.c
 hget 10.0.2.2 8077 /src/x10.c x10.c
 hget 10.0.2.2 8077 /src/nidris.c nidris.c
+hget 10.0.2.2 8077 /src/heap.c heap.c
 hget 10.0.2.2 8077 /src/mkinc mkinc
 hget 10.0.2.2 8077 /src/mk mk
 hget 10.0.2.2 8077 /src/lka lka

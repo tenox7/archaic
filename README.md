@@ -121,7 +121,7 @@ Where the window system has no scroll bar, Archaic draws its own, in the style o
 ![Archaic's own scroll bar at the right, in GEM style: Wikipedia's Atari ST article](screenshots/scrollbar.png)
 
 ```
-archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [-r n] [-u] [-n] [--version] [--help] [url]
+archaic [-g WxH+X+Y] [-a] [-c n] [-f type] [-t] [-v] [-o file] [-s script] [-r n] [-u] [-n] [--version] [--help] [url]
 ```
 
 | Option | Does |
@@ -130,7 +130,7 @@ archaic [-g WxH+X+Y] [-a] [-c n] [-f gif] [-t] [-v] [-o file] [-s script] [-r n]
 | `-g WxH+X+Y` | window size and place |
 | `-a` | also show WRP's M, T and C menus |
 | `-c n` | pictures in n colors (2 to 256) |
-| `-f gif` | ask WRP for GIF pictures only |
+| `-f type` | ask WRP for one type of pictures: `gif`, `abm`, `abm3`, `ab8` or `small` |
 | `-t` | test mode: no window |
 | `-v` | status messages also to stderr |
 | `-o file` | save the first picture (PBM or PPM) |

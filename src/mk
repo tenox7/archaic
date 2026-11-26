@@ -18,4 +18,5 @@ c pic.c
 c update.c
 c x10.c
 c nidris.c
+c -o heap heap.c
 sh lka

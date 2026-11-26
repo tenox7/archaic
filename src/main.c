@@ -133,6 +133,9 @@ static int quiet;		/* getting a slice the user did not ask for */
 static char surl[MAXURL];	/* a slice's address */
 static char spage[MAXURL];	/* the address WRP showed before */
 static char ssave[200];		/* the status line before a slice */
+static int pinfo;		/* the status line is a page's last line, a
+				 * slice's line or the test's result: the
+				 * next slice's line takes its place */
 
 /* Archaic's own scroll bar, for systems that have none (g_bar), in the
  * style of the Atari ST's GEM: at the right of the page part, an arrow
@@ -203,6 +206,45 @@ static int copt;		/* -c's colors, or 0 */
 static int cmenu;		/* the display has colors: WRP's C menu is shown */
 static char cval[8];		/* the line chosen in C, as 128n, or "" */
 static int idepth = 1;		/* the pictures' pixels: 1 or 8 bits */
+/* The pictures' types (see pic.c). WRP can send a picture in a type that
+ * is fast to decode (ABM; in colors AB8), or in one that is small and
+ * slow to decode (ABM3; in colors the GIF, when it is the smaller one).
+ * Which of them is on the screen first depends on this computer's CPU
+ * and on its line, and Archaic knows neither. So it times its pictures
+ * (the ones that are not drawn while they come), from the answer's
+ * header until the last row is there, and asks for the kind that is
+ * faster here: see choice(). -f sets one type, with no choice. */
+#define F_AUTO 0		/* -f: none: Archaic chooses */
+#define F_GIF 1			/* only GIFs */
+#define F_ABM 2			/* ABM; in colors GIFs (as Archaic 0.11) */
+#define F_AB3 3			/* ABM3; in colors GIFs */
+#define F_AB8 4			/* AB8, and ABM */
+#define F_SMALL 5		/* for each picture, the smallest type */
+static int fopt;
+static char acc[100];		/* http_accept, as setaccept() makes it */
+#define NTRY 2			/* pictures of a kind before it is judged, */
+#define NTRYMAX 6		/*  and at most, with a clock too coarse to tell */
+#define GAP0 8			/* pictures until the other kind is tried */
+#define GAPMAX 64		/*  again: twice as many each time, up to this */
+typedef struct choice {
+	int small;		/* Archaic asks for 1: the small kind, 0: the fast one */
+	long t[2];		/* ms its pictures took, asked for as [0] fast, [1] small, */
+	long r[2];		/*  their bytes in the fast type, */
+	int n[2];		/*  and how many they were */
+	int trial;		/* 1: the kind asked for is tried, the other is in use */
+	int left;		/* pictures until the next trial */
+	int gap;		/* how many that was the last time */
+} Choice;
+static Choice chs[2];		/* [0] black and white, [1] colors */
+/* the two kinds' names for the user: [black and white or colors][kind] */
+static char *kindname[2][2] = { { "ABM", "ABM3" }, { "AB8", "GIF or AB8" } };
+/* The picture test: at its start Archaic gets a test picture from WRP in
+ * each kind, and times them (pictest()). WRP's log gets a note of what
+ * the test and the trials do (http_note). */
+static int ptest = 3;		/* the test is still to do: tries left */
+static int wrptest;		/* this WRP has the test: it takes a note alone */
+static char pnote[220];		/* the note that waits */
+static int notenow;		/* send it after this picture */
 static int wrpf[MAXFORM];	/* the form is WRP's */
 static int oldpic;		/* WRP's next page comes: the picture shown is old */
 static int pclick;		/* the pending load is a click on WRP's picture */
@@ -562,6 +604,7 @@ char *s;
 {
 	plen = 0;
 	kwait = -1;
+	pinfo = 0;
 	scopy(sline, s, (int)sizeof sline);
 	showstatus();
 }
@@ -611,20 +654,54 @@ long n;
 	return nb;
 }
 
+/* The type of the picture that comes, for the status line: GIF, ABM,
+ * ABM3, AB8 ... It is the answer's type (image/x-abm3) with no image/
+ * and no x-, in capitals. "" if no picture comes. */
+static char *ptype()
+{
+	static char t[12];
+	char *p = http_type;
+	int i;
+
+	t[0] = 0;
+	if (!strnieq(p, "image/", 6))
+		return t;
+	p += 6;
+	if (p[0] == 'x' && p[1] == '-')
+		p += 2;
+	for (i = 0; p[i] && i < (int)sizeof t - 1; ++i)
+		t[i] = p[i] >= 'a' && p[i] <= 'z' ? p[i] + 'A' - 'a' : p[i];
+	t[i] = 0;
+	return t;
+}
+
 /* what is coming, and how much of it has come */
 static void progress()
 {
+	static char lab[80];
 	long g = http_got, n = http_len;
+	char *t = ptype();
+	int k;
 
 	if (!what[0])
 		return;
+	/* what comes, and for a picture its type: "Picture part 3 of 9
+	 * (ABM3)", "Picture part 4 of 9 (ahead, ABM3)" */
+	scopy(lab, what, 60);
+	k = len(lab);
+	if (!strnieq(lab, "Picture", 7))
+		;			/* a page: no type */
+	else if (t[0] && k > 0 && lab[k - 1] == ')')
+		sprintf(lab + k - 1, ", %s)", t);
+	else if (t[0])
+		sprintf(lab + k, " (%s)", t);
 	if (n > 0 && n < 1024)
-		sprintf(msg, "%.50s: %ld of %ld bytes", what, g, n);
+		sprintf(msg, "%s: %ld of %ld bytes", lab, g, n);
 	else if (n > 0)
-		sprintf(msg, "%.50s: %ld of %ld KB", what, (g + 512) / 1024,
+		sprintf(msg, "%s: %ld of %ld KB", lab, (g + 512) / 1024,
 			(n + 512) / 1024);
 	else
-		sprintf(msg, "%.50s: %s", what, bytes(g));
+		sprintf(msg, "%s: %s", lab, bytes(g));
 	sayp(msg, g, n);
 }
 
@@ -2248,6 +2325,7 @@ static void showkeys()
 		"Password" : "Keys to the page", kecho);
 	plen = 0;
 	kwait = refreshon(t) ? waitleft(t) : -1;
+	pinfo = 0;
 	scopy(sline, msg, (int)sizeof sline);
 	showstatus();
 }
@@ -2573,19 +2651,28 @@ int ui_poll()
 	return stop;
 }
 
-/* rows y up to y + n - 1 of im have come */
-void img_rows(im, y, n)
-Image *im;
-int y, n;
+/* Rows of a picture that have come and are not on the screen yet: rows
+ * ry0 up to ry1 - 1 of rim. A call that draws has a fixed cost (on a
+ * 68030 Mac about 15 ms, and the status line 7 ms more): 44 calls for a
+ * slice took longer than its pixels. So new rows wait, and go to the
+ * screen ROWMS apart, with the progress. A display with no clock (the
+ * 3B1, Idris) uses http.c's: on Idris that is a second apart. */
+static Image *rim;
+static int ry0, ry1;
+static long rlast = -1;		/* the clock when rows were drawn last */
+static int rdrawn;		/* rows went to the screen since it was set to 0 */
+#define ROWMS 200
+
+/* draw the rows that wait */
+static void rowsdraw()
 {
+	Image *im = rim;
 	Item *it;
-	int i, a;
+	int i, a, y = ry0, n = ry1 - ry0;
 	long p;
 
-	http_pump();
-	progress();
-	YIELD;			/* the Mac: the other programs run too */
-	if (headless)
+	rim = 0;
+	if (!im || headless)
 		return;
 	for (i = 0; i < nitems; ++i) {
 		it = &items[i];
@@ -2594,6 +2681,7 @@ int y, n;
 			continue;
 		a = it->y - top + y;
 		drawimage(i, a, a + n);
+		rdrawn = 1;
 		if (popup >= 0 && a < py + ph && a + n > py)
 			drawpop();
 	}
@@ -2604,11 +2692,47 @@ int y, n;
 		if (p < viewh && p + n > 0) {
 			a = p < 0 ? 0 : (int)p;
 			drawtall(a, p + n < viewh ? (int)(p + n) : viewh);
+			rdrawn = 1;
 			if (popup >= 0 && a < py + ph && p + n > py)
 				drawpop();
 		}
 	}
 	g_flush();
+}
+
+/* rows y up to y + n - 1 of im have come */
+void img_rows(im, y, n)
+Image *im;
+int y, n;
+{
+	long t, res;
+
+	http_pump();
+	YIELD;			/* the Mac: the other programs run too */
+	if (headless) {
+		progress();
+		return;
+	}
+	if (rim && rim != im)
+		rowsdraw();
+	if (!rim) {
+		rim = im;
+		ry0 = y;
+		ry1 = y + n;
+	} else {
+		if (y < ry0)
+			ry0 = y;
+		if (y + n > ry1)
+			ry1 = y + n;
+	}
+	t = g_ms();
+	if (t < 0)
+		t = nowms(&res);	/* a display with no clock: http.c's */
+	if (rlast >= 0 && t >= rlast && t - rlast < ROWMS)
+		return;
+	rlast = t;
+	progress();
+	rowsdraw();
 }
 
 static void imfree(im)
@@ -2618,6 +2742,8 @@ Image *im;
 		free((char *)im->bits);
 	if (im->pal)
 		free((char *)im->pal);
+	if (rim == im)
+		rim = 0;
 	im->bits = im->pal = 0;
 	im->w = im->h = 0;
 	im->kind = 0;
@@ -2833,12 +2959,327 @@ static void nopage()
 	redraw(0, 0, winw, viewh);
 }
 
+/* http_accept: the picture types Archaic takes. One that it takes but
+ * does not want now has q=0.5: WRP sends the smallest picture of the
+ * types with the highest q. ABM and AB8 are fast to decode; ABM3 is
+ * small. In colors the small kind is the smaller one of AB8 and the GIF.
+ * AB8 needs a display with colors. */
+static void setaccept()
+{
+	int col = idepth == 8;
+
+	switch (fopt) {
+	case F_GIF:
+		http_accept = "text/html, image/gif";
+		return;
+	case F_ABM:
+		http_accept = "text/html, image/x-abm, image/gif";
+		return;
+	case F_AB3:
+		http_accept = "text/html, image/x-abm3, image/gif";
+		return;
+	case F_AB8:
+		http_accept = col ? "text/html, image/x-abm, image/x-ab8, image/gif;q=0.5" :
+			"text/html, image/x-abm, image/gif";
+		return;
+	case F_SMALL:
+		http_accept = col ? "text/html, image/x-abm, image/x-abm3, image/x-ab8, image/gif" :
+			"text/html, image/x-abm, image/x-abm3, image/gif";
+		return;
+	}
+	sprintf(acc, "text/html, image/x-abm, image/x-abm3%s%s, image/gif%s",
+		chs[0].small ? "" : ";q=0.5", col ? ", image/x-ab8" : "",
+		col && !chs[1].small ? ";q=0.5" : "");
+	http_accept = acc;
+}
+
+/* A clock in ms for the pictures' times: the display's, or with none
+ * http.c's. *res: how far off it can be. */
+static long ptime(res)
+long *res;
+{
+	long t = g_ms();
+
+	if (t < 0)
+		return nowms(res);
+	*res = 20;			/* the Mac's clock ticks 60 times a second */
+	return t;
+}
+
+/* Is kind a's time for a byte, times pct / 100, less than kind b's? The
+ * clock is off by res at most: with sure 1, a's time counts as longer by
+ * what that can be over its pictures, and b's as shorter (a is less for
+ * sure); with -1 the other way (a may be less); with 0 as they are. */
+static int lesstime(c, a, b, pct, sure, res)
+Choice *c;
+int a, b, pct, sure;
+long res;
+{
+	long ta = c->t[a] + sure * (res * (c->n[a] + 1) / 4);
+	long tb = c->t[b] - sure * (res * (c->n[b] + 1) / 4);
+	long ra = c->r[a], rb = c->r[b];
+
+	if (tb <= 0)
+		return 0;
+	if (ta < 0)
+		ta = 0;
+	while (ta >= 4096 || tb >= 4096) {	/* the products fit in a long */
+		ta >>= 1;
+		tb >>= 1;
+	}
+	while (ra >= 4096 || rb >= 4096) {
+		ra >>= 1;
+		rb >>= 1;
+	}
+	if (ra < 1)
+		ra = 1;
+	if (rb < 1)
+		rb = 1;
+	return ta * rb * pct < tb * ra * 100;
+}
+
+/* ms milliseconds for the status line: as "2.1 s", or "40 ms" if it is
+ * less than a second, or "under 1 ms" */
+static void mstext(ms, s)
+long ms;
+char *s;
+{
+	if (ms < 1)
+		sprintf(s, "under 1 ms");
+	else if (ms < 1000)
+		sprintf(s, "%ld ms", ms);
+	else
+		sprintf(s, "%ld.%ld s", ms / 1000, ms % 1000 / 100);
+}
+
+/* The note that waits goes to WRP now, in a request of its own, with no
+ * status line. Only a WRP that has the picture test takes it (wrptest);
+ * with another one the note goes with the next request. */
+static void sendnote()
+{
+	static char nu[MAXURL], w0[60];
+
+	notenow = 0;
+	if (!wrptest || !http_note)
+		return;
+	scopy(w0, what, (int)sizeof w0);
+	what[0] = 0;
+	url_join(wrpu, "archaic-test", nu);
+	http_open(nu, (char *)0);
+	http_close();
+	scopy(what, w0, (int)sizeof what);
+}
+
+/* Kind i's time for 10 KB of the fast type, for the status line */
+static void ktime(c, i, s)
+Choice *c;
+int i;
+char *s;
+{
+	long t = c->t[i], r = c->r[i];
+
+	while (t >= 0x20000L) {		/* t * 10240 fits in a long */
+		t >>= 1;
+		r >>= 1;
+	}
+	if (r < 1)
+		r = 1;
+	mstext(t * 10240 / r, s);
+}
+
+/* The picture im came whole, ms after the answer's header (the clock is
+ * off by res at most): count it, and choose the kind to ask for next.
+ * The time before the header (the connect, the request, WRP's work) is
+ * the same for both kinds, and not counted: for small pictures it would
+ * be most of the time, and hide what the kind does.
+ *
+ * Pictures of the two kinds are not the same pictures, so their times
+ * are counted for a byte of the fast type: WRP says how long a small
+ * picture is in the fast type (http_fast). At the start, and from time
+ * to time, Archaic tries the other kind for NTRY pictures (more, up to
+ * NTRYMAX, while a coarse clock can't tell). The other kind takes over
+ * when its time is 10% less. If not, the next trial comes after twice as
+ * many pictures (GAP0 up to GAPMAX), or after GAPMAX at once when the
+ * other kind took 2 times as long. A kind whose pictures take less than
+ * 1/10 s stays: there is nothing to win.
+ *
+ * WRP's log gets a note of each trial: its start, and how it ended, with
+ * the two kinds' times for 10 KB of the fast type ("pictures in black
+ * and white: now ABM3 (2.1 s for 10 KB, ABM 3.4 s); fast ..."); with -v
+ * the sums go to stderr. The status line shows no trial: it shows each
+ * slice that came, with its type, size and speed (sliceline()). */
+static void choice(im, ms, res)
+Image *im;
+long ms, res;
+{
+	static char *kind[] = { "black and white", "colors" };
+	static char ta[16], tb[16];
+	Choice *c;
+	long r = http_fast > 0 ? http_fast : http_len;
+	int k, m, o, i, both, win;
+
+	if (im->kind == P_ABM || im->kind == P_AB3)
+		k = 0;
+	else if ((im->kind == P_AB8 || im->kind == P_GIF) && im->depth == 8)
+		k = 1;
+	else
+		return;
+	if (fopt != F_AUTO || ms < 0 || r < 1024)
+		return;
+	c = &chs[k];
+	m = c->small;
+	o = !m;
+	/* the fast type was the smallest: this picture is the same in both kinds */
+	both = m && (im->kind == P_ABM || im->kind == P_AB8);
+	for (i = 0; i < 2; ++i)
+		if (i == m || both) {
+			if (c->n[i] >= 16) {	/* older pictures count less */
+				c->t[i] /= 2;
+				c->r[i] /= 2;
+				c->n[i] /= 2;
+			}
+			c->t[i] += ms;
+			c->r[i] += r;
+			++c->n[i];
+		}
+	if (c->n[m] < NTRY)
+		return;
+	if (c->n[o] < NTRY || (!c->trial && --c->left <= 0)) {
+		if (c->n[o] >= NTRY) {		/* not the first trial: */
+			c->t[o] = c->r[o] = 0;	/*  what is known is old */
+			c->n[o] = 0;
+		}
+		c->small = o;			/* try the other kind */
+		c->trial = 1;
+		setaccept();
+		sprintf(pnote, "pictures in %s: trial of %s starts (%s is in use)",
+			kind[k], kindname[k][o], kindname[k][m]);
+		http_note = pnote;
+		return;
+	}
+	if (!c->trial)
+		return;
+	/* m is on trial, o is the kind in use */
+	if (c->t[o] < 100L * c->n[o])
+		win = 0;			/* nothing to win */
+	else if (lesstime(c, m, o, 110, 1, res))
+		win = 1;
+	else if (c->n[m] < NTRYMAX && lesstime(c, m, o, 110, -1, res))
+		return;				/* the clock can't tell yet */
+	else
+		win = lesstime(c, m, o, 110, 0, res);
+	c->trial = 0;
+	if (verbose) {
+		fprintf(stderr, "archaic: pictures in %s: fast %ld ms for %ld KB, small %ld ms for %ld KB\n",
+			kind[k], c->t[0], (c->r[0] + 512) / 1024, c->t[1],
+			(c->r[1] + 512) / 1024);
+		fflush(stderr);
+	}
+	if (win)
+		c->gap = GAP0;
+	else {
+		c->gap = lesstime(c, o, m, 200, 0, res) || c->gap >= GAPMAX / 2 ?
+			GAPMAX : c->gap < GAP0 ? GAP0 : 2 * c->gap;
+		c->small = o;
+		setaccept();
+	}
+	c->left = c->gap;
+	i = c->small;			/* the kind from now on */
+	ktime(c, i, ta);
+	ktime(c, !i, tb);
+	sprintf(pnote, "pictures in %s: %s %s (%s for 10 KB, %s %s); fast %ld ms for %ld KB, small %ld ms for %ld KB",
+		kind[k], win ? "now" : "still", kindname[k][i], ta, kindname[k][!i],
+		tb, c->t[0], (c->r[0] + 512) / 1024, c->t[1], (c->r[1] + 512) / 1024);
+	http_note = pnote;
+	notenow = 1;
+}
+
+/* A picture's load is over: its last rows go to the screen. If it came
+ * whole (r: pic_load() said 0), its time since t0 (when its header was
+ * here, and rdrawn was set to 0) is counted (choice). Not if rows of it
+ * went to the screen meanwhile: drawing takes time that the slices which
+ * come ahead do not have, and the first trial would have it in one kind
+ * only. So of a page's slices, the ones that come ahead are counted. */
+static void picdone(im, r, t0)
+Image *im;
+int r;
+long t0;
+{
+	long res, t;
+
+	if (rim)
+		rowsdraw();
+	http_sync();			/* http_got: all that the decoder took */
+	if (r != 0 || stop || rdrawn || http_len <= 0 || http_got + 16 < http_len)
+		return;
+	t = ptime(&res);
+	choice(im, t - t0, res);
+}
+
+/* a picture type's name for the status line: P_AB8 is "AB8" */
+static char *ptname(kind)
+int kind;
+{
+	static char *pn[] = { "", "GIF", "ABM", "ABM3", "AB8" };
+
+	return pn[kind > 0 && kind < 5 ? kind : 0];
+}
+
+/* The type of the page's pictures, for its last status line: ", AB8"
+ * (the slice in the frame, or the first picture), or "" with none */
+static char *pagetype()
+{
+	static char t[12];
+	int i, k = 0;
+
+	for (i = 0; tall >= 0 && !k && i < NSLICE; ++i)
+		if (slices[i].state == 2)
+			k = slices[i].im.kind;
+	for (i = 0; !k && i < nimgs; ++i)
+		k = imgs[i].kind;
+	t[0] = 0;
+	if (ptname(k)[0])
+		sprintf(t, ", %s", ptname(k));
+	return t;
+}
+
+/* The status line of a slice that has come, into msg: part k of m, its
+ * type, its size (len bytes), the time from the answer's header to its
+ * last row (ms), and the bytes a second that makes:
+ * "Picture part 3 of 9: ABM3, 5 KB in 2.7 s, 1.9 KB/s" */
+static void sliceline(k, m, kind, len, ms)
+long k, m, len, ms;
+int kind;
+{
+	static char tt[16], sp[24];
+	long v;
+
+	mstext(ms, tt);
+	sp[0] = 0;
+	if (ms > 0 && len < 2000000L) {
+		v = len * 1000 / ms;
+		if (v >= 1048576L)
+			sprintf(sp, ", %ld.%ld MB/s", v / 1048576L,
+				v % 1048576L * 10 / 1048576L);
+		else if (v >= 102400L)
+			sprintf(sp, ", %ld KB/s", v / 1024);
+		else if (v >= 1024)
+			sprintf(sp, ", %ld.%ld KB/s", v / 1024, v % 1024 * 10 / 1024);
+		else
+			sprintf(sp, ", %ld bytes/s", v);
+	}
+	sprintf(msg, "Picture part %ld of %ld: %s, %s in %s%s", k, m, ptname(kind),
+		bytes(len), tt, sp);
+}
+
 /* picture k of the n on the page: item i */
 static void loadimg(i, k, n)
 int i, k, n;
 {
 	Item *it = &items[i];
 	Image *im = &imgs[it->img];
+	long t0, res;
+	int r;
 
 	url_join(base, it->text, u);
 	if (n > 1)
@@ -2849,6 +3290,8 @@ int i, k, n;
 		say(openerr());
 		return;
 	}
+	t0 = ptime(&res);
+	rdrawn = 0;
 	if (http_status != 200) {
 		sprintf(msg, "Picture: HTTP %d", http_status);
 		say(msg);
@@ -2856,7 +3299,9 @@ int i, k, n;
 		return;
 	}
 	im->depth = idepth;
-	if (pic_load(im) == 0)
+	r = pic_load(im);
+	picdone(im, r, t0);
+	if (r == 0)
 		progress();
 	else if (!stop) {
 		sprintf(msg, "Picture: can't show %s", http_type[0] ? http_type : "it");
@@ -2864,6 +3309,8 @@ int i, k, n;
 	}
 	lbytes += http_got;
 	http_close();
+	if (notenow)
+		sendnote();
 	if (im->w > 0 && (im->w != it->w || im->h != it->h)) {
 		layout();
 		redraw(0, 0, winw, winh);
@@ -2921,8 +3368,8 @@ int i;
 long a, b;
 {
 	Slice *s = &slices[i];
-	int n, c, ok = 0, was = spinon;
-	long k, m;
+	int n, c, r, ok = 0, was = spinon, info = pinfo;
+	long k, m, t0, res, ms = 0, blen = 0;
 
 	if (!quiet)
 		spinto(1);
@@ -2948,10 +3395,19 @@ long a, b;
 		if (http_open(surl, (char *)0) < 0)
 			say(openerr());
 		else {
+			t0 = ptime(&res);
+			rdrawn = 0;
+			r = -1;
+			if (http_status == 200) {
+				r = pic_load(&s->im);
+				picdone(&s->im, r, t0);
+				ms = ptime(&res) - t0;
+				blen = http_len;
+			}
 			if (http_status != 200) {
 				sprintf(msg, "Picture: HTTP %d", http_status);
 				say(msg);
-			} else if (pic_load(&s->im) < 0) {
+			} else if (r < 0) {
 				if (!stop)
 					say("Picture: can't show the slice");
 			} else if (s->im.h != b - a)	/* the server ignored y and h */
@@ -2962,13 +3418,20 @@ long a, b;
 				progress();	/* all of it */
 			}
 			http_close();
+			if (notenow)
+				sendnote();
 		}
 	}
 	loading = 0;
 	spinto(was);
 	if (ok && !stop) {
 		s->state = 2;
-		say(ssave);
+		if (info) {		/* this slice's type, size and speed */
+			sliceline(k, m, s->im.kind, blen, ms);
+			say(msg);
+			pinfo = 1;
+		} else
+			say(ssave);
 		return;
 	}
 	imfree(&s->im);
@@ -3359,8 +3822,10 @@ char *url, *post;
 	else if (done)
 		say(done);
 	else {
-		sprintf(msg, "%ld s, %s  %.150s", now() - t0, bytes(lbytes), base);
+		sprintf(msg, "%ld s, %s%s  %.150s", now() - t0, bytes(lbytes),
+			pagetype(), base);
 		say(msg);
+		pinfo = 1;
 	}
 	/* too slow to come while the user types: no more of them */
 	if (byrefr && tr >= 0 && (t = g_ms()) >= tr && t - tr > rsec * 1000L) {
@@ -3405,7 +3870,7 @@ static void dump()
 {
 	static char *tn[] = { "?", "text", "br", "para", "field", "button",
 		"hidden", "select", "image" };
-	static char *kn[] = { "none", "gif", "abm", "?" };
+	static char *kn[] = { "none", "gif", "abm", "abm3", "ab8", "?" };
 	Item *it;
 	Image *im;
 	Slice *s;
@@ -3448,14 +3913,14 @@ static void dump()
 				s = &slices[j];
 				if (s->state == 2 && s->y0 <= oy && oy < s->y0 + s->im.h)
 					printf(" got %dx%d %s sum %08lx%s", s->im.w, s->im.h,
-						kn[s->im.kind & 3], sum(&s->im),
+						kn[s->im.kind < 5 ? s->im.kind : 5], sum(&s->im),
 						s->im.depth == 8 ? " colors" : "");
 			}
 			printf(" tall %dx%d at %ld", it->iw, it->ih, oy);
 		} else if (it->type == I_IMAGE && it->img >= 0) {
 			im = &imgs[it->img];
 			printf(" got %dx%d %s sum %08lx%s", im->w, im->h,
-				kn[im->kind & 3], sum(im),
+				kn[im->kind < 5 ? im->kind : 5], sum(im),
 				im->depth == 8 ? " colors" : "");
 		}
 		printf("\n");
@@ -3526,7 +3991,7 @@ long n;
  * later, up to 3 times. Esc stops it for this run. */
 static void autoupd()
 {
-	int r;
+	int r, info = pinfo;
 
 	scopy(ssave, sline, (int)sizeof ssave);
 	loading = 1;
@@ -3541,8 +4006,126 @@ static void autoupd()
 		fflush(stderr);
 	} else if (r == U_STOP && !pending)
 		say("Stopped");
-	else if (!pending)
+	else if (!pending) {
 		say(ssave);	/* the status line as it was */
+		pinfo = info;
+	}
+}
+
+/* The picture test. Once a run, when WRP's page is here and Archaic has
+ * nothing to do, it gets a test picture from WRP (a part of a sample
+ * page, as large as the frame, in the colors in use), first in the kind
+ * that is fast to decode, then in the small kind, and times the two. The
+ * status line shows each one as it comes ("Picture test 1 of 2 (ABM): 3
+ * of 7 KB"), then the result: "Picture test: ABM3 is used (2.2 s, ABM
+ * 3.5 s)". The small kind is used if it took 10% less. WRP's log gets
+ * the start and the result. Later the pictures of the pages are timed,
+ * and the choice can change (choice()).
+ * A WRP with no test: Archaic starts with the fast kind, and choice()
+ * does it all. A click or a key stops the test: it comes again later (3
+ * times at most); Esc stops it for this run. Not with -f. */
+static void pictest()
+{
+	static Image tim;
+	static char tu[MAXURL], cs[12], ta[16], tb[16];
+	static char *tname[2][2] = { { "ABM", "ABM3" }, { "AB8", "GIF" } };
+	Choice *c;
+	long t0, res = 20, fast = 0;
+	long t[2], n[2];
+	int k, m, r = -1, w, h, win, was, same = 0, notest = 0, info = pinfo;
+
+	k = ncol > 2;
+	if (k && idepth != 8) {		/* colors on a black and white display: GIFs */
+		ptest = 0;
+		return;
+	}
+	c = &chs[k];
+	was = c->small;
+	picsize(&w, &h);
+	if (cval[0])
+		sprintf(cs, "%.7s", cval);
+	else
+		sprintf(cs, "%d", ncol);
+	sprintf(msg, "archaic-test?w=%d&h=%d&c=%s", w, h, cs);
+	url_join(wrpu, msg, tu);
+	scopy(ssave, sline, (int)sizeof ssave);
+	loading = 1;
+	t[0] = t[1] = n[0] = n[1] = 0;
+	for (m = 0; m < 2; ++m) {
+		c->small = m;
+		setaccept();
+		sprintf(what, "Picture test %d of 2", m + 1);
+		if (m == 0) {
+			sprintf(pnote, "picture test starts: %s, then %s (%dx%d, %s)",
+				tname[k][0], tname[k][1], w, h, cs);
+			http_note = pnote;
+		}
+		r = -1;
+		if (http_open(tu, (char *)0) < 0)
+			;
+		else if (http_status != 200 || !strnieq(http_type, "image/", 6))
+			notest = 1;		/* an older WRP */
+		else {
+			t0 = ptime(&res);
+			tim.depth = idepth;
+			r = pic_load(&tim);
+			http_sync();
+			if (r != 0 || stop || http_len <= 0 || http_got + 16 < http_len)
+				r = -1;
+			t[m] = ptime(&res) - t0;
+			n[m] = http_len;
+			if (http_fast > 0)
+				fast = http_fast;
+			if (m)			/* the fast type was the smaller one */
+				same = tim.kind == P_ABM || tim.kind == P_AB8;
+			progress();
+			imfree(&tim);
+		}
+		http_close();
+		if (r != 0)
+			break;
+	}
+	loading = 0;
+	what[0] = 0;
+	if (r != 0) {			/* no test, or it was stopped */
+		c->small = was;
+		setaccept();
+		if (notest || !stop || !pending)
+			ptest = 0;
+		else
+			--ptest;
+		if (!pending) {
+			say(stop && !notest ? "Stopped" : ssave);
+			if (!stop || notest)
+				pinfo = info;	/* the line as it was */
+		}
+		return;
+	}
+	ptest = 0;
+	wrptest = 1;
+	c->t[0] = t[0];
+	c->r[0] = n[0];
+	c->t[1] = t[1];
+	c->r[1] = fast > 0 ? fast : n[0];
+	c->n[0] = c->n[1] = NTRY;
+	win = !same && t[0] >= 100 && lesstime(c, 1, 0, 110, 1, res);
+	c->small = win;
+	c->trial = 0;
+	c->left = c->gap = GAP0;
+	setaccept();
+	mstext(t[win], ta);
+	mstext(t[!win], tb);
+	if (same)
+		sprintf(msg, "Picture test: %s is used, %s (%s is not smaller)",
+			tname[k][0], ta, k ? "the GIF" : "ABM3");
+	else
+		sprintf(msg, "Picture test: %s is used (%s, %s %s)", tname[k][win],
+			ta, tname[k][!win], tb);
+	say(msg);
+	pinfo = 1;
+	sprintf(pnote, "p%.200s", msg + 1);
+	http_note = pnote;
+	sendnote();
 }
 
 /* one step of the -s script */
@@ -3587,7 +4170,8 @@ static char *helpl[] = {
 	"  =WxH+X+Y     window size and place (also -g WxH+X+Y)",
 	"  -a           also show WRP's M, T and C menus",
 	"  -c n         pictures in n colors, 2 to 256 (default: the display's)",
-	"  -f gif       ask WRP for GIF pictures only (-f abm: the default)",
+	"  -f type      ask WRP for one type of pictures: gif, abm, abm3, ab8 or small",
+	"               (default: Archaic times them, and asks for the faster kind)",
 	"  -t           test: no window, print the page and its pictures",
 	"  -v           status messages also to stderr",
 	"  -o file      at the end, save the first picture (PBM or PPM)",
@@ -3620,6 +4204,7 @@ int argc;
 char **argv;
 {
 	static Event e;
+	static char *fname[] = { "gif", "abm", "abm3", "ab8", "small" };
 	char *a, *url = 0, *geom = 0;
 	int i, n, upd = 0;
 
@@ -3646,10 +4231,11 @@ char **argv;
 			a[1] == 'f' || a[1] == 'r')) {
 			if (a[1] == 'f') {
 				a = argv[++i];
-				if (strieq(a, "gif"))
-					http_accept = "text/html, image/gif";
-				else if (!strieq(a, "abm")) {
-					fprintf(stderr, "archaic: -f takes gif or abm\n");
+				for (fopt = F_GIF; fopt <= F_SMALL &&
+					!strieq(a, fname[fopt - 1]); ++fopt)
+					;
+				if (fopt > F_SMALL) {
+					fprintf(stderr, "archaic: -f takes gif, abm, abm3, ab8 or small\n");
 					return 2;
 				}
 			} else if (a[1] == 'r') {
@@ -3682,7 +4268,7 @@ char **argv;
 			showhelp();
 			return 0;
 		} else if (a[0] == '-') {
-			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-f gif|abm] [-t] [-v] [-o file] [-s script] [-r secs] [-u] [-n] [--version] [--help] [url]\n");
+			fprintf(stderr, "usage: archaic [=WxH+X+Y] [-a] [-c colors] [-f type] [-t] [-v] [-o file] [-s script] [-r secs] [-u] [-n] [--version] [--help] [url]\n");
 			return 2;
 		} else
 			url = a;
@@ -3740,6 +4326,7 @@ char **argv;
 		(int)dcolors;
 	cmenu = dcolors > 2;
 	idepth = cmenu ? 8 : 1;
+	setaccept();
 	sprintf(msg, "Archaic %s, %s", VERSION, cname(dcolors));
 	say(msg);
 	/* WRP's start page as the next ones: its C menu (WRP shows it
@@ -3784,6 +4371,10 @@ char **argv;
 		}
 		if (slicework(1))	/* the frame's slices, then the next ones */
 			continue;
+		if (ptest > 0 && fopt == F_AUTO && nitems > 0 && wrpform() >= 0) {
+			pictest();	/* once a run, on WRP's page */
+			continue;
+		}
 		if (updon > 0 && nitems > 0 && wrpform() >= 0) {
 			autoupd();	/* once a run, on WRP's page */
 			continue;
