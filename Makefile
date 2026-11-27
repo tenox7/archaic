@@ -5,9 +5,9 @@
 # make mac: Mac OS 6 and 7.5 on a 68k Mac, with Retro68 in
 # Docker: src/build-mac/Archaic.dsk, a floppy image (see src/mkmac).
 # make mint: FreeMiNT with GEM (XaAES) on the Atari, as on ARAnyM, with
-# the m68k-atari-mint gcc in Docker: archaic-mint (see src/mkmint).
+# the m68k-atari-mint gcc in Docker: archaic-mint.prg (see src/mkmint).
 # make tos: TOS with GEM on any ST, STE, TT or Falcon, with STinG (a
-# NetUSBee or EtherNEC card), the same gcc: archaic-tos (see src/mktos).
+# NetUSBee or EtherNEC card), the same gcc: archaic-tos.prg (see src/mktos).
 # The old systems have a build script of their own, in src. The Idris
 # (Atari ST) build is src/mk, run inside Idris; the AT&T UNIX PC (3B1)
 # build is src/mkunixpc. On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix,
@@ -90,6 +90,6 @@ test: archaic-asan archaic-headless
 	sh test/run.sh
 
 clean:
-	rm -rf archaic archaic-asan archaic-asan.dSYM archaic-sdl archaic-cocoa archaic-headless archaic-mint archaic-tos %archaic src/build-mac
+	rm -rf archaic archaic-asan archaic-asan.dSYM archaic-sdl archaic-cocoa archaic-headless archaic-mint.prg archaic-tos.prg %archaic src/build-mac
 
 .PHONY: sdl cocoa headless mac mint tos knr test clean

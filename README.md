@@ -58,7 +58,7 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 | System | Window system | Network | Get it |
 |---|---|---|---|
 | Whitesmiths Idris 3.14 on the Atari ST | X10 | TCP/IP over SLIP | release: `archaic-idris`, or in the Idris kit |
-| AT&T UNIX PC (3B1, PC 7300) | its own | WIN/TCP on its Ethernet board | release: `archaic-unixpc`, or in the 3B1 kit |
+| AT&T UNIX PC (3B1, PC 7300) | its own | WIN/TCP on its Ethernet board | release: `archaic-3b1`, or in the 3B1 kit |
 | UNIX System V Release 3.2 on an AT&T 3B2 | layers, on a DMD 5620 terminal (the Blit) | WIN/3B on its Ethernet board | release: `archaic-3b2`, or in the 3B2 kit |
 | SunOS 4.1 on a Sun-4 (SPARC) | SunView, in color | BSD sockets | release: `archaic-sun4`, or in the SunOS 4 kit |
 | SunOS 3.5 on a Sun-3 (68020) | SunView | BSD sockets | release: `archaic-sun3`, or in the Sun-3 kit |
@@ -69,8 +69,8 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 | Ultrix 4.5 on a DECstation (MIPS) | X11 (DECwindows), in color | BSD sockets | release: `archaic-ultrix4`, or in the DECstation kit |
 | Mac OS 6 (System 6) on a 68k Mac (Mac II) | QuickDraw, in color | MacTCP | release: `archaic-macos6.dsk` (a floppy image), or `make mac` |
 | Mac OS 7.5 on a 68k Mac (Mac II) | QuickDraw, in color, multitasking | Open Transport | release: `archaic-macos7.dsk` (a floppy image), or `make mac` |
-| FreeMiNT on an Atari (ARAnyM: TT/Falcon-class 68040) | GEM (XaAES), in color | MiNTNet (BSD sockets) | `make mint`: `archaic-mint` |
-| TOS on an Atari ST, STE, TT or Falcon | GEM, in color with 16 colors or more | STinG (NetUSBee, EtherNEC) | `make tos`: `archaic-tos` |
+| FreeMiNT on an Atari (ARAnyM: TT/Falcon-class 68040) | GEM (XaAES), in color | MiNTNet (BSD sockets) | `make mint`: `archaic-mint.prg` |
+| TOS on an Atari ST, STE, TT or Falcon | GEM, in color with 16 colors or more | STinG (NetUSBee, EtherNEC) | `make tos`: `archaic-tos.prg` |
 | A/UX 3.1 on a 68k Mac (Quadra) | the A/UX Toolbox (QuickDraw), in color, multitasking | BSD sockets | in the A/UX kit, or build it on A/UX: `sh mkaux` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
@@ -184,8 +184,8 @@ make cocoa        # ./archaic-cocoa: a macOS window
 make sdl          # ./archaic-sdl: SDL 2
 make headless     # ./archaic-headless: no window
 make mac          # src/build-mac/Archaic.dsk: Mac OS 6 and 7.5 on a 68k Mac (Retro68, in Docker)
-make mint         # ./archaic-mint: FreeMiNT with GEM on the Atari (m68k-atari-mint gcc, in Docker)
-make tos          # ./archaic-tos: TOS with GEM and STinG on the Atari (the same gcc, in Docker)
+make mint         # ./archaic-mint.prg: FreeMiNT with GEM on the Atari (m68k-atari-mint gcc, in Docker)
+make tos          # ./archaic-tos.prg: TOS with GEM and STinG on the Atari (the same gcc, in Docker)
 make test         # the tests (need ImageMagick)
 ```
 

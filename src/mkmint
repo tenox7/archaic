@@ -4,7 +4,7 @@
 # 4.6.4, MiNTLib, GEMLib) from his Ubuntu PPA (ppa:vriviere/ppa). The image
 # archaic-mint is made the first time (amd64; on Apple silicon Docker runs
 # it with Rosetta). Run it on the host, not on the Atari. It makes
-# archaic-mint (next to src): a MiNT program for a 68000 or newer. In MiNT
+# archaic-mint.prg (next to src): a MiNT program for a 68000 or newer. In MiNT
 # it goes in /usr/local/bin/archaic. It links in /tmp in the container and
 # copies the result: a file replaced on a network drive (strip) leaves
 # .nfs files while Docker holds it.
@@ -22,5 +22,5 @@ docker run --rm --platform linux/amd64 -v "$PWD":/a -w /a/src archaic-mint sh -c
 		main.c html.c http.c gif.c pic.c update.c fb.c gem.c nsock.c -lgem &&
 	m68k-atari-mint-strip /tmp/archaic &&
 	m68k-atari-mint-stack -S 128k /tmp/archaic >/dev/null &&
-	cp /tmp/archaic ../archaic-mint' || exit 1
-ls -l archaic-mint
+	cp /tmp/archaic ../archaic-mint.prg' || exit 1
+ls -l archaic-mint.prg

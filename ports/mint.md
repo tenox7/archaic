@@ -13,8 +13,8 @@ make mint       # or: sh src/mkmint
 
 - It needs Docker. The first run makes the image `archaic-mint`: Ubuntu 24.04 with `ppa:vriviere/ppa`
   (gcc 4.6.4, MiNTLib, GEMLib), amd64: on Apple silicon Docker runs it with Rosetta.
-- It makes `archaic-mint` (about 230 KB): a MiNT program for a 68000 or newer, with a 128 KB stack.
-  Git ignores it. The system name is `mint` (`__MINT__`): the release file is `archaic-mint`.
+- It makes `archaic-mint.prg` (about 230 KB): a MiNT program for a 68000 or newer, with a 128 KB stack.
+  Git ignores it. The system name is `mint` (`__MINT__`): the release file is `archaic-mint.prg`.
 - In FreeMiNT, put it in a folder on the PATH as `archaic`. In the ARAnyM kit the PATH is `/sbin:/bin:/usr/sbin:/usr/bin`
   and there is no `/usr/local` (kits before 2026-11-26 v4 have no `/usr` at all): use `/bin/archaic`
   (on the host: `drive_c/mint/1-19-2af/sys-root/bin`). Copy it in through a HostFS drive (C: is the folder `drive_c`).

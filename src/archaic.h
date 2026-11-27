@@ -101,7 +101,7 @@ extern char ident[];
 #define NOUNISTD
 #endif
 #ifdef unixpc
-#define SYSID "@(#)Archaic for unixpc"
+#define SYSID "@(#)Archaic for 3b1"
 #define NORENAME
 #define NOUNISTD
 #endif

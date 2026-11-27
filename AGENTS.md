@@ -59,10 +59,10 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/dnr.c`, `dnr.h` | the classic Mac OS: MacTCP's name resolver, for host names (from HTTPHead, a MacTCP sample for Snow). C99: only the Mac build compiles it |
 | `src/mkmac`, `CMakeLists.txt`, `archaic.r` | the classic Mac OS: build with Retro68 in Docker, on your computer (`make mac`). `archaic.r`: the SIZE resource, with the multitasking flags |
 | `src/gem.c` | display for GEM on the Atari (FreeMiNT with XaAES, as on ARAnyM): a GEM window with GEM's own scroll bar. It shows `fb.c`'s screen in memory through the VDI: in colors on a screen of 15 to 32 bits, else in black and white |
-| `src/mkmint` | FreeMiNT: build with the m68k-atari-mint gcc in Docker, on your computer (`make mint`): `archaic-mint` |
+| `src/mkmint` | FreeMiNT: build with the m68k-atari-mint gcc in Docker, on your computer (`make mint`): `archaic-mint.prg` |
 | `src/tos.c` | display for GEM on TOS: the ST, STE, TT and Falcon, and graphics cards. A GEM window with GEM's own scroll bar. It keeps the window's pixels in the screen's own format (1 bit, the Atari's bit planes, or packed pixels) and draws them itself, so a redraw only copies (see `ports/tos.md`). Also TOS's `main()`: the options from `ARCHAIC.INF` |
 | `src/nsting.c` | network for TOS: STinG's TCP (a NetUSBee or an EtherNEC card), found through the cookie `STiK` |
-| `src/mktos` | TOS: build with the m68k-atari-mint gcc in Docker, on your computer (`make tos`): `archaic-tos`, `ARCHAIC.PRG` on the Atari |
+| `src/mktos` | TOS: build with the m68k-atari-mint gcc in Docker, on your computer (`make tos`): `archaic-tos.prg`, `ARCHAIC.PRG` on the Atari |
 | `src/mkaux`, `auxrsrc.r` | A/UX 3 script: compile and link with A/UX's cc and the A/UX Toolbox (libmac), for `mac.c` and `nsock.c`. `auxrsrc.r`: the SIZE resource, which `rez` puts in `%archaic`, the resource file next to the program |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
@@ -777,14 +777,14 @@ A broken file, a full disk or Esc: the old program stays, and no `archaic.PID` s
 The question and the answer are plain text, a line each:
 
 ```
-GET /archaic-update?p=unixpc&v=0.8
+GET /archaic-update?p=3b1&v=0.8
 
 archaic-update 1
 version 0.9
-file archaic-unixpc
+file archaic-3b1
 size 67027
 crc 1f2e3d4c
-get archaic-update?p=unixpc&f=0.9
+get archaic-update?p=3b1&f=0.9
 ```
 
 - The `get` line gives the file (`application/octet-stream`). A version that is not the newest gets 404.
@@ -793,12 +793,12 @@ get archaic-update?p=unixpc&f=0.9
 - An older WRP (before 4.13.0) sends its page. Archaic then says `This WRP has no updates for Archaic: it is an older WRP`.
 
 **The marks.** Each program carries 2 strings, for WRP. `what` and `strings` show them too,
-and `archaic --version` says them as `Archaic v0.9 for unixpc`:
+and `archaic --version` says them as `Archaic v0.9 for 3b1`:
 
 | Mark | Set in `archaic.h` by | Like |
 |---|---|---|
 | `@(#)Archaic VERSION` | `IDENT` | `@(#)Archaic 0.9` |
-| `@(#)Archaic for SYSTEM` | `SYSID` | `@(#)Archaic for unixpc` |
+| `@(#)Archaic for SYSTEM` | `SYSID` | `@(#)Archaic for 3b1` |
 
 WRP reads the marks in the file, not the release's tag:
 
@@ -809,12 +809,13 @@ WRP reads the marks in the file, not the release's tag:
 - WRP does not offer a file with no marks (Archaic 0.8 and older).
 
 **System names.** `archaic.h` sets `SYSID` from the names that the compiler defines.
-The release's file is `archaic-` and the system name.
+The release's file is `archaic-` and the system name; on the Atari (TOS, FreeMiNT) also `.prg`:
+`archaic-tos.prg`, `archaic-mint.prg`.
 
 | System | Compiler defines | Name |
 |---|---|---|
 | Idris (Atari ST) | `_WSLAS` | `idris` |
-| AT&T UNIX PC (3B1) | `unixpc` | `unixpc` |
+| AT&T UNIX PC (3B1) | `unixpc` | `3b1` (Archaic 0.14 and older: `unixpc`, which WRP still takes) |
 | AT&T 3B2 (with a DMD 5620) | `u3b2` | `3b2` |
 | SunOS 4 (Sun-4) | `SUNVIEW` (mksunview), `sparc` | `sun4` |
 | SunOS 3.5 (Sun-3) | `SUNVIEW` (mksunview), `mc68020` | `sun3` |
@@ -847,7 +848,7 @@ An error is a short text with HTTP 404: `curl -f` does not save it.
 
 - Change `IDENT` in `archaic.h`. Then build the systems again, or keep their old files:
   WRP offers only a file that is newer.
-- Keep the files' names (`archaic-NAME`).
+- Keep the files' names: `archaic-NAME`, on the Atari `archaic-NAME.prg`.
 - The first version with updates must go into each kit once. After that, a kit's Archaic updates itself.
 
 **Trust.** Archaic and WRP talk plain HTTP, as for the pages. WRP gets the file from GitHub over HTTPS,

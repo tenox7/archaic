@@ -6,7 +6,7 @@ The parts that all systems share (Colors, Pictures, Updates, Porting ...) are in
 
 - Needs the Ethernet board and **WIN/TCP** (TWG's TCP/IP, in `/usr/ethernet`).
   Kit: `att3b1-unix351-freebee` (FreeBee), on osarchive in `os/att/3b1/virt/`.
-- Release binary: `archaic-unixpc`. Copy it to the 3B1 as `/usr/local/bin/archaic`,
+- Release binary: `archaic-3b1` (in older releases: `archaic-unixpc`). Copy it to the 3B1 as `/usr/local/bin/archaic`,
   then `chmod 755 /usr/local/bin/archaic`.
 - Open a shell window (Office > UNIX System) and type `archaic`.
   It opens a window of its own, as large as the screen allows.

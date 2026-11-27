@@ -7,9 +7,9 @@ archaic-headless
 # the classic Mac build (src/mkmac)
 src/build-mac/
 # the FreeMiNT build (src/mkmint)
-archaic-mint
+archaic-mint.prg
 # the TOS build (src/mktos)
-archaic-tos
+archaic-tos.prg
 *.dSYM/
 *.o
 *.pbm

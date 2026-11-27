@@ -4,18 +4,18 @@
  * archaic.h): once a run, when WRP's first page is here and there is
  * nothing else to do (main.c), or at once with archaic -u:
  *
- *	GET /archaic-update?p=unixpc&v=0.8
+ *	GET /archaic-update?p=3b1&v=0.8
  *
- * WRP takes Archaic's file for that system (archaic-unixpc) from the
+ * WRP takes Archaic's file for that system (archaic-3b1) from the
  * GitHub release, and checks it: the old systems have no HTTPS. It
  * answers in plain text, a line each:
  *
  *	archaic-update 1
  *	version 0.9
- *	file archaic-unixpc
+ *	file archaic-3b1
  *	size 67027
  *	crc 1f2e3d4c
- *	get archaic-update?p=unixpc&f=0.9
+ *	get archaic-update?p=3b1&f=0.9
  *
  * With nothing to offer, a "note" line says why, and there is no
  * version. An older WRP answers with its page: no updates there.

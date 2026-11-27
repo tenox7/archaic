@@ -3,7 +3,7 @@
 # TT or Falcon, with STinG's TCP (a NetUSBee or an EtherNEC card), in
 # Docker: the same cross tools as mkmint (the image archaic-mint, made
 # by mkmint the first time). Run it on the host, not on the Atari. It
-# makes archaic-tos (next to src): a GEM program for a 68000 or newer,
+# makes archaic-tos.prg (next to src): a GEM program for a 68000 or newer,
 # ARCHAIC.PRG on the Atari. tos.c has main(): main.c's main is
 # archaic_main. It links in /tmp in the container and copies the result
 # (see mkmint).
@@ -19,5 +19,5 @@ docker run --rm --platform linux/amd64 -v "$PWD":/a -w /a/src archaic-mint sh -c
 		html.c http.c gif.c pic.c update.c tos.c nsting.c -lgem &&
 	m68k-atari-mint-strip /tmp/archaic &&
 	m68k-atari-mint-stack -S 128k /tmp/archaic >/dev/null &&
-	cp /tmp/archaic ../archaic-tos' || exit 1
-ls -l archaic-tos
+	cp /tmp/archaic ../archaic-tos.prg' || exit 1
+ls -l archaic-tos.prg

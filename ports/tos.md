@@ -7,7 +7,7 @@ The parts that all systems share (Colors, Pictures, Updates, Porting ...) are in
 - **TOS** with GEM on an Atari ST, STE, Mega ST, TT or Falcon (a 68000 or newer), with **STinG** 1.26
   and a NetUSBee or EtherNEC card (`ENEC.STX`). Tested in Hatari with its NetUSBee and NAT:
   the Mega ST VM in `~/VM/ataritos` (TOS 2.06, STinG in `C:\AUTO`).
-- Copy `archaic-tos` to the Atari as `ARCHAIC.PRG`, in any folder. The desktop gives a `.PRG` no command line:
+- Copy `archaic-tos.prg` to the Atari as `ARCHAIC.PRG`, in any folder. The desktop gives a `.PRG` no command line:
   Archaic reads its options from `ARCHAIC.INF` next to it (words, as on a command line), such as `http://HOST:8080/ -v`.
   A command line (a shell, a `.TTP` name) goes before the file. With `-v` the messages go to `ARCHAIC.LOG` there,
   not over GEM's screen.
@@ -26,7 +26,7 @@ make tos        # or: sh src/mktos
 - The image `archaic-mint` of `mkmint` (gcc 4.6.4, MiNTLib, GEMLib). MiNTLib runs on TOS with no MiNT.
 - `main.c` is compiled with `-Dmain=archaic_main`: `tos.c` has `main()`. `-DATARITOS` gives the system name `tos`
   (`__MINT__` is set too: `archaic.h` looks at `ATARITOS` first).
-- It makes `archaic-tos` (about 220 KB), with a 128 KB stack.
+- It makes `archaic-tos.prg` (about 220 KB), with a 128 KB stack.
 
 ## TOS: what to know
 
