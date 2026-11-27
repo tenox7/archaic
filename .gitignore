@@ -6,11 +6,15 @@ archaic-cocoa
 archaic-headless
 # the classic Mac build (src/mkmac)
 src/build-mac/
+# the FreeMiNT build (src/mkmint)
+archaic-mint
 *.dSYM/
 *.o
 *.pbm
 ._*
 .DS_Store
+# the A/UX build (src/mkaux): the resource file next to archaic
+%archaic
 # the program before an update (see Updates in AGENTS.md)
 archaic.old
 # the 3B2 build (src/mk3b2): the terminal part, its C table, the tool

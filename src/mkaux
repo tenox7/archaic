@@ -1,0 +1,22 @@
+# mkaux - build Archaic on A/UX 3 (68k Macintosh) with the A/UX Toolbox:
+# sh mkaux
+# cc is A/UX's own C compiler, K&R (-DNOPROTO), with its big tables
+# (-B /usr/lib/big/). The display is mac.c, the one of the classic Mac
+# OS, through the A/UX Toolbox: its headers are in /usr/include/mac, and
+# the link is the one of /mac/src/examples/makefile (maccrt0.o, low.o,
+# the shared libmac_s and libc_s, low.ld). The network is BSD sockets
+# (nsock.c). main.c's main is archaic_main: mac.c has main().
+# It makes two files: archaic, and %archaic, its resources (auxrsrc.r,
+# with rez and fcnvt). Keep them together: the A/UX Toolbox does not
+# start archaic without %archaic.
+CC=cc
+CFLAGS="-O -B /usr/lib/big/ -DAUX -DNOPROTO"
+$CC $CFLAGS -Dmain=archaic_main -c main.c &&
+$CC $CFLAGS -c html.c http.c gif.c pic.c update.c nsock.c mac.c &&
+ld /usr/lib/maccrt0.o /lib/crt2.o -o archaic main.o html.o http.o gif.o pic.o update.o nsock.o mac.o \
+	/usr/lib/low.o -lmac_s -lat -lld -lmr -lc_s /lib/crtn.o /usr/lib/low.ld &&
+/mac/bin/rez -i /:mac:lib:rincludes auxrsrc.r &&
+/mac/bin/fcnvt -f -d Rez.out archaic.rsrc &&
+mv %archaic.rsrc %archaic &&
+rm -f Rez.out archaic.rsrc &&
+ls -l archaic %archaic

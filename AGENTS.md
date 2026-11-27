@@ -34,9 +34,9 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/cocoa.m` | display for macOS: a Cocoa window |
 | `src/sdl.c` | display for SDL 2 (macOS, Linux, Windows ...) |
 | `src/headless.c` | display with no window, for tests and automation: commands on standard input, screenshots |
-| `src/fb.c`, `fb.h` | a screen in memory, for `cocoa.m`, `sdl.c` and `headless.c`; writes PNG screenshots |
+| `src/fb.c`, `fb.h` | a screen in memory, for `cocoa.m`, `sdl.c`, `gem.c` and `headless.c`; writes PNG screenshots |
 | `src/font6x13.h` | the X11 6x13 font (public domain), for `fb.c` |
-| `src/nsock.c` | network for BSD sockets (Unix, macOS) |
+| `src/nsock.c` | network for BSD sockets (Unix, macOS, FreeMiNT, A/UX). On A/UX it waits in the Toolbox's `WaitNextEvent` (see A/UX 3: what to know) |
 | `src/fetch`, `mkinc`, `mk`, `lka` | Idris scripts: get the sources, headers, compile, link |
 | `src/heap.c` | Idris tool: sets how much memory a program file asks for. `lka` links with a copy of the linker that asks for more |
 | `src/unixpc.c` | display for the AT&T UNIX PC (3B1) window system |
@@ -52,10 +52,13 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/mkaix` | AIX 3.2 script: compile and link with IBM's XL C (or gcc), for X11 (`x11.c`, `nsock.c`) |
 | `src/mkaixps2` | AIX PS/2 1.3 script: compile and link with MetaWare High C (or the kit's hcc), for X11 (`x11.c`, `nsock.c`) |
 | `src/mkultrix` | Ultrix 4 script: compile and link with Ultrix's cc (or gcc), for X11 (`x11.c`, `nsock.c`) |
-| `src/mac.c` | display for the classic Mac OS (System 6, Mac OS 7.5) on a 68k Mac: a QuickDraw window with the Mac's own scroll bar, and the Mac's `main()`. It shares the CPU with the other programs (see Multitasking on the classic Mac OS) |
+| `src/mac.c` | display for the classic Mac OS (System 6, Mac OS 7.5) on a 68k Mac: a QuickDraw window with the Mac's own scroll bar, and the Mac's `main()`. It shares the CPU with the other programs (see Multitasking on the classic Mac OS). Also the display for A/UX 3, through the A/UX Toolbox (`-DAUX`) |
 | `src/nmactcp.c` | network for the classic Mac OS: MacTCP's TCP driver (on Mac OS 7.5: the MacTCP part of Open Transport) |
 | `src/dnr.c`, `dnr.h` | the classic Mac OS: MacTCP's name resolver, for host names (from HTTPHead, a MacTCP sample for Snow). C99: only the Mac build compiles it |
 | `src/mkmac`, `CMakeLists.txt`, `archaic.r` | the classic Mac OS: build with Retro68 in Docker, on your computer (`make mac`). `archaic.r`: the SIZE resource, with the multitasking flags |
+| `src/gem.c` | display for GEM on the Atari (FreeMiNT with XaAES, as on ARAnyM): a GEM window with GEM's own scroll bar. It shows `fb.c`'s screen in memory through the VDI: in colors on a screen of 15 to 32 bits, else in black and white |
+| `src/mkmint` | FreeMiNT: build with the m68k-atari-mint gcc in Docker, on your computer (`make mint`): `archaic-mint` |
+| `src/mkaux`, `auxrsrc.r` | A/UX 3 script: compile and link with A/UX's cc and the A/UX Toolbox (libmac), for `mac.c` and `nsock.c`. `auxrsrc.r`: the SIZE resource, which `rez` puts in `%archaic`, the resource file next to the program |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `tools/slowline.py` | host tool: a TCP proxy that is a slow line (bytes a second), to try Archaic on a slow line with WRP |
@@ -75,8 +78,8 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f type] [-t] [-v] [-o file] [-s script] [-r n] 
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, the 3B2, SunView, HP-UX, DG/UX and AIX: `10.0.2.2`, other Unix and the classic Mac OS: `127.0.0.1`). Ultrix in gxemul and Mac OS 7.5 in Snow need WRP's address: see Running on Ultrix 4 and Running on Mac OS 7.5 |
-| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`). On the classic Mac OS: the screen under the menu bar (on System 7, less the column of disk icons at the right). On the DMD 5620: the layer as it is (Reshape in the layers menu changes it) |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, the 3B2, SunView, HP-UX, DG/UX, AIX and FreeMiNT: `10.0.2.2`, A/UX: `192.168.1.10`, other Unix and the classic Mac OS: `127.0.0.1`). Ultrix in gxemul and Mac OS 7.5 in Snow need WRP's address: see Running on Ultrix 4 and Running on Mac OS 7.5 |
+| `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`). On the classic Mac OS and A/UX: the screen under the menu bar (on System 7 and A/UX, less the column of disk icons at the right). On the DMD 5620: the layer as it is (Reshape in the layers menu changes it) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
 | `-f type` | ask WRP for one type of pictures, with no choice. `gif`: GIFs only. `abm`: ABM, and GIFs in colors (as Archaic 0.11). `abm3`: ABM3. `ab8`: AB8, and ABM. `small`: for each picture the smallest type. Without `-f`, Archaic times its pictures and asks for the kind that is faster here (see Pictures: GIF, ABM, ABM3 and AB8) |
@@ -502,7 +505,7 @@ Cocoa has the Mac's own scroll bar; SDL has Archaic's (see Scrolling).
 (on an HP keyboard: Prev and Next; on DEC's LK201: Prev Screen and Next Screen). The up and down arrows and each step of the mouse wheel
 scroll a quarter of it. Close in the window manager's menu quits. The scroll bar is Archaic's.
 
-**On Mac OS 6 and 7.5**, its own keys, menus and window parts work too:
+**On Mac OS 6 and 7.5, and on A/UX**, its own keys, menus and window parts work too:
 
 | Key or part | Does |
 |---|---|
@@ -516,7 +519,7 @@ scroll a quarter of it. Close in the window manager's menu quits. The scroll bar
 | the grow box, the zoom box | a new window size (see A new window size) |
 | the Apple menu | About Archaic, and the desk accessories |
 | the Application menu (System 7), a click in another program's window | another program is in front. Archaic goes on loading the page behind it |
-| the Finder's Shut Down or Restart | quit (the Quit Apple event, System 7) |
+| the Finder's Shut Down or Restart | quit (the Quit Apple event, System 7; not on A/UX: its Toolbox has no Apple events) |
 
 Control and a letter is its control code, as on Unix: Ctrl-U, Ctrl-Q. A keyboard with no Control key
 (the Mac Plus): Cmd-Q quits.
@@ -639,7 +642,7 @@ Archaic keeps WRP's page and shows the error on the status line, like
   Start WRP, then press Return: Archaic tries again. Or start Archaic with WRP's address.
 - While Archaic connects to WRP with no page yet, the box says `Connecting to WRP` and the address
   (then `Waiting for WRP`, while WRP makes the page). Esc stops.
-- With BSD sockets (`nsock.c`: Unix, macOS, SunOS, HP-UX, DG/UX, AIX, Ultrix) the connect does not hold up the window:
+- With BSD sockets (`nsock.c`: Unix, macOS, SunOS, HP-UX, DG/UX, AIX, Ultrix, A/UX) the connect does not hold up the window:
   it is drawn, Esc stops, and after 20 s with no answer Archaic gives up (an address that
   does not exist on this network, like 10.0.2.2 outside an emulator kit).
   MacTCP (`nmactcp.c`, the classic Mac OS) does the same: Cmd-. stops.
@@ -811,6 +814,8 @@ The release's file is `archaic-` and the system name.
 | AIX 3.2 | `_AIX`, `_IBMR2` | `aix3` |
 | AIX PS/2 1.3 | `_AIX`, `ps2` | `aixps2` |
 | Ultrix 4 | `ultrix` | `ultrix4` |
+| A/UX 3 | `AUX` (mkaux) | `aux3` |
+| FreeMiNT (Atari, ARAnyM) | `__MINT__` (m68k-atari-mint gcc) | `mint` |
 
 A build with no `SYSID` gets no updates: macOS, Linux, the tests, the classic Mac OS (for now). For a new port:
 `cc -DSYSID='"@(#)Archaic for NAME"'`, or a line in `archaic.h`.
@@ -852,8 +857,8 @@ make test         # sh test/run.sh
 ```
 
 - `make` needs X11 (on macOS: XQuartz in `/opt/X11`).
-- On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix and SunOS, `make` (or `gmake`) runs the system's script in `src`
-  (see each Building section), and moves `archaic` up. `CC` goes to the scripts that take it
+- On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix, SunOS and A/UX, `make` (or `gmake`) runs the system's script in `src`
+  (see each Building section), and moves `archaic` up (on A/UX also `%archaic`). `CC` goes to the scripts that take it
   (`mkaix`, `mkaixps2`, `mkultrix`): `CC=gcc gmake`. SunOS 3: put `/usr/5bin` (its `uname`) on the PATH.
 - `make cocoa` needs only the Xcode command line tools.
 - `make sdl` needs SDL 2: `sdl2-config` on the PATH (`brew install sdl2`).
@@ -2212,6 +2217,153 @@ On System 7 (and with MultiFinder) the programs share the CPU only when each one
 - Measured: Note Pad in front, and Archaic behind it loading and decoding Wikipedia's Apple Inc. article
   (216 colors). 150 keys typed 60 ms apart: Note Pad got all 150. The Archaic before this (no yields)
   lost 2 of them: the Mac's event queue was full while it decoded.
+
+## Building for the Atari (FreeMiNT, GEM)
+
+Archaic for FreeMiNT with GEM (XaAES), as in the ARAnyM kit `freemint119-aranym.tar.lz`,
+is built on your computer, with Vincent Riviere's m68k-atari-mint cross tools in Docker:
+
+```
+make mint       # or: sh src/mkmint
+```
+
+- It needs Docker. The first run makes the image `archaic-mint`: Ubuntu 24.04 with `ppa:vriviere/ppa`
+  (gcc 4.6.4, MiNTLib, GEMLib), amd64: on Apple silicon Docker runs it with Rosetta.
+- It makes `archaic-mint` (about 230 KB): a MiNT program for a 68000 or newer, with a 128 KB stack.
+  Git ignores it. The system name is `mint` (`__MINT__`): the release file is `archaic-mint`.
+- In FreeMiNT, put it in a folder on the PATH as `archaic`. In the ARAnyM kit the PATH is `/sbin:/bin:/usr/sbin:/usr/bin`
+  and there is no `/usr/local` (kits before 2026-11-26 v4 have no `/usr` at all): use `/bin/archaic`
+  (on the host: `drive_c/mint/1-19-2af/sys-root/bin`). Copy it in through a HostFS drive (C: is the folder `drive_c`).
+- Start it from a shell: Desk > TosWin2, File > Start shell, then `archaic &`.
+  Under XaAES a program from a shell opens GEM windows.
+- WRP's default address is `10.0.2.2:8080`: in ARAnyM's slirp, that is port 8080 of the host.
+  Start WRP on the host with `wrp -l 127.0.0.1:8080`.
+
+## FreeMiNT: what to know
+
+- `gem.c` draws into `fb.c`'s screen in memory (0xRRGGBB). `g_flush` copies the changed part to the
+  window with the VDI, through GEM's rectangle list (`wind_update` locks the screen meanwhile).
+- The screen's pixels come from `vq_scrninfo`:
+  - packed 32-bit 0x00RRGGBB (ARAnyM's fVDI, `mode ...x32` in `fvdi.sys`): `vro_cpyfm` takes `fb`'s rows
+    as they are, when the window is a multiple of 16 pixels wide; else they are copied to a buffer first.
+  - other packed pixels (15, 16 and 24 bits, also Intel byte order): through tables made from the
+    bit numbers that `vq_scrninfo` gives.
+  - bit planes, and pixels with a palette (2 to 256 colors): black and white with `vrt_cpyfm`.
+    `g_colors()` is then 2, and WRP sends ABM pictures. No palette is set.
+- The window has GEM's scroll bar (`g_bar` 0). Its arrows send `S_STEP`, its grey part `S_PAGE`,
+  its slider `S_TO` (GEM's 0 to 1000, times the page's max). `g_sbar` sets the slider only when it changes.
+- Keys: the up and down arrows scroll a quarter, with Shift a window (also a PC's Page Up and Page Down).
+  ClrHome goes to the top, Shift+ClrHome to the end. Undo is Esc.
+  The Atari's characters 0200 to 0377 become ISO 8859-1 (`latin[]`); the window's title goes the other way.
+- The mouse: `evnt_multi` with `MU_BUTTON` (any button down, then all up) and `MU_M1` (the mouse moves
+  while a button is down) gives `E_DOWN`, `E_MOVE` and `E_UP`. A click outside the work area, or on
+  another window over Archaic's, gives none.
+- Quit: Ctrl-Q, the close box, or `AP_TERM` (`shel_write(9, 1, ...)` says Archaic knows it).
+- GEM has no file for `select()`: `g_fd()` is -1, so `nsock.c` waits 1/20 s at most, and
+  `ui_poll()` takes GEM's events with no wait.
+- `wind_set_str(WF_NAME)`: the AES keeps the pointer, so the title is a static buffer.
+- Tested (2026-11-26): ARAnyM 1.2.0 Unofficial Beta 3, FreeMiNT 1.19 with XaAES and TeraDesk,
+  fVDI 1280x1024x32, 1024x768x16 and 1024x768x8 (black and white), WRP 4.14.2:
+  pages in colors (AB8), links, typing in the address box, Ctrl-U, the scroll bar (arrows, grey part,
+  slider), the arrow keys, the fuller and the sizer (WRP makes the page again for the new width),
+  the close box and Ctrl-Q.
+  Not tested: a real Atari, MagiC, N.AES, an ST's monochrome screen, 24-bit screens.
+
+## Running on A/UX 3
+
+- **A/UX 3.1.1** (Apple's Unix, with the System 7 Finder) on a Quadra 800 (68040), in QEMU (LEMU).
+  Kit: `aux311q800-lemu`, on osarchive in `os/a-ux/Virtual/qemu`. It has A/UX's C compiler and the A/UX Toolbox.
+  The kit has Archaic in `/usr/local/bin` since 2026-11-26. There is no release file yet: elsewhere, build it
+  (see Building on A/UX 3).
+- Archaic is **two files**: `archaic`, the program, and `%archaic`, its resources. Keep them in one folder:
+  without `%archaic` the A/UX Toolbox does not start the program (it says `FOLDER: No such file or directory`).
+  Install: `cp archaic %archaic /usr/local/bin`, then `chmod 755 /usr/local/bin/archaic`.
+  An update (see Updates) replaces only `archaic`: `%archaic` stays.
+- Log in to the Finder. Apple menu > CommandShell, then type `/usr/local/bin/archaic` (root's sh has no
+  `/usr/local/bin` on its PATH; bash has it). A telnet login as root, with root
+  logged in to the Finder, starts it too: the window comes on the Finder's screen.
+- **Cmd-Q**, Ctrl-Q or File > Quit quits.
+- Archaic looks for WRP at `http://192.168.1.10:8080/`: your computer, in the kit's network (QEMU NAT).
+  On another network (a bridged VM, a real Mac): `archaic HOST:8080`, or set `WRP` to `HOST:8080`.
+- The screen has 256 colors: the pictures have the 216 web colors (AB8).
+- `screenshots/aux.png`: the Quadra's screen, 1152 x 870 in 256 colors, with Wikipedia's A/UX article.
+
+**Measured in LEMU** (QEMU on an Apple Silicon Mac), with WRP on the same Mac:
+
+| What | Time |
+|---|---|
+| `sh mkaux` (or `make`) | 3 s |
+| Wikipedia's A/UX article, 216 colors (AB8, slices of 56 to 67 KB) | 3 s from Return: WRP's time. A slice comes and decodes in 1 or 2 ticks (17 to 33 ms) |
+
+## Building on A/UX 3
+
+Needs A/UX's C compiler, `cc`, and the A/UX Toolbox's files for programs: the headers in `/usr/include/mac`,
+`/usr/lib/libmac_s.a`, `/usr/lib/maccrt0.o`, `low.o` and `low.ld`, and `/mac/bin/rez` and `fcnvt`.
+The full A/UX install has them, and so does the kit.
+
+1. Copy these 11 files into a folder on A/UX, with NFS, ftp or rcp:
+   `src/archaic.h`, `main.c`, `html.c`, `http.c`, `gif.c`, `pic.c`, `update.c`, `nsock.c`, `mac.c`, `mkaux` and `auxrsrc.r`.
+   With the whole repository, `make` at its top runs `mkaux`, and moves `archaic` and `%archaic` up.
+2. Build:
+
+   ```
+   sh mkaux        # compile and link: archaic, about 232 KB, and its resources: %archaic, 832 bytes
+   ```
+
+   It takes 3 s in the kit. `cc` warns `& before array or function: ignored` 4 times (`&qd.black`): that is right.
+3. Test: `./archaic --version` says `Archaic v0.11 for aux3`. `./archaic -t` (no window) loads WRP's form and lists its parts.
+   **With the window:** `./archaic` in CommandShell.
+
+NFS from your computer: A/UX's `mount` takes a host name from `/etc/hosts`, not an address
+(`192.168.1.10 not in hosts database`). Put a line `ADDRESS NAME` in `/etc/hosts`, then
+`/etc/mount -t nfs NAME:/dir /mnt`. Archaic runs from an NFS folder too.
+
+## A/UX 3: what to know
+
+Test on a copy of your A/UX disk, or start QEMU with `-snapshot`.
+
+| Thing | A/UX 3.1.1 kit |
+|---|---|
+| Computer | Quadra 800 in QEMU (LEMU, `-M q800`): 68040, 128 MB |
+| Screen | 1152 x 870, 256 colors |
+| System | A/UX 3.1.1: Unix (System V with BSD parts) and the System 7 Finder |
+| Network | SONIC Ethernet (`-nic ...,model=dp83932`), BSD sockets. QEMU NAT: A/UX 192.168.1.2, **your computer 192.168.1.10** (its 127.0.0.1). No default route |
+
+- The A/UX Toolbox: an A/UX program (COFF) calls the Mac's ROM and System 7 through `libmac`.
+  The manual: *A/UX Toolbox: Macintosh ROM Interface* (A/UX 3.0, 1992; on bitsavers, `pdf/apple/mac/a_ux/aux_3.0`).
+  The display is `mac.c`, as on Mac OS 6 and 7.5, built with `-DAUX`. Apple's examples: `/mac/src/examples`.
+- `cc` is K&R: `-DNOPROTO`. `-B /usr/lib/big/` gives it larger tables, as Apple's makefile does.
+  It does not define `AUX`: `mkaux` does, as Apple's makefile.
+- The headers are A/UX's own, included as `<mac/quickdraw.h>` and so on. Some names are older ones, and `mac.c`
+  maps them: `GetItem`, `AddResMenu`, `SetCtlValue`, `SetCtlMax`, `GetCtlValue`, `DisposHandle`, `controlKey`,
+  `app4Evt`, and `transIndex` in a color table for `ctFlags`. `qd` is a macro (`*__tb_qdVars`).
+  There is no `GetMBarHeight` (`mac.c` takes 20) and no Apple events.
+- Without `_AUX_C_EXTENSIONS` (the c89 compiler of A/UX Developer's Tools) the headers have no prototypes
+  and no `pascal`. The calls take Pascal strings, and `Point` by value, as on the Mac.
+- The link, as in Apple's makefile: `ld /usr/lib/maccrt0.o /lib/crt2.o ... /usr/lib/low.o -lmac_s -lat -lld -lmr -lc_s /lib/crtn.o /usr/lib/low.ld`.
+  The sockets are in `libc_s`.
+- The resource file: `rez` makes `Rez.out` (AppleSingle) from `auxrsrc.r`, and `fcnvt -f -d` makes an AppleDouble
+  pair of it: `%archaic` is the file with the resources. A/UX's `types.r` has the older SIZE flag names
+  (`multiFinderAware` ...), so `archaic.r` (Retro68's) does not go through A/UX's `rez`.
+  The Mac heap is small (512 KB): Archaic's pages and pictures are Unix memory (`malloc`).
+- Sharing the CPU: the manual says to wait in `WaitNextEvent`, which lets the other programs run, not in `select()`.
+  So `nsock.c` waits in `mac_sel` (`mac.c`): `ui_setselect` makes `WaitNextEvent` return when the socket can be read
+  (or written, for the connect). Then `select()` looks with no wait. The masks are cleared before the event is handled.
+  `g_fd()` is -1. `YIELD` is as on the Mac.
+- `maccrt0` does not flush stdio after `main` returns: `mac.c`'s `main` flushes `stdout` and `stderr`
+  (without it, `--version`, `--help` and `-t` print nothing into a pipe or a file, such as through rsh).
+- `noCD = 1` (a variable of `libmac`): the current folder stays the shell's (for `-o FILE`). Else it is the program's folder.
+- `TickCount` runs as on the Mac: `g_ms` is right to a tick (17 ms). A slice that comes in less shows `under 1 ms`.
+- LEMU's mouse tools: A/UX speeds the pointer up, so moves land short. Use `pointer-locate`, then `mouse-move`
+  with `step-px` 1, then `mouse-click` with no x and y. Menus: `mouse-button` down, move, up. Cmd is the key `meta_l`.
+- Tested (2026-11-26): A/UX 3.1.1 in LEMU, on the LAN (bridged), with WRP 4.14.2 on the Mac's LAN address.
+  Started from CommandShell and from telnet, as root. Pages in 216 colors (AB8), a click on the page, the address box,
+  Ctrl-U, Page Down, the scroll bar's arrow (held, it repeats), the Finder in front while a page loads
+  (Archaic goes on, and draws its page behind the Finder's windows), the click that brings Archaic back (it does not
+  go to the page), File > Quit, Cmd-Q, Ctrl-Q, `-t`, `-u` (`WRP has no update: no archaic-aux3 in release v0.11`).
+  Not tested: a double-click in the Finder, the close box, the grow and zoom boxes, a drag of the scroll box, Edit > Paste,
+  the About box and the desk accessories, a screen in black and white, the sums of the test pictures
+  (`-t` with `test/data`, which needs a web server), gcc, a real Mac.
 
 ## Porting to DOS, OS/2, Win16 and others
 

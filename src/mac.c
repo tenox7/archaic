@@ -32,10 +32,50 @@
  * window's deactivate and activate. Apple events: Quit (the Finder's
  * Shut Down and Restart send it) quits; Open Application is nothing.
  * In the background a page goes on loading. On System 7 the window
- * leaves the desktop's column of disk icons at the right. */
+ * leaves the desktop's column of disk icons at the right.
+ *
+ * A/UX 3 (AUX, mkaux's build): the same window, through the A/UX
+ * Toolbox (libmac): a Unix program of A/UX (COFF) that calls the Mac's
+ * ROM. Its headers are A/UX's (/usr/include/mac), with the older names
+ * of some calls (GetItem, AddResMenu, SetCtlValue ...). It has a
+ * command line: main() passes it on, and there is no options file.
+ * The network is BSD sockets (nsock.c): it waits in WaitNextEvent too
+ * (mac_sel), with ui_setselect, so the Finder and the other programs
+ * run meanwhile (A/UX Toolbox: Macintosh ROM Interface, chapter 2). No
+ * Apple events. noCD: the current folder stays the shell's. */
 #include "archaic.h"
 #include <string.h>
+#ifdef AUX
+#include <mac/types.h>
+#include <mac/quickdraw.h>
+#include <mac/fonts.h>
+#include <mac/events.h>
+#include <mac/windows.h>
+#include <mac/controls.h>
+#include <mac/menus.h>
+#include <mac/textedit.h>
+#include <mac/dialogs.h>
+#include <mac/desk.h>
+#include <mac/scrap.h>
+#include <mac/toolutils.h>
+#include <mac/memory.h>
+#include <mac/osutils.h>
+/* the names that the Multiversal Interfaces have, in A/UX's headers */
+#define GetMenuItemText GetItem
+#define AppendResMenu AddResMenu
+#define SetControlMaximum SetCtlMax
+#define SetControlValue SetCtlValue
+#define GetControlValue GetCtlValue
+#define DisposeHandle DisposHandle
+#define ControlKey controlKey
+#define osEvt app4Evt
+#define ctFlags transIndex
+#define GetMBarHeight() 20
+int ui_setselect();
+int noCD = 1;			/* libmac: the shell's folder, not Archaic's */
+#else
 #include <Multiverse.h>
+#endif
 
 #define MSB 15			/* the scroll bar's column, less its frame */
 #define ZOOMDOC 8		/* zoomDocProc: a window with a zoom box */
@@ -848,10 +888,12 @@ EventRecord *ev;
 			activate(fg);
 		}
 		break;
+#ifndef AUX
 	case kHighLevelEvent:	/* an Apple event: Quit, from Shut Down */
 		if (aeok)
 			AEProcessAppleEvent(ev);
 		break;
+#endif
 	}
 }
 
@@ -885,6 +927,31 @@ void mac_yield()
 	if ((long)TickCount() - tyield >= 4)
 		mac_wait(0L);
 }
+
+#ifdef AUX
+/* A/UX: the network waits as mac_wait does, and the wait also ends when
+ * fd can be read (wr 0) or written (wr 1): ui_setselect makes
+ * WaitNextEvent return then. The masks are cleared before the event is
+ * handled: a menu or the About box waits for events of its own. */
+void mac_sel(fd, wr, t)
+int fd, wr;
+long t;
+{
+	EventRecord ev;
+	int m, got;
+
+	if (fd < 0 || fd > 31) {
+		mac_wait(t);
+		return;
+	}
+	m = 1 << fd;
+	ui_setselect(fd + 1, wr ? 0 : m, wr ? m : 0, 0);
+	got = next(&ev, t);
+	ui_setselect(0, 0, 0, 0);
+	if (got)
+		handle(&ev);
+}
+#endif
 
 int g_event(e, wait)
 Event *e;
@@ -928,6 +995,7 @@ int wait;
 	}
 }
 
+#ifndef AUX
 /* the words of the file "Archaic Options" in Archaic's folder, as the
  * command line's, after av[0] */
 static int options(av, max)
@@ -977,12 +1045,21 @@ static pascal OSErr aequit(const AppleEvent *e, AppleEvent *r, int32_t k)
 	put(E_QUIT, 0, 0, 0);
 	return noErr;
 }
+#endif
 
+#ifdef AUX
+int main(argc, argv)
+int argc;
+char **argv;
+#else
 int main()
+#endif
 {
+#ifndef AUX
 	static char *av[32];
-	SysEnvRec env;
 	LONGINT g;
+#endif
+	SysEnvRec env;
 	int i;
 
 	InitGraf(&qd.thePort);
@@ -998,6 +1075,10 @@ int main()
 		MoreMasters();
 	SysEnvirons(1, &env);
 	cqd = env.hasColorQD;
+#ifdef AUX
+	wne = 1;		/* A/UX 3: System 7's Toolbox */
+	sys7 = 1;
+#else
 	wne = NGetTrapAddress(0xA860, kToolboxTrapType) !=
 		NGetTrapAddress(0xA89F, kToolboxTrapType);
 	if (NGetTrapAddress(0xA1AD, kOSTrapType) !=	/* Gestalt */
@@ -1015,6 +1096,7 @@ int main()
 		AEInstallEventHandler(kCoreEventClass, kAEQuitApplication,
 			NewAEEventHandlerUPP(aequit), 0, false);
 	}
+#endif
 	for (i = 0; i < 128; ++i)
 		if (lat[i])
 			mac[lat[i] - 128] = (unsigned char)(i + 128);
@@ -1029,6 +1111,16 @@ int main()
 	AppendMenu(medit, ps("Undo/Z;(-;Cut/X;Copy/C;Paste/V;Clear"));
 	InsertMenu(medit, 0);
 	DrawMenuBar();
+#ifdef AUX
+	/* A/UX's start code (maccrt0) does not flush stdio after main:
+	 * without this, --version, --help and -t print nothing into a
+	 * pipe or a file */
+	i = archaic_main(argc, argv);
+	fflush(stdout);
+	fflush(stderr);
+	return i;
+#else
 	i = options(av, 32);
 	return archaic_main(i, av);
+#endif
 }

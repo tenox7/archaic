@@ -2,7 +2,10 @@
  * SunOS, HP-UX). An address such as 10.0.2.2 goes through inet_addr()
  * first: SunOS 4's gethostbyname() knows only names. The connect does
  * not hold up the window (FIONBIO): it is drawn while Archaic waits,
- * Esc stops the wait, and after CWAIT seconds Archaic gives up. */
+ * Esc stops the wait, and after CWAIT seconds Archaic gives up.
+ * A/UX (AUX, with mac.c): a wait for the network is a wait in the
+ * Toolbox's WaitNextEvent (mac_sel), so the Finder and the other Mac
+ * programs run meanwhile; select() then only looks, with no wait. */
 #include "archaic.h"
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -94,6 +97,10 @@ char *err;
 			FD_SET(d, &r);
 		tv.tv_sec = 0;
 		tv.tv_usec = 100000L;
+#ifdef AUX
+		mac_sel(s, 1, 6L);
+		tv.tv_usec = 0;
+#endif
 		if (select((s > d ? s : d) + 1, &r, &w, (fd_set *)0, &tv) > 0 &&
 			FD_ISSET(s, &w))
 			break;
@@ -182,6 +189,11 @@ char *buf;
 		FD_SET(d, &r);
 	tv.tv_sec = 0;
 	tv.tv_usec = wait ? 50000L : 0;
+#ifdef AUX
+	if (wait)
+		mac_sel(h, 0, 3L);
+	tv.tv_usec = 0;
+#endif
 	m = select((h > d ? h : d) + 1, &r, (fd_set *)0, (fd_set *)0, &tv);
 	if (m <= 0 || !FD_ISSET(h, &r))
 		return -2;

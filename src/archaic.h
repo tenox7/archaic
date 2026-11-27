@@ -48,7 +48,9 @@ extern char ident[];
  * the host is 10.0.2.2 (slirp, QEMU's user network): Whitesmiths C
  * (_WSLAS) means Idris, gcc's unixpc the AT&T UNIX PC (3B1), SUNVIEW
  * (mksunview's build) SunOS 3 or 4 with SunView, __hpux HP-UX,
- * __DGUX__ DG/UX and _AIX AIX (WRP does not run there). */
+ * __DGUX__ DG/UX, _AIX AIX and __MINT__ FreeMiNT (ARAnyM's slirp) (WRP
+ * does not run there). AUX (mkaux's build) is A/UX: in the A/UX kit,
+ * QEMU's NAT has the host at 192.168.1.10. */
 #ifndef DEFURL
 #ifdef _WSLAS
 #define DEFURL "http://10.0.2.2:8080/"
@@ -70,6 +72,12 @@ extern char ident[];
 #endif
 #ifdef _AIX
 #define DEFURL "http://10.0.2.2:8080/"
+#endif
+#ifdef __MINT__
+#define DEFURL "http://10.0.2.2:8080/"
+#endif
+#ifdef AUX
+#define DEFURL "http://192.168.1.10:8080/"
 #endif
 #ifndef DEFURL
 #define DEFURL "http://127.0.0.1:8080/"
@@ -125,6 +133,12 @@ extern char ident[];
 #endif
 #ifdef ultrix
 #define SYSID "@(#)Archaic for ultrix4"
+#endif
+#ifdef __MINT__
+#define SYSID "@(#)Archaic for mint"
+#endif
+#ifdef AUX
+#define SYSID "@(#)Archaic for aux3"
 #endif
 #ifndef UPDPATH
 #define UPDPATH "/usr/local/bin/archaic"
@@ -367,8 +381,18 @@ int g_fd P((void));
  * other programs their time. mac_wait: they run, at most t ticks (less
  * when an event comes for Archaic: it goes to g_event's queue).
  * YIELD in long work (img_rows: a picture decodes): mac_wait(0) each
- * 1/15 s. Elsewhere YIELD is nothing. */
+ * 1/15 s. Elsewhere YIELD is nothing. A/UX (AUX) has mac.c too: its
+ * Toolbox programs share the Toolbox the same way. mac_sel (A/UX
+ * only): mac_wait, which also ends when the file fd can be read (wr 0)
+ * or written (wr 1), for nsock.c. */
 #ifdef macintosh
+#define MACTB
+#endif
+#ifdef AUX
+#define MACTB
+void mac_sel P((int fd, int wr, long t));
+#endif
+#ifdef MACTB
 void mac_wait P((long t));
 void mac_yield P((void));
 #define YIELD mac_yield()

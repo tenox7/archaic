@@ -45,6 +45,10 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 
 ![Archaic in Snow: Mac OS 7.5.5 on a Macintosh IIcx, showing Wikipedia in 216 colors](screenshots/snow-macos7.png)
 
+![Archaic in ARAnyM: FreeMiNT 1.19 with XaAES on an Atari Falcon-class 68040, showing Wikipedia in color](screenshots/aranym.png)
+
+![Archaic in LEMU (QEMU): A/UX 3.1.1 with the Finder on a Quadra 800, showing Wikipedia in 216 colors](screenshots/lemu-aux.png)
+
 ## Platforms
 
 | System | Window system | Network | Get it |
@@ -61,6 +65,8 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 | Ultrix 4.5 on a DECstation (MIPS) | X11 (DECwindows), in color | BSD sockets | release: `archaic-ultrix4`, or in the DECstation kit |
 | Mac OS 6 (System 6) on a 68k Mac (Mac II) | QuickDraw, in color | MacTCP | release: `archaic-macos6.dsk` (a floppy image), or `make mac` |
 | Mac OS 7.5 on a 68k Mac (Mac II) | QuickDraw, in color, multitasking | Open Transport | release: `archaic-macos7.dsk` (a floppy image), or `make mac` |
+| FreeMiNT on an Atari (ARAnyM: TT/Falcon-class 68040) | GEM (XaAES), in color | MiNTNet (BSD sockets) | `make mint`: `archaic-mint` |
+| A/UX 3.1 on a 68k Mac (Quadra) | the A/UX Toolbox (QuickDraw), in color, multitasking | BSD sockets | in the A/UX kit, or build it on A/UX: `sh mkaux` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
 | anything with SDL 2 | SDL 2 | BSD sockets | `make sdl` |
@@ -76,6 +82,8 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 2. Copy the binary to the old computer as `archaic`, and make it executable:
    - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
    - 3B1, 3B2, SunOS, HP-UX, DG/UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
+   - FreeMiNT in the ARAnyM kit: `/bin/archaic` (the kit has no `/usr/local/bin`). Copy it in through C: (the folder `drive_c`).
+   - A/UX: `archaic` and its resource file `%archaic`, both in `/usr/local/bin`, then `chmod 755 /usr/local/bin/archaic`.
    - The kits named in the table have it already. As root, it updates itself.
    - With curl or wget: `curl -O http://HOST:8080/archaic-download/archaic-hpux9`. WRP gets it from the newest release.
    - Mac OS 6 and 7.5: `archaic-macos6.dsk` and `archaic-macos7.dsk` are floppy images with Archaic: put one in the floppy drive. For a real Mac: the `.bin` file (MacBinary).
@@ -92,8 +100,12 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
      Type `archaic HOST:8080`, with your computer's LAN address: gxemul's network can't reach its 127.0.0.1.
    - Mac OS 6 and 7.5: open Archaic in the Finder. Options go in a file `Archaic Options`, next to it.
      On Mac OS 7.5, put WRP's address there: Open Transport's 127.0.0.1 is the Mac itself.
+   - FreeMiNT: Desk > TosWin2, then File > Start shell. Type `archaic &`.
+   - A/UX: log in to the Finder, then Apple menu > CommandShell. Type `/usr/local/bin/archaic`
+     (root's sh doesn't have `/usr/local/bin` on its PATH). In the A/UX kit, WRP's address is
+     `192.168.1.10:8080`, the default. Elsewhere type `archaic HOST:8080`.
 4. Click the address box, type an address, press Return.
-5. **Ctrl-Q** quits. On the 3B1: **Exit**. On the Mac: **Cmd-Q**.
+5. **Ctrl-Q** quits. On the 3B1: **Exit**. On the Mac and A/UX: **Cmd-Q**.
 
 ## Using it
 
@@ -125,7 +137,7 @@ With an older WRP: type in ![keys](screenshots/icons/k.png), then click ![Return
 | right button (DMD 5620: the middle one) | scroll: top half of the window up, bottom half down |
 | Ctrl-Q | quit |
 
-The 3B1's own keys (Exit, Page, Prev) and the window frames of the 3B1, SunView and the Mac work too.
+The 3B1's own keys (Exit, Page, Prev) and the window frames of the 3B1, SunView, the Mac and GEM work too.
 
 Where the window system has no scroll bar, Archaic draws its own, in the style of the Atari ST's GEM:
 
@@ -163,6 +175,7 @@ make cocoa        # ./archaic-cocoa: a macOS window
 make sdl          # ./archaic-sdl: SDL 2
 make headless     # ./archaic-headless: no window
 make mac          # src/build-mac/Archaic.dsk: Mac OS 6 and 7.5 on a 68k Mac (Retro68, in Docker)
+make mint         # ./archaic-mint: FreeMiNT with GEM on the Atari (m68k-atari-mint gcc, in Docker)
 make test         # the tests (need ImageMagick)
 ```
 
@@ -179,8 +192,9 @@ On the old systems, copy the sources in, then:
 | AIX 3.2 | `sh mkaix` | IBM's XL C 1.3, or gcc 2.7.2 |
 | AIX PS/2 1.3 | `sh mkaixps2` | MetaWare High C R2.2g |
 | Ultrix 4 | `sh mkultrix` | Ultrix's cc, or gcc 3.0.4 |
+| A/UX 3 | `sh mkaux` | A/UX's cc, with the A/UX Toolbox (libmac) |
 
-With the whole repository, `make` runs the right script on AIX, HP-UX, DG/UX, Ultrix and SunOS.
+With the whole repository, `make` runs the right script on AIX, HP-UX, DG/UX, Ultrix, SunOS and A/UX.
 `CC=gcc make` uses gcc where the script takes it.
 
 Which files to copy and how, the facts of each system, and how to port:

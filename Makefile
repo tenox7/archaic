@@ -4,12 +4,15 @@
 # make headless: no window, for tests and automation: archaic-headless.
 # make mac: Mac OS 6 and 7.5 on a 68k Mac, with Retro68 in
 # Docker: src/build-mac/Archaic.dsk, a floppy image (see src/mkmac).
+# make mint: FreeMiNT with GEM (XaAES) on the Atari, as on ARAnyM, with
+# the m68k-atari-mint gcc in Docker: archaic-mint (see src/mkmint).
 # The old systems have a build script of their own, in src. The Idris
 # (Atari ST) build is src/mk, run inside Idris; the AT&T UNIX PC (3B1)
-# build is src/mkunixpc. On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix and
-# SunOS, make runs the system's script (mkaix, mkaixps2, mkhpux, mkdgux,
-# mkultrix, mksunview) and moves its archaic here: their compilers do not
-# know the flags below. SunOS 3 has its uname in /usr/5bin: put it on the
+# build is src/mkunixpc. On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix,
+# SunOS and A/UX, make runs the system's script (mkaix, mkaixps2, mkhpux,
+# mkdgux, mkultrix, mksunview, mkaux) and moves its archaic here (on A/UX
+# also %archaic, its resources): their compilers do not know the flags
+# below. SunOS 3 has its uname in /usr/5bin: put it on the
 # PATH. CC is the compiler, also for the scripts that take one (mkaix,
 # mkaixps2, mkultrix): CC=gcc gmake.
 
@@ -32,10 +35,12 @@ archaic: $(CORE) src/x11.c src/nsock.c $(HDR)
 	dgux*) m=mkdgux ;; \
 	ULTRIX*) m=mkultrix ;; \
 	SunOS?[34]*) m=mksunview ;; \
+	A/UX*) m=mkaux ;; \
 	esac; \
 	if [ -n "$$m" ]; then \
 		echo "cd src && CC=$(CC) sh $$m && mv archaic .."; \
-		cd src && CC="$(CC)" sh $$m && mv archaic ..; \
+		cd src && CC="$(CC)" sh $$m && mv archaic .. && \
+		if [ -f %archaic ]; then mv %archaic ..; fi; \
 	else \
 		echo "$(CC) $(CFLAGS) -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS)"; \
 		$(CC) $(CFLAGS) -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS); \
@@ -64,6 +69,9 @@ headless: archaic-headless
 mac:
 	sh src/mkmac
 
+mint:
+	sh src/mkmint
+
 # the same, with the address and undefined behaviour sanitizers
 archaic-asan: $(CORE) src/x11.c src/nsock.c $(HDR)
 	$(CC) $(CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS)
@@ -77,6 +85,6 @@ test: archaic-asan archaic-headless
 	sh test/run.sh
 
 clean:
-	rm -rf archaic archaic-asan archaic-asan.dSYM archaic-sdl archaic-cocoa archaic-headless src/build-mac
+	rm -rf archaic archaic-asan archaic-asan.dSYM archaic-sdl archaic-cocoa archaic-headless archaic-mint %archaic src/build-mac
 
-.PHONY: sdl cocoa headless mac knr test clean
+.PHONY: sdl cocoa headless mac mint knr test clean
