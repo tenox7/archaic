@@ -8,6 +8,8 @@ archaic-headless
 src/build-mac/
 # the FreeMiNT build (src/mkmint)
 archaic-mint
+# the TOS build (src/mktos)
+archaic-tos
 *.dSYM/
 *.o
 *.pbm

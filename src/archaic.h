@@ -48,7 +48,8 @@ extern char ident[];
  * the host is 10.0.2.2 (slirp, QEMU's user network): Whitesmiths C
  * (_WSLAS) means Idris, gcc's unixpc the AT&T UNIX PC (3B1), SUNVIEW
  * (mksunview's build) SunOS 3 or 4 with SunView, __hpux HP-UX,
- * __DGUX__ DG/UX, _AIX AIX and __MINT__ FreeMiNT (ARAnyM's slirp) (WRP
+ * __DGUX__ DG/UX, _AIX AIX and __MINT__ FreeMiNT (ARAnyM's slirp), also
+ * TOS (ATARITOS, mktos's build: Hatari's NetUSBee NAT) (WRP
  * does not run there). AUX (mkaux's build) is A/UX: in the A/UX kit,
  * QEMU's NAT has the host at 192.168.1.10. */
 #ifndef DEFURL
@@ -134,8 +135,12 @@ extern char ident[];
 #ifdef ultrix
 #define SYSID "@(#)Archaic for ultrix4"
 #endif
+#ifdef ATARITOS
+#define SYSID "@(#)Archaic for tos"
+#else
 #ifdef __MINT__
 #define SYSID "@(#)Archaic for mint"
+#endif
 #endif
 #ifdef AUX
 #define SYSID "@(#)Archaic for aux3"

@@ -47,6 +47,10 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 
 ![Archaic in ARAnyM: FreeMiNT 1.19 with XaAES on an Atari Falcon-class 68040, showing Wikipedia in color](screenshots/aranym.png)
 
+![Archaic in Hatari: TOS 2.06 with GEM on an Atari Mega ST, mono 640x400, STinG on a NetUSBee, showing Wikipedia](screenshots/tos-mono.png)
+
+![Archaic in Hatari: EmuTOS 1.4 with GEM on an Atari Falcon030, 640x480 in 256 colors, STinG on a NetUSBee, showing Wikipedia in 216 colors](screenshots/tos-color.png)
+
 ![Archaic in LEMU (QEMU): A/UX 3.1.1 with the Finder on a Quadra 800, showing Wikipedia in 216 colors](screenshots/lemu-aux.png)
 
 ## Platforms
@@ -66,6 +70,7 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 | Mac OS 6 (System 6) on a 68k Mac (Mac II) | QuickDraw, in color | MacTCP | release: `archaic-macos6.dsk` (a floppy image), or `make mac` |
 | Mac OS 7.5 on a 68k Mac (Mac II) | QuickDraw, in color, multitasking | Open Transport | release: `archaic-macos7.dsk` (a floppy image), or `make mac` |
 | FreeMiNT on an Atari (ARAnyM: TT/Falcon-class 68040) | GEM (XaAES), in color | MiNTNet (BSD sockets) | `make mint`: `archaic-mint` |
+| TOS on an Atari ST, STE, TT or Falcon | GEM, in color with 16 colors or more | STinG (NetUSBee, EtherNEC) | `make tos`: `archaic-tos` |
 | A/UX 3.1 on a 68k Mac (Quadra) | the A/UX Toolbox (QuickDraw), in color, multitasking | BSD sockets | in the A/UX kit, or build it on A/UX: `sh mkaux` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
@@ -84,6 +89,7 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
    - 3B1, 3B2, SunOS, HP-UX, DG/UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
    - FreeMiNT in the ARAnyM kit: `/bin/archaic` (the kit has no `/usr/local/bin`). Copy it in through C: (the folder `drive_c`).
    - A/UX: `archaic` and its resource file `%archaic`, both in `/usr/local/bin`, then `chmod 755 /usr/local/bin/archaic`.
+   - TOS: `ARCHAIC.PRG` in any folder. Put the options in `ARCHAIC.INF` next to it, such as WRP's address: `http://HOST:8080/`.
    - The kits named in the table have it already. As root, it updates itself.
    - With curl or wget: `curl -O http://HOST:8080/archaic-download/archaic-hpux9`. WRP gets it from the newest release.
    - Mac OS 6 and 7.5: `archaic-macos6.dsk` and `archaic-macos7.dsk` are floppy images with Archaic: put one in the floppy drive. For a real Mac: the `.bin` file (MacBinary).
@@ -101,6 +107,9 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
    - Mac OS 6 and 7.5: open Archaic in the Finder. Options go in a file `Archaic Options`, next to it.
      On Mac OS 7.5, put WRP's address there: Open Transport's 127.0.0.1 is the Mac itself.
    - FreeMiNT: Desk > TosWin2, then File > Start shell. Type `archaic &`.
+   - TOS: load STinG (its `STING.PRG` in AUTO), then open `ARCHAIC.PRG` on the desktop.
+     In Hatari with a NetUSBee, start Hatari with `--nat-loopback on` (tenox7/hatari, branch netusbee):
+     then 10.0.2.2 is the host's 127.0.0.1. Else give WRP's LAN address in `ARCHAIC.INF`.
    - A/UX: log in to the Finder, then Apple menu > CommandShell. Type `/usr/local/bin/archaic`
      (root's sh doesn't have `/usr/local/bin` on its PATH). In the A/UX kit, WRP's address is
      `192.168.1.10:8080`, the default. Elsewhere type `archaic HOST:8080`.
@@ -176,6 +185,7 @@ make sdl          # ./archaic-sdl: SDL 2
 make headless     # ./archaic-headless: no window
 make mac          # src/build-mac/Archaic.dsk: Mac OS 6 and 7.5 on a 68k Mac (Retro68, in Docker)
 make mint         # ./archaic-mint: FreeMiNT with GEM on the Atari (m68k-atari-mint gcc, in Docker)
+make tos          # ./archaic-tos: TOS with GEM and STinG on the Atari (the same gcc, in Docker)
 make test         # the tests (need ImageMagick)
 ```
 
