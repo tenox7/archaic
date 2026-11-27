@@ -53,6 +53,8 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 
 ![Archaic in LEMU (QEMU): A/UX 3.1.1 with the Finder on a Quadra 800, showing Wikipedia in 216 colors](screenshots/lemu-aux.png)
 
+![Archaic in LEMU (QEMU): Windows NT 3.1 on a Pentium PC, showing Wikipedia in 216 colors](screenshots/lemu-nt.png)
+
 ## Platforms
 
 | System | Window system | Network | Get it |
@@ -72,6 +74,7 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 | FreeMiNT on an Atari (ARAnyM: TT/Falcon-class 68040) | GEM (XaAES), in color | MiNTNet (BSD sockets) | `make mint`: `archaic-mint.prg` |
 | TOS on an Atari ST, STE, TT or Falcon | GEM, in color with 16 colors or more | STinG (NetUSBee, EtherNEC) | `make tos`: `archaic-tos.prg` |
 | A/UX 3.1 on a 68k Mac (Quadra) | the A/UX Toolbox (QuickDraw), in color, multitasking | BSD sockets | in the A/UX kit, or build it on A/UX: `sh mkaux` |
+| Windows NT 3.1 and newer on x86, MIPS and Alpha, NT 3.51 and newer on PowerPC | Win32 (GDI), in color | Winsock | `make nt`: `archaic-ntx86.exe`, `archaic-ntmips.exe`, `archaic-ntalpha.exe`, `archaic-ntppc.exe` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
 | anything with SDL 2 | SDL 2 | BSD sockets | `make sdl` |

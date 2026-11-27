@@ -50,8 +50,9 @@ extern char ident[];
  * (mksunview's build) SunOS 3 or 4 with SunView, __hpux HP-UX,
  * __DGUX__ DG/UX, _AIX AIX and __MINT__ FreeMiNT (ARAnyM's slirp), also
  * TOS (ATARITOS, mktos's build: Hatari's NetUSBee NAT) (WRP
- * does not run there). AUX (mkaux's build) is A/UX: in the A/UX kit,
- * QEMU's NAT has the host at 192.168.1.10. */
+ * does not run there), and _WIN32 Windows NT (QEMU's NAT). AUX (mkaux's
+ * build) is A/UX: in the A/UX kit, QEMU's NAT has the host at
+ * 192.168.1.10. */
 #ifndef DEFURL
 #ifdef _WSLAS
 #define DEFURL "http://10.0.2.2:8080/"
@@ -75,6 +76,9 @@ extern char ident[];
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifdef __MINT__
+#define DEFURL "http://10.0.2.2:8080/"
+#endif
+#ifdef _WIN32
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifdef AUX
@@ -144,6 +148,21 @@ extern char ident[];
 #endif
 #ifdef AUX
 #define SYSID "@(#)Archaic for aux3"
+#endif
+/* Windows NT (ntwin.c, nwin.c): a system for each CPU */
+#ifdef _WIN32
+#ifdef _M_IX86
+#define SYSID "@(#)Archaic for ntx86"
+#endif
+#ifdef _M_MRX000
+#define SYSID "@(#)Archaic for ntmips"
+#endif
+#ifdef _M_ALPHA
+#define SYSID "@(#)Archaic for ntalpha"
+#endif
+#ifdef _M_PPC
+#define SYSID "@(#)Archaic for ntppc"
+#endif
 #endif
 #ifndef UPDPATH
 #define UPDPATH "/usr/local/bin/archaic"
@@ -415,5 +434,11 @@ int n_open P((char *host, int port, char *err));
 int n_read P((int h, char *buf, int n, int wait));
 int n_write P((int h, char *buf, int n));
 void n_close P((int h));
+
+#ifdef _WIN32
+/* ntwin.c, for update.c: the program's file (GetModuleFileName), 0 if
+ * none */
+int nt_self P((char *s, int n));
+#endif
 
 #endif

@@ -34,7 +34,13 @@
  * not offer a file of an older version (a release also carries older
  * builds, for the systems not built again), or one for another system.
  *
- * Only Unix builds of the release have SYSID: the others get no updates.
+ * Windows NT (_WIN32): the program's file is GetModuleFileName's
+ * (nt_self), its folder ends at a backslash, and the file comes as
+ * archaic.NNN (NT 3.1's FAT has 8.3 names). The program that runs can't
+ * be deleted, but it can be renamed: it goes to archaic.old first, then
+ * the new file takes its name (rename() does not replace a file there).
+ *
+ * The builds of the release have SYSID; the others get no updates.
  */
 #include "archaic.h"
 
@@ -46,6 +52,24 @@ char upd_msg[300];		/* what upd_run() did, or why not */
 char *getenv();
 #else
 #include <stdlib.h>
+#endif
+#ifdef _WIN32		/* Windows NT: Microsoft's C library */
+#include <io.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <process.h>
+#include <stdio.h>
+/* the files are binary: no CR LF for LF */
+#undef creat
+#define creat(f, m) open(f, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, \
+	S_IREAD | S_IWRITE)
+#define OPENR(f) open(f, O_RDONLY | O_BINARY)
+#define SEP '\\'
+#endif
+#ifndef OPENR
+#define OPENR(f) open(f, 0)
+#define SEP '/'
 #endif
 #ifdef __STDC__		/* the prototypes; the old compilers need none */
 #include <sys/types.h>
@@ -206,7 +230,11 @@ int n;
 static int isprog(p)
 char *p;
 {
+#ifdef _WIN32
+	return access(p, 0) == 0;	/* there: NT has no x bit */
+#else
 	return access(p, 1) == 0;
+#endif
 }
 
 /* the program's file: as it was started (a), with its folder, else
@@ -218,6 +246,10 @@ char *a;
 	char *d, *p;
 	int n, k;
 
+#ifdef _WIN32
+	if (nt_self(self, (int)sizeof self))
+		return isprog(self);
+#endif
 	for (p = a; *p && *p != '/'; ++p)
 		;
 	if (*p) {
@@ -258,12 +290,28 @@ static void dirof()
 	int i;
 
 	scopy(dir, self, (int)sizeof dir);
-	for (i = ulen(dir); i > 0 && dir[i - 1] != '/'; --i)
+	for (i = ulen(dir); i > 0 && dir[i - 1] != SEP; --i)
 		;
 	if (i == 0)
 		scopy(dir, ".", (int)sizeof dir);
+#ifdef _WIN32
+	else if (i == 3 && dir[1] == ':')
+		dir[3] = 0;		/* "C:\archaic.exe": "C:\" */
+#endif
 	else
 		dir[i > 1 ? i - 1 : 1] = 0;	/* "/archaic": "/" */
+}
+
+/* d: file f in the folder dir */
+static void indir(d, f)
+char *d, *f;
+{
+	int n = ulen(dir);
+
+	if (n > 0 && dir[n - 1] == SEP)
+		sprintf(d, "%s%s", dir, f);
+	else
+		sprintf(d, "%s%c%s", dir, SEP, f);
 }
 
 /* get the file into tmpf. 0 if all of it came, else -1 (upd_msg says why) */
@@ -326,7 +374,7 @@ char *f;
 	long got = 0;
 	int fd, n;
 
-	fd = open(f, 0);
+	fd = OPENR(f);
 	if (fd < 0)
 		return 0;
 	while ((n = read(fd, (char *)blk, (int)sizeof blk)) > 0) {
@@ -359,7 +407,24 @@ static int uinstall()
 			nver, tmpf);
 		return -1;
 	}
-	sprintf(oldf, "%s/archaic.old", dir);
+	indir(oldf, "archaic.old");
+#ifdef _WIN32
+	/* the program that runs can be renamed, not deleted */
+	if (!ueq(oldf, self)) {
+		unlink(oldf);
+		if (rename(self, oldf) < 0) {
+			sprintf(upd_msg, "Archaic %s: unable to replace %.200s", nver,
+				self);
+			return -1;
+		}
+	}
+	if (rename(tmpf, self) < 0) {
+		rename(oldf, self);
+		sprintf(upd_msg, "Archaic %s: unable to replace %.200s", nver, self);
+		return -1;
+	}
+	return 0;
+#else
 	if (!ueq(oldf, self)) {
 		unlink(oldf);
 #ifdef NORENAME
@@ -388,6 +453,7 @@ static int uinstall()
 	}
 #endif
 	return 0;
+#endif
 }
 
 /* Ask WRP (at the address wrp) for the newest Archaic, and install it if
@@ -445,6 +511,11 @@ char *wrp, *prog;
 	}
 	dirof();
 	if (access(dir, 2) < 0) {
+#ifdef _WIN32
+		sprintf(upd_msg, "Archaic %s is out. To upgrade, start it as Administrator",
+			nver);
+		return U_OUT;
+#else
 		if (getuid() != 0) {
 			sprintf(upd_msg, "Archaic %s is out. To upgrade, start archaic as root",
 				nver);
@@ -453,13 +524,19 @@ char *wrp, *prog;
 		sprintf(upd_msg, "Archaic %s is out, but Archaic can't write %.200s",
 			nver, dir);
 		return U_FAIL;
+#endif
 	}
 	if (ucheck(self)) {	/* another Archaic has installed it */
 		sprintf(upd_msg, "Archaic upgraded to %s. Start archaic again to use it: %.200s",
 			nver, self);
 		return U_DONE;
 	}
-	sprintf(tmpf, "%s/archaic.%ld", dir, (long)getpid() % 100000L);
+#ifdef _WIN32
+	sprintf(ans, "archaic.%03ld", (long)getpid() % 1000L);	/* 8.3 */
+#else
+	sprintf(ans, "archaic.%ld", (long)getpid() % 100000L);
+#endif
+	indir(tmpf, ans);
 	sprintf(ans, "Archaic %s", nver);
 	ui_what(ans);
 	r = ufetch();

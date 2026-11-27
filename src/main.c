@@ -3544,10 +3544,11 @@ long a, b;
 		say("Stopped");
 }
 
-/* get one slice: one the frame shows that is missing, else (near) the
- * next one below or above. 1 if it got one, or tried */
-static int slicework(near)
-int near;
+/* get one slice: one the frame shows that is missing, else (nb, the
+ * ones nearby) the next one below or above. 1 if it got one, or tried.
+ * (Not "near": Microsoft's C for NT still has it as a word of its own.) */
+static int slicework(nb)
+int nb;
 {
 	static long want[4];
 	long a, b, k0, k1;
@@ -3562,7 +3563,7 @@ int near;
 	if (k1 != k0)
 		want[n++] = k1;
 	v = n;			/* want[0] up to want[v - 1] are in the frame */
-	if (near) {
+	if (nb) {
 		want[n++] = sdir > 0 ? k1 + 1 : k0 - 1;
 		want[n++] = sdir > 0 ? k0 - 1 : k1 + 1;
 	}
@@ -4054,6 +4055,12 @@ static void writepbm()
 		return;
 	}
 #ifdef MSDOS
+#define WBIN
+#endif
+#ifdef _WIN32
+#define WBIN
+#endif
+#ifdef WBIN
 	f = fopen(pbm, "wb");
 #else
 	f = fopen(pbm, "w");

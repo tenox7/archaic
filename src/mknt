@@ -1,0 +1,51 @@
+#!/bin/sh
+# mknt - build Archaic for Windows NT, for each CPU of NT: x86, MIPS and
+# Alpha with the Win32 SDK for NT 3.1 (July 1993), PowerPC with the SDK
+# for NT 4.0 and Visual C++ 4.1 (NT for PowerPC starts at 3.51). In
+# Docker: the image tenox7/ntsdk (github.com/tenox7/ntsdk) has the
+# original compilers, and runs them with no Wine. Run it on the host. It
+# makes archaic-ntx86.exe, archaic-ntmips.exe, archaic-ntalpha.exe and
+# archaic-ntppc.exe (next to src): console programs that open a window
+# (see ntwin.c). The release has them with these names. Each is built
+# in /tmp in the container, from
+# a copy of the sources. mknt x86 (or mips, alpha, ppc): only that one.
+cd "$(dirname "$0")/.." || exit 1
+IMG=${NTSDK_IMAGE:-tenox7/ntsdk}
+docker image inspect "$IMG" >/dev/null 2>&1 || {
+	echo "mknt: no image $IMG: docker pull tenox7/ntsdk" >&2
+	exit 1
+}
+set -- ${*:-x86 mips alpha ppc}
+for cpu; do
+	case $cpu in
+	x86|mips|alpha) sdk=nt31 ;;
+	ppc) sdk=nt40 ;;
+	*) echo "mknt: no CPU $cpu (x86, mips, alpha, ppc)" >&2; exit 1 ;;
+	esac
+	rm -f archaic-nt$cpu.exe
+	docker run --rm --network none -v "$PWD":/a "$IMG" $sdk $cpu sh -c '
+		rm -rf /tmp/b && mkdir /tmp/b && cd /a/src &&
+		cp main.c html.c http.c gif.c pic.c update.c ntwin.c nwin.c \
+			archaic.h archaic.rc archaic.ico /tmp/b && cd /tmp/b || exit 1
+		for f in main html http gif pic update ntwin nwin; do
+			cl -nologo -c -Ox -W3 -DWIN32 $f.c >log 2>&1 ||
+				{ cat log; exit 1; }
+			grep -i -E "warning|error" log
+		done
+		rc -r archaic.rc || exit 1
+		if [ $NTSDK = nt31 ]; then	# its linker takes no .res
+			cvtres -$CPU archaic.res -o archaic.rbj >log 2>&1 ||
+				{ cat log; exit 1; }
+			L=archaic.rbj
+		else
+			L="archaic.res -machine:PPC -subsystem:console,3.51"	# NT 3.51
+		fi
+		cl -nologo -Fearchaic.exe main.obj html.obj http.obj gif.obj \
+			pic.obj update.obj ntwin.obj nwin.obj user32.lib gdi32.lib \
+			wsock32.lib kernel32.lib libc.lib -link $L >log 2>&1 ||
+			{ cat log; exit 1; }
+		grep -i -E "warning|error" log
+		cp archaic.exe /a/archaic-nt'$cpu'.exe' | tr -d '\r'
+	[ -f archaic-nt$cpu.exe ] || exit 1
+done
+ls -l archaic-nt*.exe

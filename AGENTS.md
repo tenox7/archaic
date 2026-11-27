@@ -63,10 +63,14 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/tos.c` | display for GEM on TOS: the ST, STE, TT and Falcon, and graphics cards. A GEM window with GEM's own scroll bar. It keeps the window's pixels in the screen's own format (1 bit, the Atari's bit planes, or packed pixels) and draws them itself, so a redraw only copies (see `ports/tos.md`). Also TOS's `main()`: the options from `ARCHAIC.INF` |
 | `src/nsting.c` | network for TOS: STinG's TCP (a NetUSBee or an EtherNEC card), found through the cookie `STiK` |
 | `src/mktos` | TOS: build with the m68k-atari-mint gcc in Docker, on your computer (`make tos`): `archaic-tos.prg`, `ARCHAIC.PRG` on the Atari |
+| `src/ntwin.c` | display for Windows NT (3.1 and newer, on x86, MIPS, Alpha and PowerPC): a Win32 window drawn with GDI, with NT's own scroll bar, a palette of its own on a screen of 256 colors (see `ports/nt.md`) |
+| `src/nwin.c` | network for Windows NT: Winsock 1.1 (WSOCK32.DLL) |
+| `src/mknt`, `archaic.rc`, `archaic.ico` | Windows NT: build with Microsoft's own SDKs in Docker (the image `tenox7/ntsdk`), on your computer (`make nt`): `archaic-ntx86.exe`, `archaic-ntmips.exe`, `archaic-ntalpha.exe`, `archaic-ntppc.exe`. `archaic.rc`: the icon |
 | `src/mkaux`, `auxrsrc.r` | A/UX 3 script: compile and link with A/UX's cc and the A/UX Toolbox (libmac), for `mac.c` and `nsock.c`. `auxrsrc.r`: the SIZE resource, which `rez` puts in `%archaic`, the resource file next to the program |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `tools/slowline.py` | host tool: a TCP proxy that is a slow line (bytes a second), to try Archaic on a slow line with WRP |
+| `tools/ntico.py` | host tool: draws Archaic's icon for Windows NT (`archaic.ico`, 32 x 32, black and white) |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
 | `tools/dmdlog.py` | host tool for the DMD 5620 port: decodes a log of the bytes that Archaic sent to the terminal (`ARCHAICLOG`), a command a line, and draws the screen they make |
 | `test/run.sh` | tests: GIF decoder, HTML, forms, WRP, the headless display |
@@ -83,7 +87,7 @@ archaic [=WxH+X+Y] [-a] [-c n] [-f type] [-t] [-v] [-o file] [-s script] [-r n] 
 
 | Option | Meaning |
 |---|---|
-| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, the 3B2, SunView, HP-UX, DG/UX, AIX, FreeMiNT and TOS: `10.0.2.2`, A/UX: `192.168.1.10`, other Unix and the classic Mac OS: `127.0.0.1`). Ultrix in gxemul, Mac OS 7.5 in Snow and TOS in Hatari need WRP's address: see `ports/ultrix4.md`, `ports/mac.md` and `ports/tos.md` |
+| `url` | WRP's address, like `10.0.2.2:8080`. Default: `$WRP`, else port 8080 on the host (Idris, the 3B1, the 3B2, SunView, HP-UX, DG/UX, AIX, FreeMiNT, TOS and Windows NT: `10.0.2.2`, A/UX: `192.168.1.10`, other Unix and the classic Mac OS: `127.0.0.1`). Ultrix in gxemul, Mac OS 7.5 in Snow and TOS in Hatari need WRP's address: see `ports/ultrix4.md`, `ports/mac.md` and `ports/tos.md` |
 | `=WxH+X+Y` | window size and place (also `-g WxH+X+Y`). Default on Idris and SunView: about 9/10 of the screen, in the middle. On the 3B1: 686 x 248 inside a frame; a larger size gets no frame, up to 720 x 288 (`-g 720x288`). On the classic Mac OS and A/UX: the screen under the menu bar (on System 7 and A/UX, less the column of disk icons at the right). On the DMD 5620: the layer as it is (Reshape in the layers menu changes it) |
 | `-a` | also show WRP's M, T and C menus, and send them as they are set |
 | `-c n` | start with pictures of n colors (2 to 256), not as many as the display shows (see Colors). With `-t`: as if the display showed n colors |
@@ -188,6 +192,7 @@ The first status line says what it found, like `Archaic 0.10, millions of colors
 | Cocoa, SDL | the screen's depth: millions |
 | Mac OS 6 and 7.5 | the main screen's depth, as set in Monitors: 2, 4, 16 or 256; millions with 16 or 32 bits. A Mac with no Color QuickDraw: black and white |
 | GEM on TOS (`tos.c`) | 1 plane (ST high, TT high) and ST medium's 4 colors: black and white. 16 and 256 colors (ST low, TT, Falcon, a card in 8 bits): 16 or 256. 15 to 32 bits (the Falcon's true color, cards): millions |
+| Windows NT (`ntwin.c`) | the screen's bits for a pixel: 2, 16, 256 (a palette: see `ports/nt.md`), 65536, millions |
 | `archaic-headless` | millions, like SDL (`-c 2` for black and white). `ARCHAIC_COLORS=N`: as a display of N colors (for the tests) |
 
 On a display with colors:
@@ -514,6 +519,10 @@ Cocoa has the Mac's own scroll bar; SDL has Archaic's (see Scrolling).
 (on an HP keyboard: Prev and Next; on DEC's LK201: Prev Screen and Next Screen). The up and down arrows and each step of the mouse wheel
 scroll a quarter of it. Close in the window manager's menu quits. The scroll bar is Archaic's.
 
+**On Windows NT:** Page Up and Page Down scroll a window. The up and down arrows and each step of the
+mouse wheel (NT 4.0) scroll a quarter of it; Home and End go to the top and the end. The scroll bar is NT's own:
+its arrows and gray parts step while the button is down, and its box can be dragged. The close box quits.
+
 **On Mac OS 6 and 7.5, and on A/UX**, its own keys, menus and window parts work too:
 
 | Key or part | Does |
@@ -654,7 +663,7 @@ Archaic keeps WRP's page and shows the error on the status line, like
 - With BSD sockets (`nsock.c`: Unix, macOS, SunOS, HP-UX, DG/UX, AIX, Ultrix, A/UX) the connect does not hold up the window:
   it is drawn, Esc stops, and after 20 s with no answer Archaic gives up (an address that
   does not exist on this network, like 10.0.2.2 outside an emulator kit).
-  MacTCP (`nmactcp.c`, the classic Mac OS) does the same: Cmd-. stops.
+  MacTCP (`nmactcp.c`, the classic Mac OS) does the same: Cmd-. stops. So does Winsock (`nwin.c`, Windows NT).
   On the 3B1 (`ntwg.c`) the connect waits as long as the system does.
 - With a page, a failed connect is on the status line:
   `Unable to connect to WRP at 10.0.2.2:8080: connection refused. Ensure WRP is up and running.`
@@ -712,6 +721,7 @@ A system that has scroll bars uses its own. Where it has none, Archaic draws one
 | Cocoa (macOS) | the Mac's own (NSScroller), always shown. A click in its track scrolls as Page Down or Page Up, or jumps to that place, as set in System Settings (with Option, the other one) |
 | the 3B1 | the window frame's scroll arrows |
 | Mac OS 6 and 7.5 | the Mac's own (a scroll bar control): see Mouse and keys |
+| Windows NT | NT's own (a scroll bar control): see Mouse and keys |
 | SDL, X11, X10 (the Atari ST), the DMD 5620, headless | Archaic's own, in the style of the Atari ST's GEM |
 
 Archaic's own scroll bar is at the right of the window, 17 pixels wide (`screenshots/scrollbar.png`):
@@ -827,6 +837,7 @@ The release's file is `archaic-` and the system name; on the Atari (TOS, FreeMiN
 | A/UX 3 | `AUX` (mkaux) | `aux3` |
 | FreeMiNT (Atari, ARAnyM) | `__MINT__` (m68k-atari-mint gcc) | `mint` |
 | TOS (Atari ST, STE, TT, Falcon) | `ATARITOS` (mktos) | `tos` |
+| Windows NT on x86, MIPS, Alpha, PowerPC | `_WIN32`, and `_M_IX86`, `_M_MRX000`, `_M_ALPHA`, `_M_PPC` | `ntx86`, `ntmips`, `ntalpha`, `ntppc` |
 
 A build with no `SYSID` gets no updates: macOS, Linux, the tests, the classic Mac OS (for now). For a new port:
 `cc -DSYSID='"@(#)Archaic for NAME"'`, or a line in `archaic.h`.
@@ -848,7 +859,7 @@ An error is a short text with HTTP 404: `curl -f` does not save it.
 
 - Change `IDENT` in `archaic.h`. Then build the systems again, or keep their old files:
   WRP offers only a file that is newer.
-- Keep the files' names: `archaic-NAME`, on the Atari `archaic-NAME.prg`.
+- Keep the files' names: `archaic-NAME`, on the Atari `archaic-NAME.prg`, on Windows NT `archaic-NAME.exe` (`archaic-ntx86.exe` ...).
 - The first version with updates must go into each kit once. After that, a kit's Archaic updates itself.
 
 **Trust.** Archaic and WRP talk plain HTTP, as for the pages. WRP gets the file from GitHub over HTTPS,
@@ -1010,6 +1021,7 @@ Read the system's file before work on its port. Put the facts of one system in i
 | FreeMiNT with GEM (Atari) | [ports/mint.md](ports/mint.md) | ARAnyM |
 | TOS with GEM (ST, STE, TT, Falcon) | [ports/tos.md](ports/tos.md) | Hatari |
 | A/UX 3 | [ports/aux3.md](ports/aux3.md) | QEMU (LEMU) |
+| Windows NT 3.1 and newer (x86, MIPS, Alpha, PowerPC) | [ports/nt.md](ports/nt.md) | QEMU (LEMU) |
 
 The next ports, for old systems with no web browser: [ports/roadmap.md](ports/roadmap.md).
 

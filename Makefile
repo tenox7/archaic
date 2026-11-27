@@ -8,6 +8,9 @@
 # the m68k-atari-mint gcc in Docker: archaic-mint.prg (see src/mkmint).
 # make tos: TOS with GEM on any ST, STE, TT or Falcon, with STinG (a
 # NetUSBee or EtherNEC card), the same gcc: archaic-tos.prg (see src/mktos).
+# make nt: Windows NT 3.1 and newer, for x86, MIPS, Alpha and PowerPC,
+# with Microsoft's own SDKs in Docker (the image tenox7/ntsdk):
+# archaic-ntx86.exe ... (see src/mknt).
 # The old systems have a build script of their own, in src. The Idris
 # (Atari ST) build is src/mk, run inside Idris; the AT&T UNIX PC (3B1)
 # build is src/mkunixpc. On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix,
@@ -77,6 +80,9 @@ mint:
 tos:
 	sh src/mktos
 
+nt:
+	sh src/mknt
+
 # the same, with the address and undefined behaviour sanitizers
 archaic-asan: $(CORE) src/x11.c src/nsock.c $(HDR)
 	$(CC) $(CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS)
@@ -90,6 +96,6 @@ test: archaic-asan archaic-headless
 	sh test/run.sh
 
 clean:
-	rm -rf archaic archaic-asan archaic-asan.dSYM archaic-sdl archaic-cocoa archaic-headless archaic-mint.prg archaic-tos.prg %archaic src/build-mac
+	rm -rf archaic archaic-asan archaic-asan.dSYM archaic-sdl archaic-cocoa archaic-headless archaic-mint.prg archaic-tos.prg archaic-nt*.exe %archaic src/build-mac
 
-.PHONY: sdl cocoa headless mac mint tos knr test clean
+.PHONY: sdl cocoa headless mac mint tos nt knr test clean

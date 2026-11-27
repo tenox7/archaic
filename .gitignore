@@ -10,6 +10,8 @@ src/build-mac/
 archaic-mint.prg
 # the TOS build (src/mktos)
 archaic-tos.prg
+# the Windows NT builds (src/mknt)
+archaic-nt*.exe
 *.dSYM/
 *.o
 *.pbm
