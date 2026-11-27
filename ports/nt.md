@@ -101,7 +101,13 @@ on a local port, and WRP 4.14.3:
   Page Down and the scroll bar.
 - One WRP for each client: WRP keeps one page. When two VMs used the same WRP, the first one's next slice failed
   (`Picture: can't show the slice`, and WRP's log said `Unable to find image`).
-- The user's own NT VMs are bridged on the LAN, with fixed addresses. Their `runs.sh` is NAT on the same addresses;
-  a test copy needs `hostfwd` to the guest's port 514 for rsh.
+- The release files of v0.14 (built from the same sources, only the time stamps differ), with NAT and rsh on a local
+  port, in all the NT VMs of `~/VM`: NT 3.1 (x86, MIPS, Alpha), NT 3.51 (x86, MIPS Magnum and RM200, Alpha, PowerPC)
+  and NT 4.0 (x86, MIPS Magnum and RM200, Alpha, PowerPC). On each: `--version`, the `-t` sums of an ABM and an AB8,
+  and `-u` with WRP 4.14.5 and the GitHub release (`Archaic 0.14 is the newest`). NT 4.0 on x86 also in the window:
+  WRP's page, the picture test (AB8), a page, Page Down.
+- The NT VMs in `~/VM` are bridged on the LAN. For a test, `LEMU_NIC` makes it NAT, with `hostfwd` to the guest's
+  port 514 for rsh. NT 3.1's VMs have fixed addresses: their `runs.sh` has a NAT network for them.
   NT 3.1 on MIPS asks to connect a network drive at logon: answer No.
-- Not tested: NT 3.5 and 4.0, a screen of 16 colors, a real computer.
+- Not tested: NT 3.5, a screen of 16 colors, a real computer. NT for the DECstation (R3000): the MIPS build is for
+  the R4000.
