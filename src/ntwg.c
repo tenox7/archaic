@@ -6,7 +6,8 @@
  *   TWG's READ_ME: compile with -DSYSTEM5 -DSHORT_IDENT
  * - select() takes bit masks, not fd_set. It cannot wait for the window
  *   too, so n_read waits at most 0.1 s: then the window gets its turn
- * - gethostbyname() reads /etc/hosts only (no DNS). An address such as
+ * - on the 3B1, gethostbyname() reads /etc/hosts only (no DNS). WIN/3B's
+ *   also asks the name server of /etc/resolv.conf. An address such as
  *   10.0.2.2 goes through inet_addr() first
  */
 #include "archaic.h"
@@ -43,7 +44,11 @@ int port;
 	else {
 		he = gethostbyname(host);
 		if (!he) {
+#ifdef u3b2
+			sprintf(err, "%.60s: unknown host", host);
+#else
 			sprintf(err, "%.60s: unknown host (not in /etc/hosts)", host);
+#endif
 			return -1;
 		}
 		p = (char *)he->h_addr;

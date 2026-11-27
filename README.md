@@ -51,7 +51,7 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 |---|---|---|---|
 | Whitesmiths Idris 3.14 on the Atari ST | X10 | TCP/IP over SLIP | release: `archaic-idris`, or in the Idris kit |
 | AT&T UNIX PC (3B1, PC 7300) | its own | WIN/TCP on its Ethernet board | release: `archaic-unixpc`, or in the 3B1 kit |
-| UNIX System V Release 3.2 on an AT&T 3B2 | layers, on a DMD 5620 terminal (the Blit) | WIN/3B on its Ethernet board | release: `archaic-3b2` |
+| UNIX System V Release 3.2 on an AT&T 3B2 | layers, on a DMD 5620 terminal (the Blit) | WIN/3B on its Ethernet board | release: `archaic-3b2`, or in the 3B2 kit |
 | SunOS 4.1 on a Sun-4 (SPARC) | SunView, in color | BSD sockets | release: `archaic-sun4`, or in the SunOS 4 kit |
 | SunOS 3.5 on a Sun-3 (68020) | SunView | BSD sockets | release: `archaic-sun3`, or in the Sun-3 kit |
 | HP-UX 9 on an HP 9000/700 (PA-RISC) | X11, in color | BSD sockets | release: `archaic-hpux9`, or in the HP-UX kit |

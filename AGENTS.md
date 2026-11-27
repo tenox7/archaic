@@ -1286,18 +1286,20 @@ Test on a copy of your 3B1 disk.
 
 - **UNIX System V Release 3.2** on an AT&T 3B2/400, with a **DMD 5620** terminal (the Blit) in **layers**.
   Kit: `att3b2-400-svr32-simh` (Open SIMH, with the dmd5620 emulator), on osarchive in `os/att/3b2/`.
+  Archaic is in the kit: `/usr/local/bin/archaic`, and its source in `/usr/local/src/archaic`.
 - It needs WIN/3B (the 3B2's TCP/IP) and the DMD software (`/usr/dmd`: layers and `32ld`). The kit has both.
-- Release binary: `archaic-3b2`. Copy it to the 3B2 as `/usr/local/bin/archaic`,
+- Release binary: `archaic-3b2` (the kit's). On another 3B2, copy it as `/usr/local/bin/archaic`,
   then `chmod 755 /usr/local/bin/archaic`. It is one file: Archaic's part for the terminal is inside it.
 - At the DMD, log in as `root` and type `layers`. Make a window: button 3, New, then drag a rectangle with button 3.
-  In the window, type `/usr/local/bin/archaic`.
+  In the window, type `archaic`.
 - Archaic first loads its part into the terminal: the pointer is a coffee cup, for about 25 s.
   **Do not type or click while it loads.** Then WRP's form comes, and a short picture test (10 s).
 - The window is the layer. Reshape in the layers menu (button 3) gives it another size.
   A small window is faster: its pictures are smaller.
 - **Ctrl-Q** quits: the layer is a terminal again.
 - In the kit, your computer is `10.0.2.2` for the 3B2. So Archaic looks for WRP at `http://10.0.2.2:8080/`.
-  On another network: `archaic HOST:8080`, or set `WRP` to `HOST:8080`. The kit has a name server.
+  On another network: `archaic HOST:8080`, or set `WRP` to `HOST:8080`.
+  The kit has a name server, so HOST can be a name.
 - The screen is black and white. White is a lit pixel, so a page is a bright window.
 - `screenshots/dmd5620.png`: the terminal's screen, 800 x 1024: `uname -a` in a layer,
   and Archaic in a second layer with Wikipedia's Blit article.
@@ -1417,6 +1419,8 @@ So Archaic is two programs.
 
 - BSD sockets, as on the 3B1: `ntwg.c` is for both. On the 3B2 `struct sockaddr_in` is in `<sys/in.h>`.
 - Link with `-lnet -lnsl_s`: `libnet.a` uses the TLI functions (`t_open` ...) of the shared `libnsl_s`.
+- Host names: `gethostbyname()` also asks the name server of `/etc/resolv.conf` (in the kit: SIMH's, 10.0.2.3).
+  So `archaic -t http://example.com/` works there. The 3B1's reads only `/etc/hosts`.
 - `times()` counts 1/100 s: Archaic's clock for the pictures' times (`nowms()` in `http.c`).
   The display has no clock (`g_ms`).
 
