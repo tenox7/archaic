@@ -9,7 +9,8 @@
  * -a		show WRP's M, T and C menus (mode, picture type, colors)
  * -c n		start with pictures of n colors (2 to 256), not as many
  *		as the display shows (g_colors; 216 for a colormap of
- *		256). With -t: as if the display showed n
+ *		256; WRP's own, 216n by default, for millions). With -t:
+ *		as if the display showed n
  * -f fmt	gif: ask WRP for GIFs only. abm (as without -f): WRP may
  *		send its black and white pictures as ABM (see pic.c). To
  *		compare the two on a computer
@@ -205,6 +206,7 @@ static char nbwhy[100];
 static int loading, quit, pending, pendpost, headless, verbose, allset;
 static long dcolors;		/* the colors the display shows (g_colors) */
 static int ncol;		/* the colors asked of WRP, 2 to 256 */
+static int wrpcol;		/* millions of colors, no -c: WRP's own (its -g) */
 static int copt;		/* -c's colors, or 0 */
 static int cmenu;		/* the display has colors: WRP's C menu is shown */
 static char cval[8];		/* the line chosen in C, as 128n, or "" */
@@ -1847,9 +1849,10 @@ Item *it;
 		it->form >= 0 && it->form < MAXFORM && wrpf[it->form];
 }
 
-/* WRP's C menu: the line chosen last (cval), else the first line of the
- * number nearest ncol, and not above it if it can. In WRP's one menu, the
- * first line of a number is WRP's default for it, as 256d and 216n. */
+/* WRP's C menu: the line chosen last (cval), else (wrpcol) WRP's line,
+ * else the first line of the number nearest ncol, and not above it if it
+ * can. In WRP's one menu, the first line of a number is WRP's default for
+ * it, as 256d and 216n. */
 static void setcol(it)
 Item *it;
 {
@@ -1862,6 +1865,13 @@ Item *it;
 			it->sel = j;
 			return;
 		}
+	}
+	if (wrpcol && it->sel >= 0 && it->sel < it->nopt) {
+		/* WRP's SELECTED line: its -g, 216n by default */
+		v = atoin(opts[it->opt + it->sel].val);
+		if (v >= 2 && v <= 256)
+			ncol = v;
+		return;
 	}
 	for (j = 0; j < it->nopt; ++j) {
 		o = &opts[it->opt + j];
@@ -2143,7 +2153,7 @@ int f, b;
 			for (i = 0; i < nitems; ++i)
 				if (items[i].form == f && iscmenu(&items[i]))
 					break;
-			if (i == nitems) {	/* no C menu: Archaic's colors */
+			if (i == nitems && !wrpcol) {	/* no C menu: Archaic's colors */
 				sprintf(num, "%d", ncol);
 				addq("c", num);
 			}
@@ -4144,9 +4154,14 @@ static void pictest()
 #endif
 	if (cval[0])
 		sprintf(cs, "%.7s", cval);
+	else if (wrpcol)
+		sprintf(cs, "WRP's");	/* no c: WRP's own colors */
 	else
 		sprintf(cs, "%d", ncol);
-	sprintf(msg, "archaic-test?w=%d&h=%d&c=%s", w, h, cs);
+	if (!cval[0] && wrpcol)
+		sprintf(msg, "archaic-test?w=%d&h=%d", w, h);
+	else
+		sprintf(msg, "archaic-test?w=%d&h=%d&c=%s", w, h, cs);
 	url_join(wrpu, msg, tu);
 	scopy(ssave, sline, (int)sizeof ssave);
 	loading = 1;
@@ -4276,7 +4291,7 @@ static char rhelp[50];		/* -r's default, as showhelp() prints it */
 static char *helpl[] = {
 	"  =WxH+X+Y     window size and place (also -g WxH+X+Y)",
 	"  -a           also show WRP's M, T and C menus",
-	"  -c n         pictures in n colors, 2 to 256 (default: the display's)",
+	"  -c n         pictures in n colors, 2 to 256 (default: the display's or WRP's)",
 	"  -f type      ask WRP for one type of pictures: gif, abm, abm3, ab8 or small",
 	"               (default: Archaic times them, and asks for the faster kind)",
 	"  -t           test: no window, print the page and its pictures",
@@ -4428,9 +4443,11 @@ char **argv;
 	/* a colormap of 256 (8 bits): 216, the web colors (WRP makes GIP's
 	 * pictures for them), as the old browsers had. They are the same on
 	 * every page, and x11.c takes cells only for the ones a picture
-	 * uses. C has 256 too. */
-	ncol = copt ? copt : dcolors > 256 ? 256 : dcolors == 256 ? 216 :
-		(int)dcolors;
+	 * uses. C has 256 too. Millions: WRP's own colors, as its -g says
+	 * (216n by default, the fastest): Archaic sends no c, and C stays at
+	 * WRP's line (setcol). */
+	wrpcol = !copt && dcolors > 256;
+	ncol = copt ? copt : dcolors >= 256 ? 216 : (int)dcolors;
 	cmenu = dcolors > 2;
 	idepth = cmenu ? 8 : 1;
 	setaccept();
@@ -4440,8 +4457,12 @@ char **argv;
 	 * for GIF), and no Up and Dn (slices) */
 	for (i = 7; u[i] && u[i] != '/'; ++i)
 		;
-	if (!allset && u[i] == '/' && !u[i + 1] && i < MAXURL - 50)
-		sprintf(u + i + 1, "?m=ismap&t=gif&c=%d&sl=1", ncol);
+	if (!allset && u[i] == '/' && !u[i + 1] && i < MAXURL - 50) {
+		if (wrpcol)
+			sprintf(u + i + 1, "?m=ismap&t=gif&sl=1");
+		else
+			sprintf(u + i + 1, "?m=ismap&t=gif&c=%d&sl=1", ncol);
+	}
 	go(u, (char *)0);
 	while (!quit) {
 		/* keys for the page first: they came before the load */

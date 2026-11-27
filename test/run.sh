@@ -633,9 +633,10 @@ fi
 #     letter, d dither, n no dither, p only photos (2 colors), and there
 #     is no D menu. With colors: C is set to the first line of
 #     the nearest number (256d; 216n; for 100 colors 16d). A new line sends
-#     St at once, and the next page keeps it. Black and white: C shows only
-#     the lines of 2, set to 2p, and its label is the dither pattern (9
-#     pixels wide). A new line sends St at once.
+#     St at once, and the next page keeps it. Millions of colors (headless,
+#     no -c): C stays at WRP's line (216n; 256d when WRP marks it). Black
+#     and white: C shows only the lines of 2, set to 2p, and its label is
+#     the dither pattern (9 pixels wide). A new line sends St at once.
 cat >"$here/data/wrpc.html" <<'EOF'
 <HTML><HEAD><TITLE>WRP</TITLE></HEAD><BODY>
 <FORM ACTION="/wrpc.html" METHOD="GET">
@@ -646,10 +647,10 @@ W <INPUT TYPE="TEXT" NAME="w" VALUE="1152" SIZE="4">
 H <INPUT TYPE="TEXT" NAME="h" VALUE="600" SIZE="4">
 C <SELECT NAME="c">
 <OPTION DISABLED>Ncol</OPTION>
-<OPTION VALUE="256d">256d</OPTION>
-<OPTION VALUE="256n">256n</OPTION>
 <OPTION VALUE="216n" SELECTED>216n</OPTION>
 <OPTION VALUE="216d">216d</OPTION>
+<OPTION VALUE="256d">256d</OPTION>
+<OPTION VALUE="256n">256n</OPTION>
 <OPTION VALUE="128d">128d</OPTION>
 <OPTION VALUE="128n">128n</OPTION>
 <OPTION VALUE="16d">16d</OPTION>
@@ -675,9 +676,27 @@ bx=$(awk '$2 == "select" && $8 == "c" { print $3 + 5; exit }' "$tmp/c2.out")
 by=$(awk '$2 == "select" && $8 == "c" { print $4 + 5; exit }' "$tmp/c2.out")
 py=$(awk '$2 == "select" && $8 == "c" { print $4 + $6 + 1 + 2 * 15 + 7; exit }' "$tmp/c2.out")
 "$bin" -t -s "@$bx,$by;@$bx,$py;" "http://127.0.0.1:$port/wrpc.html" >/dev/null 2>&1
+if [ -x "$hl" ]; then
+	sed -e 's/ SELECTED>/>/' -e 's/"256d">/"256d" SELECTED>/' -e 's/wrpc\.html/wrpc256.html/' \
+		"$here/data/wrpc.html" >"$here/data/wrpc256.html"
+	for p in wrpc wrpc256; do
+		printf '%s\n' "click $ux $uy" 'key return' 'sleep 300' quit |
+			"$hl" -g 657x400 "http://127.0.0.1:$port/$p.html" >/dev/null 2>&1
+	done
+	rm -f "$here/data/wrpc256.html"
+	if grep -Eq 'GET /wrpc\.html\?url=&c=216n&w=[0-9]+&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log" &&
+		grep -Eq 'GET /wrpc256\.html\?url=&c=256d&w=[0-9]+&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log"; then
+		ok "wrp one menu, millions of colors: C stays at WRP's line (216n, or 256d when WRP says so)"
+	else
+		bad "wrp one menu, millions of colors: C did not stay at WRP's line:"
+		grep 'GET /wrpc' "$tmp/http.log"
+	fi
+else
+	echo "skip  wrp one menu, millions of colors: no $hl"
+fi
 rm -f "$here/data/wrpc.html"
-if grep -q 'select .* c sel 1: -Ncol=Ncol 256d=256d 256n=256n 216n=216n ' "$tmp/c256.out" &&
-	grep -q 'select .* c sel 3: ' "$tmp/c216.out" && grep -q 'select .* c sel 7: ' "$tmp/c100.out" &&
+if grep -q 'select .* c sel 3: -Ncol=Ncol 216n=216n 216d=216d 256d=256d ' "$tmp/c256.out" &&
+	grep -q 'select .* c sel 1: ' "$tmp/c216.out" && grep -q 'select .* c sel 7: ' "$tmp/c100.out" &&
 	grep -Eq 'GET /wrpc\.html\?url=&Fn=St&c=128n&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log" &&
 	grep -Eq 'GET /wrpc\.html\?url=x&c=128n&w=632&h=[0-9]+&sl=1&m=ismap&t=gif ' "$tmp/http.log"; then
 	ok "wrp one menu, colors: C set to 256d (216n; 16d for 100); 128n sends St at once, the next page keeps it"
@@ -975,6 +994,14 @@ if [ -x "$hl" ]; then
 	else
 		bad "headless: the color picture is wrong ($(magick identify -format '%[channels]' "$tmp/c1.png"))"
 	fi
+	# millions of colors: WRP's own (its -g, 216n by default), no c
+	echo quit | "$hl" "http://127.0.0.1:$port/" >/dev/null 2>&1
+	if grep -q 'GET /?m=ismap&t=gif&sl=1 ' "$tmp/http.log"; then
+		ok "headless: millions of colors ask WRP for its own colors (no c)"
+	else
+		bad "headless: millions of colors sent c:"
+		grep 'GET /?m=' "$tmp/http.log"
+	fi
 	# a display of 256 colors (an 8-bit colormap) asks WRP for 216
 	echo quit | ARCHAIC_COLORS=256 "$hl" "http://127.0.0.1:$port/" >/dev/null 2>&1
 	if grep -q 'GET /?m=ismap&t=gif&c=216&sl=1 ' "$tmp/http.log"; then
@@ -1020,8 +1047,8 @@ printf '%s\n' "click $kx $ky" 'type ab' 'size 657 300' 'sleep 600' 'size 500 300
 rm -f "$here/data/wrp3.html"
 q3='url=http%3A%2F%2Fx\.org%2F'
 if [ "$(grep -c 'GET /wrp3\.html?.*Fn=St' "$tmp/http.log")" = 1 ] &&
-	grep -Eq "GET /wrp3\.html\?$q3&Fn=St&k=ab&w=475&h=[0-9]+&sl=1&m=ismap&t=gif&c=256 " "$tmp/http.log" &&
-	grep -Eq "GET /wrp3\.html\?$q3&k=ab&w=475&h=[0-9]+&sl=1&m=ismap&t=gif&c=256 " "$tmp/http.log"; then
+	grep -Eq "GET /wrp3\.html\?$q3&Fn=St&k=ab&w=475&h=[0-9]+&sl=1&m=ismap&t=gif " "$tmp/http.log" &&
+	grep -Eq "GET /wrp3\.html\?$q3&k=ab&w=475&h=[0-9]+&sl=1&m=ismap&t=gif " "$tmp/http.log"; then
 	ok "new width: one St with w=475 (none for a new height), and K's text stays"
 else
 	bad "new width: wrong:"

@@ -128,7 +128,8 @@ Each line is a number of colors and a letter:
 | n | no dither: each pixel gets the nearest color. Photos get bands of color. In 2 colors, the smallest pictures |
 | p | only in 2 colors, for reading: only photos are dithered. Text and lines are sharp, and the pictures are about 20% smaller than 2d |
 
-The lines are 256d, 256n, 216n, 216d, 128d, 128n, 16d, 16n, 2p, 2d and 2n.
+The lines are 216n, 216d, 256d, 256n, 128d, 128n, 16d, 16n, 2p, 2d and 2n
+(WRP 4.14.2 and older: 256d and 256n first).
 128 is for SunView: its colormap segment has 128 places. (WRP 4.13.0 and older also have 64d and 64n.)
 The first line of each number is WRP's default for it: 216 is sharp (the web colors, see 216 colors: GIP),
 2 dithers only photos, and the other numbers are dithered.
@@ -185,7 +186,9 @@ The first status line says what it found, like `Archaic 0.10, millions of colors
 
 On a display with colors:
 
-- WRP's **C** menu shows. It is set to the display's colors: the first line of the nearest of WRP's
+- WRP's **C** menu shows. Millions of colors: C stays at WRP's line, as WRP's `-g` says
+  (216n by default: the fastest), and the start page asks with no `c`.
+  Fewer colors: C is set to the display's colors: the first line of the nearest of WRP's
   numbers (256, 216, 128, 16, 2) that is not more, or of `-c n`.
   A display of 256 colors (an 8-bit colormap) gets 216n: the web colors, as the old browsers had
   (see 216 colors: GIP). Choose 256d in C for the page's own colors.
@@ -925,7 +928,8 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    With colors: C shows, set to the colors (for 100 colors: 64); another choice sends St at once;
    the start page request has WRP's settings.
    WRP's one menu (5c): with colors, C is set to the first line of the nearest number (256d, 216n,
-   16d for 100 colors); a new line sends St at once, and the next page keeps it.
+   16d for 100 colors); with millions (headless), C stays at WRP's line (216n, or 256d);
+   a new line sends St at once, and the next page keeps it.
    In black and white, C has only 2p, 2d and 2n, is set to 2p, and its label is the dither pattern.
    Text in K, then ↵ or ⌫: the text and the key go as keys (`k=ab%0D`), with no button.
    The address box's clear button empties it.
@@ -938,7 +942,8 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 6. With WRP running (default `127.0.0.1:8089`): the start page, then a page with a window-wide picture.
 7. `archaic-headless`: PNG and PBM screenshots (the same pixels), typing into a form and sending it, a new size.
    A color picture on the screen is exactly the GIF's, and the PNG is in colors.
-   A display of 256 colors (`ARCHAIC_COLORS=256`) asks WRP for 216, and one of 128 (as SunView) for 128.
+   Millions of colors ask WRP for its own (no `c`). A display of 256 colors (`ARCHAIC_COLORS=256`)
+   asks WRP for 216, and one of 128 (as SunView) for 128.
    A new width: one St with the new width, once the size stays (none for a new height); typed text stays.
    No WRP: the box in the middle of the window. The window's title: `Archaic`, then the page's title;
    on WRP's page, the address, not WRP. Archaic's version at the right end of the status line:
