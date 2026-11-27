@@ -823,6 +823,7 @@ The release's file is `archaic-` and the system name.
 | Ultrix 4 | `ultrix` | `ultrix4` |
 | A/UX 3 | `AUX` (mkaux) | `aux3` |
 | FreeMiNT (Atari, ARAnyM) | `__MINT__` (m68k-atari-mint gcc) | `mint` |
+| TOS (Atari ST, STE, TT, Falcon) | `ATARITOS` (mktos) | `tos` |
 
 A build with no `SYSID` gets no updates: macOS, Linux, the tests, the classic Mac OS (for now). For a new port:
 `cc -DSYSID='"@(#)Archaic for NAME"'`, or a line in `archaic.h`.
@@ -2343,10 +2344,15 @@ make tos        # or: sh src/mktos
   TT with EmuTOS 1.4, TT medium (16 colors); Falcon with EmuTOS 1.4, 640x480 in 256 colors and 320x480 in
   true color (16 bits). Pages, typing in the address box, the arrow keys, the scroll bar, Ctrl-Q.
   The picture test picks ABM on the 8 MHz ST (ABM3 is slow there), AB8 on the color screens.
-  Not tested: a real Atari, MagiC, NVDI and graphics cards (`vq_scrninfo`), TT low (256 colors, as the Falcon's).
+  TT with MagiC 6.2 (its ROM image `MAGIC62E.IMG` in place of TOS), TT high 1280x960: EdDI's `vq_scrninfo`, the window
+  on MagiC's desktop, real-time sizing (WM_SIZED while the button is down: only the window changes, the new buffer
+  and WRP's picture at the new width come at the release; see `resize()`).
+  Not tested: a real Atari, NVDI and graphics cards, TT low (256 colors, as the Falcon's).
 - Hatari for tests: EmuTOS does not run AHDI's boot sector, so it boots from A: and `C:\AUTO` does not run.
   Start `C:\AUTO\STING.PRG` from the desktop (STinG stays after a resolution change). The Falcon has no ACSI:
   give the same disk image with `--ide-master`. The NetUSBee takes the cartridge port, so no GEMDOS drive (`--harddrive`).
+- MagiC in Hatari: osarchive `os/tos/desktops/magic/MAGICE62.ZIP`. `--tos MAGIC62E.IMG` (MagiC as a 256 KB ROM, also on a TT)
+  and its `TO_C_ROOT` files on C:. It boots from the ACSI disk like TOS, so `C:\AUTO\STING.PRG` runs.
 
 ## Running on A/UX 3
 

@@ -95,6 +95,7 @@ static int nq, iq;
 static int held;		/* a mouse button is down */
 static int down;		/* ... in the window: 1 left, 3 right */
 static short mx, my;		/* the mouse, on the screen */
+static int szpend;		/* sized while a button was down: sized() at the release */
 static long jar;		/* the cookie jar */
 static long hz;			/* _hz_200 */
 
@@ -845,6 +846,42 @@ unsigned char *pix, *pal;
 	}
 }
 
+/* white at x, y, w, h of the window */
+static void blank(x, y, w, h)
+int x, y, w, h;
+{
+	static short pxy[4], rx, ry, rw, rh;
+	int x0, y0, x1, y1;
+
+	if (wh < 0 || w <= 0 || h <= 0)
+		return;
+	wind_update(BEG_UPDATE);
+	graf_mouse(M_OFF, (MFORM *)0);
+	vswr_mode(vh, MD_REPLACE);
+	vsf_interior(vh, FIS_SOLID);
+	vsf_perimeter(vh, 0);
+	vsf_color(vh, 0);
+	wind_get(wh, WF_FIRSTXYWH, &rx, &ry, &rw, &rh);
+	while (rw > 0 && rh > 0) {
+		x0 = rx > wx + x ? rx : wx + x;
+		y0 = ry > wy + y ? ry : wy + y;
+		x1 = rx + rw < wx + x + w ? rx + rw : wx + x + w;
+		y1 = ry + rh < wy + y + h ? ry + rh : wy + y + h;
+		if (x0 < x1 && y0 < y1) {
+			pxy[0] = x0;
+			pxy[1] = y0;
+			pxy[2] = x1 - 1;
+			pxy[3] = y1 - 1;
+			vs_clip(vh, 1, pxy);
+			vr_recfl(vh, pxy);
+		}
+		wind_get(wh, WF_NEXTXYWH, &rx, &ry, &rw, &rh);
+	}
+	vs_clip(vh, 0, pxy);
+	graf_mouse(M_ON, (MFORM *)0);
+	wind_update(END_UPDATE);
+}
+
 /* buf's part x, y, w, h (in the window) to the screen, in the parts of
  * the window that show */
 static void show(x, y, w, h)
@@ -1176,19 +1213,45 @@ static void sized()
 	e->h = wkh;
 }
 
-/* WM_SIZED: the window to x, y, w, h, with at least MINW x MINH inside */
+/* a mouse button is down now */
+static int button()
+{
+	static short x, y, b, k;
+
+	graf_mkstate(&x, &y, &b, &k);
+	return b & 3;
+}
+
+/* WM_SIZED: the window to x, y, w, h, the AES's own (unless the work
+ * area would be smaller than MINW x MINH). MagiC sizes windows in real
+ * time: a WM_SIZED as the mouse moves, while the button is down. Then
+ * only the window changes, and sized() (a new buf, the page laid out
+ * again, WRP's picture at the new width) waits for the release: with
+ * sized() at each WM_SIZED, MagiC sent no more WM_SIZED for that drag
+ * (MagiC 6.2 on a TT). Until then the window's new parts are white. */
 static void resize(x, y, w, h)
 int x, y, w, h;
 {
 	static short a, b, c, d;
 
 	wind_calc(WC_WORK, KIND, x, y, w, h, &a, &b, &c, &d);
-	if (c < MINW)
-		c = MINW;
-	if (d < MINH)
-		d = MINH;
-	wind_calc(WC_BORDER, KIND, a, b, c, d, &a, &b, &c, &d);
-	wind_set(wh, WF_CURRXYWH, a, b, c, d);
+	if (c < MINW || d < MINH) {
+		if (c < MINW)
+			c = MINW;
+		if (d < MINH)
+			d = MINH;
+		wind_calc(WC_BORDER, KIND, a, b, c, d, &a, &b, &c, &d);
+		x = a;
+		y = b;
+		w = c;
+		h = d;
+	}
+	wind_set(wh, WF_CURRXYWH, x, y, w, h);
+	if (button()) {		/* MagiC sizes in real time: the rest at the release */
+		szpend = 1;
+		work();
+		return;
+	}
 	sized();
 }
 
@@ -1209,11 +1272,21 @@ static void mesg(m)
 short *m;
 {
 	long y;
+	int rx, ry;
 
 	switch (m[0]) {
 	case WM_REDRAW:
-		if (m[3] == wh)
-			show(m[4] - wx, m[5] - wy, m[6], m[7]);
+		if (m[3] != wh)
+			break;
+		show(m[4] - wx, m[5] - wy, m[6], m[7]);
+		if (szpend) {	/* bigger than buf until the release: white */
+			rx = m[4] - wx;
+			ry = m[5] - wy;
+			if (rx + m[6] > bw)
+				blank(rx > bw ? rx : bw, ry, rx + m[6] - (rx > bw ? rx : bw), m[7]);
+			if (ry + m[7] > bh)
+				blank(rx, ry > bh ? ry : bh, m[6], ry + m[7] - (ry > bh ? ry : bh));
+		}
 		break;
 	case WM_TOPPED:
 		if (m[3] == wh)
@@ -1354,15 +1427,19 @@ int wait;
 		fl = MU_MESAG | MU_KEYBD | MU_BUTTON;
 		if (down)
 			fl |= MU_M1;	/* the mouse leaves where it was */
-		if (wait != 1)
+		if (wait != 1 || szpend)
 			fl |= MU_TIMER;
 		/* no button held: wait for one down (0x101: not state 0);
 		 * held: wait for all up */
 		ev = evnt_multi(fl, held ? 1 : 0x101, 3, 0,
 			1, mx, my, 1, 1, 0, 0, 0, 0, 0,
-			m, wait == 2 ? 100L : 0L, &x, &y, &b, &ks, &k, &n);
+			m, szpend ? 50L : wait == 2 ? 100L : 0L, &x, &y, &b, &ks, &k, &n);
 		if (ev & MU_MESAG)
 			mesg(m);
+		if (szpend && !button()) {
+			szpend = 0;
+			sized();
+		}
 		if (ev & MU_KEYBD)
 			keyb(k & 0xffff, ks);
 		if (ev & MU_BUTTON)
