@@ -38,6 +38,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/headless.c` | display with no window, for tests and automation: commands on standard input, screenshots |
 | `src/fb.c`, `fb.h` | a screen in memory, for `cocoa.m`, `sdl.c`, `gem.c` and `headless.c`; writes PNG screenshots |
 | `src/font6x13.h` | the X11 6x13 font (public domain), for `fb.c` |
+| `src/candle.h` | Archaic's logo, the candle: 9 frames (no flame, then 8 lit), 1 bit a pixel. Made by `tools/candle.c` |
 | `src/nsock.c` | network for BSD sockets (Unix, macOS, FreeMiNT, A/UX). On A/UX it waits in the Toolbox's `WaitNextEvent` (see `ports/aux3.md`) |
 | `src/fetch`, `mkinc`, `mk`, `lka` | Idris scripts: get the sources, headers, compile, link |
 | `src/heap.c` | Idris tool: sets how much memory a program file asks for. `lka` links with a copy of the linker that asks for more |
@@ -72,6 +73,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `tools/slowline.py` | host tool: a TCP proxy that is a slow line (bytes a second), to try Archaic on a slow line with WRP |
 | `tools/ntico.py` | host tool: draws Archaic's icon for Windows NT (`archaic.ico`, 32 x 32, black and white) |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
+| `tools/candle.c` | host tool: draws Archaic's logo, the candle, as a C table: `cc -o candle tools/candle.c -lm`, `./candle > src/candle.h`. `-p prefix` also writes each frame as PBM. `-s n`: a picture of n x n (default 20; the design is 32) |
 | `tools/dmdlog.py` | host tool for the DMD 5620 port: decodes a log of the bytes that Archaic sent to the terminal (`ARCHAICLOG`), a command a line, and draws the screen they make |
 | `test/run.sh` | tests: GIF decoder, HTML, forms, WRP, the headless display |
 | `test/xshot.sh` | test: run the X11 build and take a screenshot |
@@ -125,8 +127,12 @@ With a WRP that has `kb` in its form, K, ⌫ and ↵ are gone: the keys go strai
 On a black and white display, C has only the dither, and its label is a dither pattern (a checkerboard).
 
 The address box is as wide as the line allows: WRP's buttons and menus are at the right end of the line.
-Right of them, in the top right corner, is Archaic's logo: for now a white A in a black box, 19 x 19 pixels.
-A line with no room for the logo (27 pixels with its margins) has none, and the box gets the room that is left.
+Right of them, in the top right corner, is Archaic's logo: a candle, 13 x 19 pixels, black and white
+(`src/candle.h`, which `tools/candle.c` draws). It is as tall as WRP's buttons.
+While the spinner turns (see The status line), the candle is lit, and its flame moves left and right:
+a frame for each step of the spinner. Then the flame goes out.
+On the DMD 5620 the flame is lit but does not move: each frame would go down the slow line.
+A line with no room for the logo (21 pixels with its margins) has none, and the box gets the room that is left.
 
 **C** is one menu for the colors and the dither (WRP 4.12.0 or newer).
 Each line is a number of colors and a letter:
@@ -609,6 +615,7 @@ value archaic ab
 
 **The status line** at the bottom of the window says what Archaic does, as it does it.
 While Archaic loads what you asked for, a **spinner** turns at its left end: 8 dots in a circle.
+Archaic's logo, the candle in the top right corner, burns meanwhile (see WRP's form).
 It stops when the page is done (or stopped). It does not turn for the slices that Archaic gets
 ahead, while you read.
 Archaic's version is at the right end of the status line, like `Archaic v0.10`. The progress bar is left of it.
@@ -943,7 +950,7 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
 3. HTML: title, entities, fields, menus, hidden fields, buttons, links, comments.
 4. A button click sends the form with the right query.
 5. WRP's form: W, H, M, T and C are hidden, and Archaic sends its own values (and with `-a`, the menus). WRP's 7 buttons and the labels Z, C, D and K are pictures, Go stays text.
-   The url field fills its line, up to Archaic's logo: in `-t` the line ends at 609. A new choice in WRP's D menu sends the form at once.
+   The url field fills its line, up to Archaic's logo: in `-t` the line ends at 615. A new choice in WRP's D menu sends the form at once.
    With colors: C shows, set to the colors (for 100 colors: 64); another choice sends St at once;
    the start page request has WRP's settings.
    WRP's one menu (5c): with colors, C is set to the first line of the nearest number (256d, 216n,
@@ -966,8 +973,8 @@ printf '%s\n' 'click 20 12' 'type https://en.wikipedia.org/wiki/AT%26T_UNIX_PC' 
    A new width: one St with the new width, once the size stays (none for a new height); typed text stays.
    No WRP: the box in the middle of the window. The window's title: `Archaic`, then the page's title;
    on WRP's page, the address, not WRP. Archaic's version at the right end of the status line:
-   the same pixels at 640 x 400 and 500 x 300. Archaic's logo in the top right corner: the 300 black pixels
-   of its picture.
+   the same pixels at 640 x 400 and 500 x 300. Archaic's logo in the top right corner: the candle with no flame,
+   the same pixels as frame 0 of `src/candle.h`.
    Typing into the page with `-r 3`, then 3 s with no keys: one St, and the status line shows the box again;
    none after 2 s, with `-r 0` or in a password box. A new picture slower than `-r`: no more of them.
    The bar beside the box's text: 3 blocks at 0.5 s, 1 at 2.5 s, none after the new picture.

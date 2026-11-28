@@ -3,6 +3,7 @@
 : Here, in an empty folder: hget 10.0.2.2 8077 /src/fetch fetch
 : then sh fetch, sh mkinc, sh mk
 hget 10.0.2.2 8077 /src/archaic.h archaic.h
+hget 10.0.2.2 8077 /src/candle.h candle.h
 hget 10.0.2.2 8077 /src/main.c main.c
 hget 10.0.2.2 8077 /src/html.c html.c
 hget 10.0.2.2 8077 /src/http.c http.c

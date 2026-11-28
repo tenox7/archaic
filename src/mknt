@@ -26,7 +26,7 @@ for cpu; do
 	docker run --rm --network none -v "$PWD":/a "$IMG" $sdk $cpu sh -c '
 		rm -rf /tmp/b && mkdir /tmp/b && cd /a/src &&
 		cp main.c html.c http.c gif.c pic.c update.c ntwin.c nwin.c \
-			archaic.h archaic.rc archaic.ico /tmp/b && cd /tmp/b || exit 1
+			archaic.h candle.h archaic.rc archaic.ico /tmp/b && cd /tmp/b || exit 1
 		for f in main html http gif pic update ntwin nwin; do
 			cl -nologo -c -Ox -W3 -DWIN32 $f.c >log 2>&1 ||
 				{ cat log; exit 1; }

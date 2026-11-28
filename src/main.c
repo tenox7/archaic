@@ -86,6 +86,7 @@
  * Dn, Bs, Rt) are drawn as pictures: see icons[].
  */
 #include "archaic.h"
+#include "candle.h"
 
 #ifdef NOPROTO
 char *getenv();
@@ -441,6 +442,41 @@ int all;
 	pdone = b;
 }
 
+/* Archaic's logo, in the top right corner: a candle (candle.h, made by
+ * tools/candle.c). It is at the right end of the line of WRP's form,
+ * which the address box fills up to it (stretch). While the spinner
+ * turns, the candle is lit, and its flame moves a frame for each step of
+ * the spinner. (REMOTE: lit, and still: each frame would go down the
+ * slow line.) */
+#define LGW CANW
+#define LGH CANH
+
+static void drawlogo()
+{
+	int y = lgy - top, f = 0;
+
+	if (lgx < 0 || y < 0 || y + LGH > viewh || lgx + LGW > vieww)
+		return;
+	if (spinon)
+#ifdef REMOTE
+		f = 1;
+#else
+		f = 1 + spinf;
+#endif
+	g_bits(lgx, y, LGW, LGH, candle[f], (LGW + 7) / 8);
+}
+
+/* the logo again, as the spinner turns: not over an open list */
+static void relogo()
+{
+	int y = lgy - top;
+
+	if (headless || lgx < 0 || (popup >= 0 && px < lgx + LGW &&
+		px + pw > lgx && py < y + LGH && py + ph > y))
+		return;
+	drawlogo();
+}
+
 #ifdef REMOTE
 /* the spinner at the left end of the status line: the display draws it
  * and turns it */
@@ -508,6 +544,7 @@ static void spin()
 		return;
 	spinf = f;
 	drawspin();
+	relogo();
 	g_flush();
 }
 #endif
@@ -603,6 +640,7 @@ int on;
 	spinon = on;
 	if (!headless) {
 		drawstatus();
+		relogo();
 		g_flush();
 	}
 }
@@ -831,41 +869,6 @@ int i;
 	text(x + 1 + PAD, y + 1 + PAD, s + n - k, k);
 	if (i == focus)
 		fill(x + 1 + PAD + tw(s + n - k, k), y + 1 + PAD, 1, fh, 1);
-}
-
-/* Archaic's logo, in the top right corner: at the right end of the line
- * of WRP's form, which the address box fills up to it (stretch). For now
- * a white A in a black box; a real logo may come in its place. */
-#define LGW 19
-#define LGH 19
-static char *logo[] = {
-	"..###############..",
-	".#################.",
-	"###################",
-	"#########..########",
-	"#########..########",
-	"########.#..#######",
-	"########.#..#######",
-	"########.#..#######",
-	"#######.###..######",
-	"#######.###..######",
-	"######.#####..#####",
-	"######........#####",
-	"######.#####..#####",
-	"#####.#######..####",
-	"#####.#######..####",
-	"###.....###.....###",
-	"###################",
-	".#################.",
-	"..###############.."
-};
-
-static void drawlogo()
-{
-	int y = lgy - top;
-
-	if (lgx >= 0 && y >= 0 && y + LGH <= viewh && lgx + LGW <= vieww)
-		pict(lgx, y, logo, LGW, LGH, 0);
 }
 
 /* WRP's buttons get pictures, like the buttons of a real browser. (WRP

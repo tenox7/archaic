@@ -12,6 +12,9 @@ tmp=$(mktemp -d)
 fail=0
 here=$(cd "$(dirname "$0")" && pwd)
 ver=$(sed -n 's/^#define IDENT "@(#)Archaic \(.*\)"$/\1/p' "$here/../src/archaic.h")
+# Archaic's logo, the candle (src/candle.h): its size
+lgw=$(sed -n 's/^#define CANW //p' "$here/../src/candle.h")
+lgh=$(sed -n 's/^#define CANH //p' "$here/../src/candle.h")
 
 # The web server for the tests: python's, and GIFs cut into slices for
 # ?y=Y&h=H, as WRP does for the tall picture (with ImageMagick). ?wait=S:
@@ -499,12 +502,12 @@ else
 	echo "$shown"
 fi
 # The url field gets the room left in its line: the line ends left of
-# Archaic's logo (19 pixels, 4 right of it, 8 left of it). It was 141 wide.
+# Archaic's logo (lgw pixels, 4 right of it, 8 left of it). It was 141 wide.
 end=$(awk '$1 ~ /^[0-9]+$/ && $8 == "url" { y = $4; h = $6 }
 	$1 ~ /^[0-9]+$/ && y != "" && $5 > 0 && $4 >= y && $4 < y + h &&
 	$3 + $5 > e { e = $3 + $5 } END { print e }' "$tmp/f.out")
 uw=$(awk '$1 ~ /^[0-9]+$/ && $8 == "url" { print $5; exit }' "$tmp/f.out")
-if [ "$end" = $((640 - 4 - 19 - 8)) ] && [ "${uw:-0}" -gt 141 ]; then
+if [ "$end" = $((640 - 4 - lgw - 8)) ] && [ "${uw:-0}" -gt 141 ]; then
 	ok "wrp form: the url field fills its line, up to Archaic's logo"
 else
 	bad "wrp form: the line ends at $end, the url field is $uw wide"
@@ -887,8 +890,9 @@ if [ -x "$hl" ]; then
 	else
 		bad "headless: no version at the right end of the status line"
 	fi
-	# Archaic's logo in the top right corner, right of WRP's form: at 760, 4
-	# (the page part is 783 wide), the 300 black pixels of its picture.
+	# Archaic's logo in the top right corner, right of WRP's form: at
+	# 783 - 4 - lgw, 4 (the page part is 783 wide), the candle with no
+	# flame, as frame 0 of src/candle.h (its picture in the comments).
 	# (At 640, this old form's line with C has no room for it.)
 	# 7a. The picture test: on WRP's page, with nothing to do, Archaic
 	#     gets WRP's test picture in the fast kind and in the small one,
@@ -947,9 +951,16 @@ if [ -x "$hl" ]; then
 	printf '%s\n' "shot $tmp/lg.pbm" quit |
 		"$hl" -g 800x400 "http://127.0.0.1:$port/wrp.html" >/dev/null 2>&1
 	rm -f "$here/data/wrp.html"
-	if [ "$(magick "$tmp/lg.pbm" -crop 19x19+760+4 -negate \
-		-format '%[fx:round(mean*w*h)]' info: 2>/dev/null)" = 300 ]; then
-		ok "headless: Archaic's logo in the top right corner"
+	awk -v w="$lgw" -v h="$lgh" 'BEGIN { print "P1"; print w, h }
+		/\/\* 0 \*\// { on = 1; next } on && /^}/ { exit }
+		on { c = $0; sub(/.*\/\* /, "", c); sub(/ \*\/.*/, "", c)
+			gsub(/#/, "1 ", c); gsub(/\./, "0 ", c); print c }' \
+		"$here/../src/candle.h" >"$tmp/lg0.pbm"
+	magick "$tmp/lg.pbm" -crop "${lgw}x$lgh+$((783 - 4 - lgw))+4" +repage \
+		"$tmp/lg1.pbm" 2>/dev/null
+	if [ "$(magick compare -metric AE "$tmp/lg0.pbm" "$tmp/lg1.pbm" null: 2>&1 |
+		cut -d' ' -f1)" = 0 ]; then
+		ok "headless: Archaic's logo in the top right corner: the candle, with no flame"
 	else
 		bad "headless: no logo in the top right corner"
 	fi

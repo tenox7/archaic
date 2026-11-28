@@ -29,7 +29,7 @@ LIBS = -L$(X11)/lib -lX11
 SDLCONFIG = sdl2-config
 
 CORE = src/main.c src/html.c src/http.c src/gif.c src/pic.c src/update.c
-HDR = src/archaic.h
+HDR = src/archaic.h src/candle.h
 FB = src/fb.c src/fb.h src/font6x13.h
 
 archaic: $(CORE) src/x11.c src/nsock.c $(HDR)
