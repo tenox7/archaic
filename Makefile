@@ -19,7 +19,8 @@
 # also %archaic, its resources): their compilers do not know the flags
 # below. SunOS 3 has its uname in /usr/5bin: put it on the
 # PATH. CC is the compiler, also for the scripts that take one (mkaix,
-# mkaixps2, mkultrix): CC=gcc gmake.
+# mkaixps2, mkultrix): CC=gcc gmake. On NetBSD, X11 is in /usr/X11R7,
+# and the program needs its run path (-R): make does both.
 
 X11 = /opt/X11
 WARN = -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-non-prototype -Wno-strict-prototypes -Wno-deprecated-declarations
@@ -33,7 +34,7 @@ HDR = src/archaic.h src/candle.h
 FB = src/fb.c src/fb.h src/font6x13.h
 
 archaic: $(CORE) src/x11.c src/nsock.c $(HDR)
-	@m=; case "`uname -s` `uname -r` `uname -m`" in \
+	@m=; x=; case "`uname -s` `uname -r` `uname -m`" in \
 	AIX*i386) m=mkaixps2 ;; \
 	AIX*) m=mkaix ;; \
 	HP-UX*) m=mkhpux ;; \
@@ -41,14 +42,15 @@ archaic: $(CORE) src/x11.c src/nsock.c $(HDR)
 	ULTRIX*) m=mkultrix ;; \
 	SunOS?[34]*) m=mksunview ;; \
 	A/UX*) m=mkaux ;; \
+	NetBSD*) x="-I/usr/X11R7/include -L/usr/X11R7/lib -Wl,-R/usr/X11R7/lib" ;; \
 	esac; \
 	if [ -n "$$m" ]; then \
 		echo "cd src && CC=$(CC) sh $$m && mv archaic .."; \
 		cd src && CC="$(CC)" sh $$m && mv archaic .. && \
 		if [ -f %archaic ]; then mv %archaic ..; fi; \
 	else \
-		echo "$(CC) $(CFLAGS) -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS)"; \
-		$(CC) $(CFLAGS) -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS); \
+		echo "$(CC) $(CFLAGS) $$x -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS)"; \
+		$(CC) $(CFLAGS) $$x -o $@ $(CORE) src/x11.c src/nsock.c $(LIBS); \
 	fi
 
 # SDL 2 and Cocoa draw with fb.c, a screen in memory

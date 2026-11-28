@@ -845,6 +845,7 @@ The release's file is `archaic-` and the system name; on the Atari (TOS, FreeMiN
 | FreeMiNT (Atari, ARAnyM) | `__MINT__` (m68k-atari-mint gcc) | `mint` |
 | TOS (Atari ST, STE, TT, Falcon) | `ATARITOS` (mktos) | `tos` |
 | Windows NT on x86, MIPS, Alpha, PowerPC | `_WIN32`, and `_M_IX86`, `_M_MRX000`, `_M_ALPHA`, `_M_PPC` | `ntx86`, `ntmips`, `ntalpha`, `ntppc` |
+| NetBSD on a 68k machine (Atari TT ...) | `__NetBSD__`, `__m68k__` | `netbsdm68k` |
 
 A build with no `SYSID` gets no updates: macOS, Linux, the tests, the classic Mac OS (for now). For a new port:
 `cc -DSYSID='"@(#)Archaic for NAME"'`, or a line in `archaic.h`.
@@ -885,7 +886,7 @@ make knr          # syntax check as a pre-ANSI compiler sees it (-DNOPROTO), als
 make test         # sh test/run.sh
 ```
 
-- `make` needs X11 (on macOS: XQuartz in `/opt/X11`).
+- `make` needs X11 (on macOS: XQuartz in `/opt/X11`). On NetBSD, `make` adds `/usr/X11R7` and its run path (`-Wl,-R`).
 - On AIX 3, AIX PS/2, HP-UX, DG/UX, Ultrix, SunOS and A/UX, `make` (or `gmake`) runs the system's script in `src`
   (see each system's file in `ports/`), and moves `archaic` up (on A/UX also `%archaic`). `CC` goes to the scripts that take it
   (`mkaix`, `mkaixps2`, `mkultrix`): `CC=gcc gmake`. SunOS 3: put `/usr/5bin` (its `uname`) on the PATH.
@@ -1029,6 +1030,7 @@ Read the system's file before work on its port. Put the facts of one system in i
 | TOS with GEM (ST, STE, TT, Falcon) | [ports/tos.md](ports/tos.md) | Hatari |
 | A/UX 3 | [ports/aux3.md](ports/aux3.md) | QEMU (LEMU) |
 | Windows NT 3.1 and newer (x86, MIPS, Alpha, PowerPC) | [ports/nt.md](ports/nt.md) | QEMU (LEMU) |
+| NetBSD/m68k on the Atari TT (X11) | [ports/netbsd.md](ports/netbsd.md) | Hatari |
 
 The next ports, for old systems with no web browser: [ports/roadmap.md](ports/roadmap.md).
 
