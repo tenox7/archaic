@@ -3,42 +3,72 @@
 # Alpha with the Win32 SDK for NT 3.1 (July 1993), PowerPC with the SDK
 # for NT 4.0 and Visual C++ 4.1 (NT for PowerPC starts at 3.51). In
 # Docker: the image tenox7/ntsdk (github.com/tenox7/ntsdk) has the
-# original compilers, and runs them with no Wine. Run it on the host. It
-# makes archaic-ntx86.exe, archaic-ntmips.exe, archaic-ntalpha.exe and
-# archaic-ntppc.exe (next to src): console programs that open a window
-# (see ntwin.c). The release has them with these names. Each is built
-# in /tmp in the container, from
-# a copy of the sources. mknt x86 (or mips, alpha, ppc): only that one.
+# original compilers, and runs them with no Wine. ARM, for PINT (NT 3.5
+# and 4.0 on the Raspberry Pi, github.com/tenox7/PINT): the image
+# tenox7/pint35sdk, Microsoft C for ARM under Wine, from the Docker
+# volume msvc-arm32 (docker run --rm tenox7/pint35sdk: how to make it),
+# or MSVC=<volume or folder>. Run it on the host. It makes
+# archaic-ntx86.exe, archaic-ntmips.exe, archaic-ntalpha.exe,
+# archaic-ntppc.exe and archaic-ntarm.exe (next to src): console
+# programs that open a window (see ntwin.c). The release has them with
+# these names. Each is built in /tmp in the container, from a copy of
+# the sources. mknt x86 (or mips, alpha, ppc, arm): only that one.
 cd "$(dirname "$0")/.." || exit 1
 IMG=${NTSDK_IMAGE:-tenox7/ntsdk}
-docker image inspect "$IMG" >/dev/null 2>&1 || {
-	echo "mknt: no image $IMG: docker pull tenox7/ntsdk" >&2
-	exit 1
+PIMG=${PINTSDK_IMAGE:-tenox7/pint35sdk}
+MSVC=${MSVC:-msvc-arm32}
+# sdkrun COMMAND...: COMMAND in the SDK's container for $cpu, the tree in /a
+sdkrun() {
+	if [ $sdk = pint35 ]; then
+		docker run --rm --network none -e NTSDK=pint35 \
+			-v "$MSVC":/opt/msvc:ro -v "$PWD":/a "$PIMG" "$@"
+	else
+		docker run --rm --network none -v "$PWD":/a "$IMG" $sdk $cpu "$@"
+	fi
 }
-set -- ${*:-x86 mips alpha ppc}
+set -- ${*:-x86 mips alpha ppc arm}
 for cpu; do
 	case $cpu in
-	x86|mips|alpha) sdk=nt31 ;;
-	ppc) sdk=nt40 ;;
-	*) echo "mknt: no CPU $cpu (x86, mips, alpha, ppc)" >&2; exit 1 ;;
+	x86|mips|alpha) sdk=nt31 i=$IMG ;;
+	ppc) sdk=nt40 i=$IMG ;;
+	arm) sdk=pint35 i=$PIMG ;;
+	*) echo "mknt: no CPU $cpu (x86, mips, alpha, ppc, arm)" >&2; exit 1 ;;
 	esac
+	docker image inspect "$i" >/dev/null 2>&1 || {
+		echo "mknt: no image $i: docker pull $i" >&2
+		exit 1
+	}
+	if [ $sdk = pint35 ]; then
+		case $MSVC in
+		*/*) [ -d "$MSVC/VC" ] ;;
+		*) docker volume inspect "$MSVC" >/dev/null 2>&1 ;;
+		esac || {
+			echo "mknt: no Microsoft C for ARM in $MSVC (docker run --rm $PIMG)" >&2
+			exit 1
+		}
+	fi
 	rm -f archaic-nt$cpu.exe
-	docker run --rm --network none -v "$PWD":/a "$IMG" $sdk $cpu sh -c '
+	sdkrun sh -c '
 		rm -rf /tmp/b && mkdir /tmp/b && cd /a/src &&
 		cp main.c html.c http.c gif.c pic.c update.c ntwin.c nwin.c \
 			archaic.h candle.h archaic.rc archaic.ico /tmp/b && cd /tmp/b || exit 1
+		F=	# PINT: the single-threaded libc, as the others
+		[ $NTSDK != pint35 ] || F=-FIstcrt.h
 		for f in main html http gif pic update ntwin nwin; do
-			cl -nologo -c -Ox -W3 -DWIN32 $f.c >log 2>&1 ||
+			cl -nologo -c -Ox -W3 -DWIN32 $F $f.c >log 2>&1 ||
 				{ cat log; exit 1; }
 			grep -i -E "warning|error" log
 		done
-		rc -r archaic.rc || exit 1
+		rc -r archaic.rc >log 2>&1 || { cat log; exit 1; }
+		grep -i -E "warning|error" log
 		if [ $NTSDK = nt31 ]; then	# its linker takes no .res
 			cvtres -$CPU archaic.res -o archaic.rbj >log 2>&1 ||
 				{ cat log; exit 1; }
 			L=archaic.rbj
-		else
+		elif [ $NTSDK = nt40 ]; then
 			L="archaic.res -machine:PPC -subsystem:console,3.51"	# NT 3.51
+		else	# the SDK marks it for NT 3.5
+			L="archaic.res -nodefaultlib:libcmt.lib"
 		fi
 		cl -nologo -Fearchaic.exe main.obj html.obj http.obj gif.obj \
 			pic.obj update.obj ntwin.obj nwin.obj user32.lib gdi32.lib \

@@ -1,13 +1,14 @@
-# Archaic on Windows NT (x86, MIPS, Alpha, PowerPC)
+# Archaic on Windows NT (x86, MIPS, Alpha, PowerPC, ARM)
 
 The parts that all systems share (Colors, Pictures, Updates, Porting ...) are in [AGENTS.md](../AGENTS.md).
 
 ## Running on Windows NT
 
 - **Windows NT 3.1** and newer, on x86, MIPS and Alpha. On PowerPC, NT 3.51 and newer (NT starts there at 3.51).
-  TCP/IP must be installed (Winsock).
+  On ARM: PINT, NT 3.5 and 4.0 on the Raspberry Pi (github.com/tenox7/PINT). TCP/IP must be installed (Winsock).
 - The release has a file for each CPU: `archaic-ntx86.exe`, `archaic-ntmips.exe`, `archaic-ntalpha.exe`,
-  `archaic-ntppc.exe`. Copy it to NT as `archaic.exe`, in any folder (rcp, FTP, a shared folder, a floppy image).
+  `archaic-ntppc.exe`, `archaic-ntarm.exe`. Copy it to NT as `archaic.exe`, in any folder (rcp, FTP, a shared
+  folder, a floppy image).
 - Start it from the Program Manager (File, Run): `C:\archaic.exe HOST:8080`. Or from a Command Prompt:
   `start archaic HOST:8080`. Without `start`, the prompt waits until Archaic quits.
 - WRP's default address is `10.0.2.2:8080` (QEMU's NAT, as in the kits). An NT on the LAN needs WRP's address.
@@ -19,13 +20,17 @@ The parts that all systems share (Colors, Pictures, Updates, Porting ...) are in
 ## Building for Windows NT
 
 ```
-make nt              # or: sh src/mknt [x86 mips alpha ppc]
+make nt              # or: sh src/mknt [x86 mips alpha ppc arm]
 ```
 
 - In Docker: the image `tenox7/ntsdk` (github.com/tenox7/ntsdk) has Microsoft's own SDKs, and runs their tools
   with no Wine. `mknt` builds in `/tmp` in the container, with no network, from a copy of the sources.
 - x86, MIPS and Alpha: the Win32 SDK for NT 3.1 (July 1993). PowerPC: the SDK for NT 4.0 with Visual C++ 4.1,
   linked with `-subsystem:console,3.51`, so it runs on NT 3.51.
+- ARM: the image `tenox7/pint35sdk`, PINT's SDK for NT 3.5: Microsoft C for ARM (MSVC 14.44) under Wine, from the
+  Docker volume `msvc-arm32` (`docker run --rm tenox7/pint35sdk` tells how to make it), or `MSVC=<volume or folder>`.
+  Its cl and link mark the program for NT 3.5, so it runs on PINT 3.5 and 4.0. `-FIstcrt.h` and
+  `-nodefaultlib:libcmt.lib`: the single-threaded `libc.lib`, as on the other CPUs.
 
 | CPU | Compiler | File (KB) | Machine in the header |
 |---|---|---|---|
@@ -33,6 +38,7 @@ make nt              # or: sh src/mknt [x86 mips alpha ppc]
 | MIPS | cl 8.00.081 ("Centaur") | 192 | 166 (R4000) |
 | Alpha | cl 8.00.9B ("MSCGEM") | 267 | 184 |
 | PowerPC | cl 10.10.6101, link 3.10 | 176 | 1F0 |
+| ARM (Thumb-2) | cl 19.44.35207 (MSVC 14.44) | 129 | 1C4 (ARMNT) |
 
 - It makes `archaic-ntx86.exe` ... next to `src`. The release has them with these names: for the system `ntx86`,
   WRP's updates take `archaic-ntx86.exe` (see Updates in AGENTS.md).
@@ -45,14 +51,14 @@ make nt              # or: sh src/mknt [x86 mips alpha ppc]
   in the 16 colors of the VGA (on a screen of 256 colors these are the system's own colors), and 32 x 32 in black
   and white. NT 3.1 uses the 32 x 32 one (Program Manager, a window made small); NT 4.0 also the 16 x 16 one
   (the title bar, the task bar).
-- `-Ox` on all four. The decoders give the same pixels as on the Mac (the `-t` sums of `test/data`).
+- `-Ox` on all five. The decoders give the same pixels as on the Mac (the `-t` sums of `test/data`).
 
 ## Windows NT: what to know
 
 - Only calls that NT 3.1 has. The SDK's KERNEL32.LIB and WSOCK32.LIB have exactly the names of NT 3.1's DLLs:
   a program that links, runs. NT 3.1 has no `SetScrollInfo` and no `CreateDIBSection`.
-- The compilers define `_WIN32`, `_MSC_VER` and the CPU: `_M_IX86`, `_M_MRX000`, `_M_ALPHA`, `_M_PPC`.
-  `archaic.h` gives the system names from these: `ntx86`, `ntmips`, `ntalpha`, `ntppc`.
+- The compilers define `_WIN32`, `_MSC_VER` and the CPU: `_M_IX86`, `_M_MRX000`, `_M_ALPHA`, `_M_PPC`,
+  `_M_ARM`. `archaic.h` gives the system names from these: `ntx86`, `ntmips`, `ntalpha`, `ntppc`, `ntarm`.
 - `near` and `far` are words of Microsoft's C: no variable can have these names.
   `IO.H` makes `creat` a macro: `update.c` takes it away. Files are opened `O_BINARY`.
 - Archaic is a console program, so that `--help`, `-t`, `-v` and `-u` write to the console.
@@ -115,8 +121,11 @@ on a local port, and WRP 4.14.3:
   (NT 4.0), and the logo lit while a page loads. The 4 programs have the 3 pictures (their resources are the
   same bytes as `archaic.ico`). On NT 3.1 (x86, MIPS, Alpha) and NT 3.51 (PowerPC): `--version` and the `-t` sums.
   Program Manager keeps an item's old icon: Properties, then OK, reads it again.
+- ARM (`archaic-ntarm.exe` of `mknt arm`), in QEMU (`raspi2b`) on copies of PINT 3.5 and PINT 4.0, with NAT and
+  WRP 4.14.5: started from Run, WRP's page, the picture test (AB8), a page, Page Down, Ctrl-Q; `--version`; with no
+  WRP, `Unable to connect to WRP`. On PINT 3.5, the `-t` sums (ABM, ABM3, AB8, GIF in 2 and 256 colors).
 - The NT VMs in `~/VM` are bridged on the LAN. For a test, `LEMU_NIC` makes it NAT, with `hostfwd` to the guest's
   port 514 for rsh. NT 3.1's VMs have fixed addresses: their `runs.sh` has a NAT network for them.
   NT 3.1 on MIPS asks to connect a network drive at logon: answer No.
-- Not tested: NT 3.5, a screen of 16 colors, a real computer. NT for the DECstation (R3000): the MIPS build is for
-  the R4000.
+- Not tested: NT 3.5 on x86, MIPS and Alpha, a screen of 16 colors, a real computer. NT for the DECstation (R3000):
+  the MIPS build is for the R4000.

@@ -66,7 +66,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `src/mktos` | TOS: build with the m68k-atari-mint gcc in Docker, on your computer (`make tos`): `archaic-tos.prg`, `ARCHAIC.PRG` on the Atari |
 | `src/ntwin.c` | display for Windows NT (3.1 and newer, on x86, MIPS, Alpha and PowerPC): a Win32 window drawn with GDI, with NT's own scroll bar, a palette of its own on a screen of 256 colors (see `ports/nt.md`) |
 | `src/nwin.c` | network for Windows NT: Winsock 1.1 (WSOCK32.DLL) |
-| `src/mknt`, `archaic.rc`, `archaic.ico` | Windows NT: build with Microsoft's own SDKs in Docker (the image `tenox7/ntsdk`), on your computer (`make nt`): `archaic-ntx86.exe`, `archaic-ntmips.exe`, `archaic-ntalpha.exe`, `archaic-ntppc.exe`. `archaic.rc`: the icon |
+| `src/mknt`, `archaic.rc`, `archaic.ico` | Windows NT: build with Microsoft's own SDKs in Docker (the image `tenox7/ntsdk`), on your computer (`make nt`): `archaic-ntx86.exe`, `archaic-ntmips.exe`, `archaic-ntalpha.exe`, `archaic-ntppc.exe`; ARM (PINT) with the image `tenox7/pint35sdk`: `archaic-ntarm.exe`. `archaic.rc`: the icon |
 | `src/mkaux`, `auxrsrc.r` | A/UX 3 script: compile and link with A/UX's cc and the A/UX Toolbox (libmac), for `mac.c` and `nsock.c`. `auxrsrc.r`: the SIZE resource, which `rez` puts in `%archaic`, the resource file next to the program |
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |

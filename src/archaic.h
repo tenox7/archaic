@@ -163,6 +163,9 @@ extern char ident[];
 #ifdef _M_PPC
 #define SYSID "@(#)Archaic for ntppc"
 #endif
+#ifdef _M_ARM
+#define SYSID "@(#)Archaic for ntarm"
+#endif
 #endif
 #ifndef UPDPATH
 #define UPDPATH "/usr/local/bin/archaic"
