@@ -39,8 +39,12 @@ make nt              # or: sh src/mknt [x86 mips alpha ppc]
 - Each `.c` is compiled alone (`cl -c`): the Alpha compiler of the NT 3.1 SDK stops with
   "c2n32: Severe: No such file or directory" when it gets several in one call.
 - The NT 3.1 linker takes no `.res`: `cvtres` makes `archaic.rbj` of it first.
-- `archaic.rc` has the icon, `archaic.ico` (32 x 32, black and white: the white A in a black box).
-  `tools/ntico.py` makes it.
+- `archaic.rc` has the icon, `archaic.ico`: the candle of Archaic's logo, lit, in the 3D look of NT 3.1's own icons
+  (the front, the top, and the side at the right): a square candle on a brass tray.
+  `tools/ntico.py` draws it. It has 3 pictures, and NT takes the one for its screen: 32 x 32 and 16 x 16
+  in the 16 colors of the VGA (on a screen of 256 colors these are the system's own colors), and 32 x 32 in black
+  and white. NT 3.1 uses the 32 x 32 one (Program Manager, a window made small); NT 4.0 also the 16 x 16 one
+  (the title bar, the task bar).
 - `-Ox` on all four. The decoders give the same pixels as on the Mac (the `-t` sums of `test/data`).
 
 ## Windows NT: what to know
@@ -106,6 +110,11 @@ on a local port, and WRP 4.14.3:
   and NT 4.0 (x86, MIPS Magnum and RM200, Alpha, PowerPC). On each: `--version`, the `-t` sums of an ABM and an AB8,
   and `-u` with WRP 4.14.5 and the GitHub release (`Archaic 0.14 is the newest`). NT 4.0 on x86 also in the window:
   WRP's page, the picture test (AB8), a page, Page Down.
+- The candle icon and the candle logo (the release files of v0.14, built again with them): on copies of NT 3.1
+  and NT 4.0 on x86, Program Manager and a window made small (NT 3.1), the desktop, the title bar and the task bar
+  (NT 4.0), and the logo lit while a page loads. The 4 programs have the 3 pictures (their resources are the
+  same bytes as `archaic.ico`). On NT 3.1 (x86, MIPS, Alpha) and NT 3.51 (PowerPC): `--version` and the `-t` sums.
+  Program Manager keeps an item's old icon: Properties, then OK, reads it again.
 - The NT VMs in `~/VM` are bridged on the LAN. For a test, `LEMU_NIC` makes it NAT, with `hostfwd` to the guest's
   port 514 for rsh. NT 3.1's VMs have fixed addresses: their `runs.sh` has a NAT network for them.
   NT 3.1 on MIPS asks to connect a network drive at logon: answer No.

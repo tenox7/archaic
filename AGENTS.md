@@ -71,7 +71,7 @@ Test on a copy of a system's disk, never on the user's own disk.
 | `tools/idris.py` | host tool: run commands in Idris over telnet, serve files |
 | `tools/hget.c` | Idris tool: download one file over HTTP (through netd) |
 | `tools/slowline.py` | host tool: a TCP proxy that is a slow line (bytes a second), to try Archaic on a slow line with WRP |
-| `tools/ntico.py` | host tool: draws Archaic's icon for Windows NT (`archaic.ico`, 32 x 32, black and white) |
+| `tools/ntico.py` | host tool: draws Archaic's icon for Windows NT (`archaic.ico`): the candle in 3D, 32 x 32 and 16 x 16 in 16 colors, 32 x 32 in black and white |
 | `tools/pcf2c.py` | host tool: an X11 PCF font as a C table (it made `font6x13.h`) |
 | `tools/candle.c` | host tool: draws Archaic's logo, the candle, as a C table: `cc -o candle tools/candle.c -lm`, `./candle > src/candle.h`. `-p prefix` also writes each frame as PBM. `-s n`: a picture of n x n (default 20; the design is 32) |
 | `tools/dmdlog.py` | host tool for the DMD 5620 port: decodes a log of the bytes that Archaic sent to the terminal (`ARCHAICLOG`), a command a line, and draws the screen they make |
