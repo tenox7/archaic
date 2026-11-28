@@ -7,14 +7,15 @@ WRP is a proxy server that runs on a modern computer. It renders each web page a
 with a click map, plus a small form. Archaic shows them, and sends your clicks and keys back.
 WRP does all the hard parts: HTTPS, JavaScript, Page Layout, CSS, fonts.
 
-## Why is Archaic better than other browsers?
+## Why is Archaic?
 
-Unlike Netscape, Mosaic or any other 3rd party browser, Archaic is very tightly integrated with WRP.
-It's a dedicated client rather than generic browser. It's able to provide WRP with the window size,
-scroll bar position and display properties. This allows smooth scroling by pre-fetching and caching
-pages as you scroll down the page.
+Unlike existing vintage browsers Netscape, Mosaic etc, Archaic has some unique abilities. 
+Is very tightly integrated with WRP. Because it has it's own window frame, it's able provide
+WRP with the window size, scrollbar position and number of colors. This allows smooth scroling
+by pre-fetching and caching pages as you scroll down the page. Other vintage browsers can't do
+that so you have to set these parameters manually.
 
-Archaic runs a performance test to determines download and image decoding speeds. It automatically
+Archaic runs a performance test to determine the download and decoding speeds. It automatically
 negotiates the most optimal image encoding format and compression based on the machine and link speed.
 
 In addition, Archaic is very small and simple and can be built for platforms that never had any browser.
