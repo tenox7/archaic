@@ -17,8 +17,9 @@ The parts that all systems share (Colors, Pictures, Updates, Porting ...) are in
 - Archaic looks for WRP at `http://10.0.2.2:8080/`: your computer, in Hatari's NAT
   (with `--nat-loopback on`, as the VM's `run.sh` has it). Elsewhere: `archaic HOST:8080`, or set `WRP` to `HOST:8080`.
 - The TT's screen in high resolution is 1280 x 960 with 1 bit (mono): the pictures are ABM, dithered to black and white.
-- `screenshots/hatari-netbsd.png`: the TT's screen, 1280 x 960 mono, with twm: `uname -a` in an xterm,
-  and Wikipedia's Atari TT030 article, in 17 s from Return until the page is complete (WRP 4.14.5 in Docker on the Mac).
+- `screenshots/hatari-netbsd.png`: Hatari's window, the TT's screen 1280 x 960 mono with twm: Reddit's r/atarist in Archaic,
+  xeyes, xclock, xload, and `ping` and `uname -a` in xterms.
+- Wikipedia's Atari TT030 article: 17 s from Return until the page is complete (WRP 4.14.5 in Docker on the Mac).
 
 ## Building on NetBSD
 
