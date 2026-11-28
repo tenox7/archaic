@@ -53,7 +53,7 @@ extern char ident[];
  * does not run there), _WIN32 Windows NT (QEMU's NAT) and __NetBSD__
  * with __m68k__ NetBSD on the Atari TT (Hatari's NetUSBee NAT). AUX
  * (mkaux's build) is A/UX: in the A/UX kit, QEMU's NAT has the host at
- * 192.168.1.10. */
+ * 192.168.1.10, as in the Dell UNIX kit (DELLUNIX, mkdellunix's build). */
 #ifndef DEFURL
 #ifdef _WSLAS
 #define DEFURL "http://10.0.2.2:8080/"
@@ -86,6 +86,9 @@ extern char ident[];
 #define DEFURL "http://10.0.2.2:8080/"
 #endif
 #ifdef AUX
+#define DEFURL "http://192.168.1.10:8080/"
+#endif
+#ifdef DELLUNIX
 #define DEFURL "http://192.168.1.10:8080/"
 #endif
 #ifndef DEFURL
@@ -152,6 +155,9 @@ extern char ident[];
 #endif
 #ifdef AUX
 #define SYSID "@(#)Archaic for aux3"
+#endif
+#ifdef DELLUNIX
+#define SYSID "@(#)Archaic for dellunix"
 #endif
 /* NetBSD on any 68k machine (Atari, Amiga, Mac, HP 300, Sun-3 ...):
  * one ELF program for all; built on NetBSD 6.1.4 */

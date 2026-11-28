@@ -1,0 +1,11 @@
+# mkdellunix - build Archaic on Dell UNIX System V Release 4.0 Issue 2.2
+# (Intel) for X11: sh mkdellunix
+# cc is Dell's System V Release 4 C compiler (/usr/ccs/bin/cc). -Xa: ANSI
+# C (its default, -Xt, keeps K&R's unsigned promotions). It defines only
+# i386 and unix, so -DDELLUNIX names the system (archaic.h).
+# X11R5 is in /usr/X5 (/usr/lib's libX11.so is X11R4's). The network is
+# BSD sockets (nsock.c): in libsocket and libnsl, as on System V Release 4.
+CC=${CC:-cc}
+$CC -Xa -O -DDELLUNIX -I/usr/X5/include -c main.c html.c http.c gif.c pic.c update.c nsock.c x11.c &&
+$CC -o archaic main.o html.o http.o gif.o pic.o update.o nsock.o x11.o -L/usr/X5/lib -lX11 -lsocket -lnsl &&
+ls -l archaic

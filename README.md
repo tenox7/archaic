@@ -77,6 +77,7 @@ In addition, Archaic is very small and simple and can be built for platforms tha
 | TOS on an Atari ST, STE, TT or Falcon | GEM, in color with 16 colors or more | STinG (NetUSBee, EtherNEC) | `make tos`: `archaic-tos.prg` |
 | NetBSD 6 and newer on a 68k machine (Atari TT) | X11 | BSD sockets (NetUSBee, EtherNEC) | release: `archaic-netbsdm68k`, or `make` on NetBSD |
 | A/UX 3.1 on a 68k Mac (Quadra) | the A/UX Toolbox (QuickDraw), in color, multitasking | BSD sockets | in the A/UX kit, or build it on A/UX: `sh mkaux` |
+| Dell UNIX System V Release 4.0 (Issue 2.2) on a PC (Intel) | X11, in color | BSD sockets | release: `archaic-dellunix`, or in the Dell UNIX kit |
 | Windows NT 3.1 and newer on x86, MIPS and Alpha, NT 3.51 and newer on PowerPC, NT 3.5 and 4.0 on ARM (PINT, the Raspberry Pi) | Win32 (GDI), in color | Winsock | `make nt`: `archaic-ntx86.exe`, `archaic-ntmips.exe`, `archaic-ntalpha.exe`, `archaic-ntppc.exe`, `archaic-ntarm.exe` |
 | Unix | X11 | BSD sockets | `make` |
 | macOS | Cocoa | BSD sockets | `make cocoa` |
@@ -178,8 +179,9 @@ On the old systems, copy the sources in, then:
 | AIX PS/2 1.3 | `sh mkaixps2` | MetaWare High C R2.2g |
 | Ultrix 4 | `sh mkultrix` | Ultrix's cc, or gcc 3.0.4 |
 | A/UX 3 | `sh mkaux` | A/UX's cc, with the A/UX Toolbox (libmac) |
+| Dell UNIX | `sh mkdellunix` | Dell's cc (`-Xa`) |
 
-With the whole repository, `make` runs the right script on AIX, HP-UX, DG/UX, Ultrix, SunOS and A/UX.
+With the whole repository, `make` runs the right script on AIX, HP-UX, DG/UX, Ultrix, SunOS, A/UX and Dell UNIX.
 `CC=gcc make` uses gcc where the script takes it.
 
 Which files to copy and how, the facts of each system, and how to port:

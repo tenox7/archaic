@@ -42,6 +42,7 @@ archaic: $(CORE) src/x11.c src/nsock.c $(HDR)
 	ULTRIX*) m=mkultrix ;; \
 	SunOS?[34]*) m=mksunview ;; \
 	A/UX*) m=mkaux ;; \
+	*" 4.0 i386") m=mkdellunix ;; \
 	NetBSD*) x="-I/usr/X11R7/include -L/usr/X11R7/lib -Wl,-R/usr/X11R7/lib" ;; \
 	esac; \
 	if [ -n "$$m" ]; then \
