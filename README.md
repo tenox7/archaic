@@ -85,39 +85,8 @@ The code is plain old C, written to port to DOS, OS/2, Win16 and others.
 
 ## Quick start
 
-1. On your computer, start [WRP](https://github.com/tenox7/wrp): `wrp`. It listens on port 8080.
-   Use WRP 4.14.2 or newer. An older WRP works, with fewer features.
-2. Copy the binary to the old computer as `archaic`, and make it executable:
-   - Idris: `/usr/X/bin/archaic`, then `chmod /usr/X/bin/archaic` (with no mode).
-   - 3B1, 3B2, SunOS, HP-UX, DG/UX, AIX and Ultrix: `/usr/local/bin/archaic`, then `chmod 755 /usr/local/bin/archaic`.
-   - FreeMiNT in the ARAnyM kit: `/bin/archaic` (the kit has no `/usr/local/bin`). Copy it in through C: (the folder `drive_c`).
-   - A/UX: `archaic` and its resource file `%archaic`, both in `/usr/local/bin`, then `chmod 755 /usr/local/bin/archaic`.
-   - TOS: `ARCHAIC.PRG` in any folder. Put the options in `ARCHAIC.INF` next to it, such as WRP's address: `http://HOST:8080/`.
-   - The kits named in the table have it already. As root, it updates itself.
-   - With curl or wget: `curl -O http://HOST:8080/archaic-download/archaic-hpux9`. WRP gets it from the newest release.
-   - Mac OS 6 and 7.5: `archaic-macos6.dsk` and `archaic-macos7.dsk` are floppy images with Archaic: put one in the floppy drive. For a real Mac: the `.bin` file (MacBinary).
-3. Start the window system, then type `archaic` in a shell window:
-   - Idris: log in as `root`, then `/usr/X/bin/xstart`.
-   - 3B1: Office > UNIX System.
-   - 3B2: at the DMD 5620, log in as `root`, then `layers`. Make a window: right button, New, then drag.
-     Archaic loads its part into the terminal first (25 s): do not type until WRP's form shows.
-   - SunOS: log in as `root` at the console, then `sunview` (SunOS 3: `suntools`).
-   - HP-UX: log in at the VUE login, then open a terminal.
-   - DG/UX: log in as `root` at the X login. An xterm opens.
-   - AIX: log in as `root` at the xdm login. An aixterm opens.
-   - Ultrix: log in as `root` at the DECwindows login, then Applications > DECterm.
-     Type `archaic HOST:8080`, with your computer's LAN address: gxemul's network can't reach its 127.0.0.1.
-   - Mac OS 6 and 7.5: open Archaic in the Finder. Options go in a file `Archaic Options`, next to it.
-     On Mac OS 7.5, put WRP's address there: Open Transport's 127.0.0.1 is the Mac itself.
-   - FreeMiNT: Desk > TosWin2, then File > Start shell. Type `archaic &`.
-   - TOS: load STinG (its `STING.PRG` in AUTO), then open `ARCHAIC.PRG` on the desktop.
-     In Hatari with a NetUSBee, start Hatari with `--nat-loopback on` (tenox7/hatari, branch netusbee):
-     then 10.0.2.2 is the host's 127.0.0.1. Else give WRP's LAN address in `ARCHAIC.INF`.
-   - A/UX: log in to the Finder, then Apple menu > CommandShell. Type `/usr/local/bin/archaic`
-     (root's sh doesn't have `/usr/local/bin` on its PATH). In the A/UX kit, WRP's address is
-     `192.168.1.10:8080`, the default. Elsewhere type `archaic HOST:8080`.
-4. Click the address box, type an address, press Return.
-5. **Ctrl-Q** quits. On the 3B1: **Exit**. On the Mac and A/UX: **Cmd-Q**.
+1. Run [WRP](https://github.com/tenox7/wrp) on another computer: `wrp`. It listens on port 8080.
+2. On the old computer, point Archaic to it: `archaic HOST:8080`.
 
 ## Using it
 
